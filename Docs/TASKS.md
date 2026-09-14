@@ -19,7 +19,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | Week | Focus | Status | Gate result |
 |---|---|---|---|
 | Pre-flight | Names, repo | ⬜ Not started | — |
-| 0 | Falsification | ⬜ Not started | — |
+| 0 | Falsification | 🟡 In progress | — |
 | 1 | Core | ⬜ Not started | — |
 | 2 | Async, ownership, trace | ⬜ Not started | — |
 | 3 | Checker, CLI, template | ⬜ Not started | — |
@@ -48,9 +48,9 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 **Setup**
 - [ ] `llms.txt` v0: API, import matrix, reactivity trap as the first item, canonical module (SPEC §10)
 - [ ] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro)
-- [ ] Freeze and version 12 eval tasks over the reference-app domain, each with a hidden test suite (EVAL §2.1)
-- [ ] Split: 6 headline tasks + 6 held-out
-- [ ] Fix the documentation token budget for both arms **and write it down** before the first run (EVAL §2.1)
+- [x] Freeze and version 12 eval tasks (EVAL §2.1) — [EVAL-TASKS.md](EVAL-TASKS.md), tag `eval-tasks-v1`, SHA-256 `7a19d6474fbcb1a417d60fb3c2be815c908d8cb68bd50a7a60a3a5a9a317f1ce`
+- [x] Split: 6 headline tasks + 6 held-out (EVAL-TASKS §2)
+- [x] Fix the documentation token budget for both arms **and write it down** before the first run — 8,000 tokens (EVAL-TASKS §1.5)
 - [ ] Control arm: React 19 + TanStack Query + Zustand, pass = tests green + ESLint + tsc clean
 - [ ] Eval harness skeleton: `bunx sheratan-eval agent` (5 seeds, 10-iteration cap, non-convergence recorded)
 - [ ] Check what exactly Lit does *not* cover for `resource` and trace (PLAN risks)
@@ -278,3 +278,4 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-14 | Task tracker created from SPEC v0.1, PLAN, EVAL v0.1 | Single place to track progress against gates |
 | 2026-09-14 | CSS scoping via native `@scope` + `@layer`, checked by `SHR-L009`; no hashes, no Shadow DOM (SPEC §9a) | Hashing needs a build step (breaks "type stripping only"); Shadow DOM breaks forms, focus and global base styles |
 | 2026-09-14 | `resource()` keeps separate `status`/`data`/`error` signals; narrowing via `is()` type guard, no union accessor (SPEC §6) | Per-hole reactivity stays fine-grained; one way to read async state |
+| 2026-09-14 | Eval task set v1 frozen: 7 parity / 5 differentiator, no router in either arm, T05 rate check kept as a declared advantage | Tasks written before any runtime can't flatter it; a single-page dashboard keeps the control stack unchanged |

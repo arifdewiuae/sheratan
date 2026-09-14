@@ -84,7 +84,8 @@ publishable.
 
 ### 2.1 Method
 
-- **Tasks:** 12 fixed, versioned tasks over the reference app domain. Each has
+- **Tasks:** 12 fixed, versioned tasks over the reference app domain, frozen in
+  [EVAL-TASKS.md](EVAL-TASKS.md) (`eval-tasks-v1`). Each has
   a hidden test suite plus `sheratan check` (or ESLint + tsc for the control).
   Pass = tests green *and* checker clean.
 - **Arms:** Sheratan vs React 19 + TanStack Query + Zustand. Same agent, same
