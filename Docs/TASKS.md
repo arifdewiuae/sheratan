@@ -85,6 +85,9 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [ ] `[must]` Attribute (`.prop`) and event (`@event`) bindings
 - [ ] Holes escaped as text by default; `unsafeHTML()` directive
 - [ ] `[must]` Keyed `each` (no virtualization); per-row watchers, rows not rebuilt on cell change
+- [ ] Style scoping (SPEC §9a): runtime sets `data-module` / `data-ui` on roots at mount; CSS module scripts attached via `adoptedStyleSheets`
+- [ ] Verify `@scope` + `@layer` browser support matrix before templates depend on it (SPEC §9a)
+- [ ] Widget mode: tokens scoped to `[data-sheratan-root]`, never `:root` of the host page
 - [ ] `[must]` `render()` + ownership/disposal of the subtree
 - [ ] `[must]` Widget mode: `render(view, el)` owns only its subtree, no `document` assumptions, disposes cleanly (SPEC §10d)
 - [ ] `[must]` Zero dependencies, plain ESM, runs from `index.html` via `<script type="module">`
@@ -103,7 +106,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 ## Week 2 — Async, ownership, trace
 
 **`resource()`** (SPEC §6)
-- [ ] `[must]` Reactive `key`; abort in-flight request on key change
+- [ ] `[must]` Reactive `key`; abort in-flight request on key change and on owner disposal (unmount)
 - [ ] `[must]` De-duplication of identical keys
 - [ ] `[must]` Out-of-order responses discarded
 - [ ] `[must]` Stale-while-revalidate (`staleAfter`, `refreshing` status, previous data retained)
@@ -145,6 +148,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [ ] `SHR-L005` direct state mutation from effects (static) + dev-build runtime assertion via write provenance (SPEC §13)
 - [ ] `SHR-L006` file set matches declared module kind (`view` / `full`)
 - [ ] `SHR-L008` acyclic module import graph
+- [ ] `SHR-L009` style scoping over `.css`: single `@scope` with lower boundary, root matches module name, `global.css` only `tokens`/`base`, no `:root` tokens in module sheets, no `!important` outside `base` — failing-case test per violation (SPEC §9a)
 - [ ] `SHR-T001` missing state/effects tests — **warning only**
 - [ ] Banned `shared/` directory; `ui/` nesting max one level
 - [ ] Inline arrow function in template → error; `unsafeHTML` with non-literal argument → flagged
@@ -154,7 +158,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 
 **CLI** (SPEC §10)
 - [ ] `[must]` `sheratan check` — human formatter + `--json` (versioned, documented schema)
-- [ ] `[must]` `sheratan generate module <name>` (scaffolds both test files)
+- [ ] `[must]` `sheratan generate module <name>` (scaffolds both test files and the scoped `<name>.css` wrapper)
 - [ ] `[must]` `sheratan generate resource <name> --in <module>`
 - [ ] `sheratan generate stream <name> --in <module>`
 - [ ] `sheratan create <app>`
@@ -162,9 +166,9 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [ ] Logic as plain functions (`checkProject()`, `scaffoldModule()`…); CLI is a thin wrapper
 
 **`create` template** (SPEC §10b)
-- [ ] Design tokens: CSS custom properties, dark mode via `prefers-color-scheme`, `@layer`
+- [ ] `styles/global.css`: layer order `tokens, base, ui, modules`; tokens + base only, dark mode via `prefers-color-scheme` (SPEC §9a)
 - [ ] `[stretch]` `ui/` primitives copied into the project (Button, Input, Select, Modal, Table, Toast) on `<dialog>` / popover / `<details>`
-- [ ] Canonical module covering every rule: 4 files, contract service via factory, `resource`, `stream`, `computed` projection, atomic transition, windowed `each`, `mount()` of a `ui/` primitive, `onDispose`, populated tests
+- [ ] Canonical module covering every rule: 4 files, contract service via factory, `resource`, `stream`, `computed` projection, atomic transition, windowed `each`, `mount()` of a `ui/` primitive, `onDispose`, a scoped stylesheet using tokens, populated tests
 - [ ] Correct code only — no commented-out "wrong way"
 - [ ] CI: canonical module passes `sheratan check` and exercises every rule code
 
@@ -262,6 +266,7 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [ ] **`resource()` placement rule.** SPEC §6 says construction outside effects is enforced by L005, but L005 is about state mutation — needs its own code or rewording.
 - [ ] **`onDispose()` placement.** SPEC §5b says effects-only; no rule code enforces it.
 - [ ] **Week 2 gate wording.** PLAN's cut-list note refers to "Week 2 gate: correct, then 60fps"; EVAL puts 60fps at Week 2–3 — pick one.
+- [x] **CSS scoping.** SPEC said `adoptedStyleSheets` on the component root, which is global on `document`. Resolved in SPEC §9a: native `@scope` + `@layer`, enforced by `SHR-L009`.
 
 ---
 
@@ -270,3 +275,4 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | Date | Decision | Why |
 |---|---|---|
 | 2026-09-14 | Task tracker created from SPEC v0.1, PLAN, EVAL v0.1 | Single place to track progress against gates |
+| 2026-09-14 | CSS scoping via native `@scope` + `@layer`, checked by `SHR-L009`; no hashes, no Shadow DOM (SPEC §9a) | Hashing needs a build step (breaks "type stripping only"); Shadow DOM breaks forms, focus and global base styles |

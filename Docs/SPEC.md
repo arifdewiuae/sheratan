@@ -103,6 +103,9 @@ satisfy the checker.
 The kind is declared in `index.ts` and checked. A `full` module with an empty
 `effects.ts` is a `view` module that has not been declared honestly.
 
+Either kind may add one `<name>.css`. It is optional, does not change the kind,
+and must follow the scoping rule in §9a (`SHR-L009`).
+
 A `full` module:
 
 ```
@@ -120,6 +123,7 @@ modules/<name>/     feature modules (four files, above)
 ui/<component>/     stateless reusable components
 lib/                pure utilities, no app knowledge
 services/           I/O adapters behind contracts
+styles/global.css   tokens and base layers only (§9a)
 app.ts              composition root
 e2e/                end-to-end tests
 ```
@@ -175,6 +179,7 @@ Three constraints the matrix cannot express:
 | `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts` |
 | `SHR-L008` | The module import graph must be acyclic |
 | `SHR-L006` | Module file set matches its declared kind (below) |
+| `SHR-L009` | Module and `ui/` stylesheets are wrapped in one `@scope` with a lower boundary; `global.css` holds only `tokens` and `base` (§9a) |
 | `SHR-T001` | **warning** — module has no `*.state.test.ts` / `*.effects.test.ts` |
 
 `SHR-L008` exists because of shared modules specifically: without it,
@@ -586,9 +591,108 @@ interpolate user data without thinking, so the default must be the safe one.
 ### CSS without a build step
 
 Component styles are plain `.css` files loaded through CSS module scripts
-(`import sheet from './button.css' with { type: 'css' }`) and attached to the
-component's root via `adoptedStyleSheets`. No bundler, no runtime CSS-in-JS.
-Design tokens are a single global stylesheet linked from `index.html`.
+(`import sheet from './button.css' with { type: 'css' }`). No bundler, no
+runtime CSS-in-JS.
+
+`adoptedStyleSheets` on `document` is global: attaching a sheet does not scope
+it. Scoping therefore needs its own decision, made here.
+
+## 9a. Style scoping
+
+**One mechanism: native CSS `@scope`, enforced by the checker.** No hashed class
+names, no Shadow DOM, no runtime selector rewriting.
+
+Rejected, with reasons:
+
+- **Hashed / generated class names** (CSS Modules style) require a transform
+  step. That breaks §10c ("type stripping only").
+- **Shadow DOM per module** isolates properly but breaks form participation,
+  focus and `:focus-visible` across boundaries, and makes global base styles
+  unreachable. It is also a second rendering model inside the tree.
+- **Runtime prefixing** needs a CSS parser in `core`, which costs size and
+  correctness for no gain over a native feature.
+
+### The rule
+
+Every module and `ui/` component root carries its name as an attribute, set by
+the runtime at mount, never written by hand:
+
+```html
+<section data-module="orders"> … </section>
+<button data-ui="button"> … </button>
+```
+
+Its stylesheet wraps **all** rules in exactly one `@scope` block keyed to that
+attribute, with a lower boundary at any nested module or component:
+
+```css
+/* modules/orders/orders.css */
+@layer modules {
+  @scope ([data-module="orders"]) to ([data-module], [data-ui]) {
+    :scope { display: grid; gap: var(--space-3); }
+    .row   { border-bottom: 1px solid var(--color-hairline); }
+  }
+}
+```
+
+The lower boundary is the point: a parent's `.row` never styles a child
+module's `.row`. Class names stay short and readable in devtools because they
+cannot collide.
+
+`sheratan generate module` and `sheratan create` write this wrapper; nobody
+types it from memory.
+
+### Common styles
+
+There is exactly one global stylesheet, `styles/global.css`, linked from
+`index.html`. It declares the layer order once and may contain only two layers:
+
+```css
+@layer tokens, base, ui, modules;
+
+@layer tokens { :root { --space-3: 12px; --color-hairline: rgb(0 0 0 / .12); } }
+@layer base   { *, *::before, *::after { box-sizing: border-box; } body { margin: 0; } }
+```
+
+- **`tokens`**: custom properties on `:root` only, plus their
+  `prefers-color-scheme` overrides. Custom properties inherit, so they are the
+  single channel by which global design reaches scoped styles, and they cross
+  widget-mode boundaries too.
+- **`base`**: reset and element defaults (`body`, `a`, form controls). No class
+  selectors.
+- **`ui`** and **`modules`**: never written in `global.css`. They are filled
+  by the scoped component and module sheets, so a module rule always beats a
+  `ui/` rule, and both beat `base`, regardless of load order or specificity.
+
+There is no utility-class layer and no shared stylesheet between modules. A
+style shared by two modules is either a token or a `ui/` component. This
+mirrors "there are no shared effects" in §4.
+
+### Widget mode
+
+A mounted widget ships its `global.css` tokens scoped to its own root instead of
+`:root` (`@scope ([data-sheratan-root])`), so it never restyles the host page.
+The host's own global CSS can still reach in. If that proves a problem in
+practice, the escape hatch is mounting the widget root in a shadow root. That is
+a mount option, not a second styling model.
+
+### Enforcement: `SHR-L009`
+
+Checked over `.css` files by the checker:
+
+| Violation | Message states |
+|---|---|
+| Module / `ui/` sheet has a rule outside its single `@scope` block | "all rules must be inside `@scope ([data-module=\"orders\"])`" |
+| `@scope` root does not match the file's own module or component name | the expected selector |
+| `@scope` block has no `to (…)` lower boundary | the canonical boundary |
+| `global.css` contains a layer other than `tokens` / `base`, or a class selector in `base` | allowed layers |
+| A module sheet declares a custom property on `:root` | "tokens live in global.css" |
+| `!important` anywhere outside `base` | "layers already decide precedence" |
+
+Browser support: `@scope` and `@layer` are required. The target niche is
+authenticated app UIs on current evergreen browsers (§1), so there is no
+fallback path. Verify the support matrix in Week 1, before templates are built
+on it.
 
 ### Composing modules: `mount()`
 
@@ -711,9 +815,9 @@ meta-framework maintaining someone else's release cycle.
 
 Instead, the template ships:
 
-- **Design tokens** — one CSS file of custom properties: colour, spacing scale,
-  typography, radii, dark mode via `prefers-color-scheme`, `@layer` for a
-  predictable cascade. No JavaScript, no dependencies, tidy out of the box.
+- **Design tokens** — `styles/global.css` with the `tokens` and `base` layers
+  from §9a: colour, spacing scale, typography, radii, dark mode via
+  `prefers-color-scheme`. No JavaScript, no dependencies, tidy out of the box.
 - **~10 `ui/` primitives copied into the user's project**, not installed:
   Button, Input, Select, Modal, Table, Toast. shadcn's model, and it fits here
   exactly because `ui/` components are stateless by definition. They belong to
@@ -733,8 +837,9 @@ both a human and an agent read is a correct, complete example.
 Required coverage: all four files; a contract-backed service passed in by
 factory; a `resource()`; a `stream()`; a `computed` deriving view shape rather
 than storing it; an atomic transition committing two responses at once; an
-`each` with a window; a `mount()` of a `ui/` primitive; an `onDispose()`; and
-both test files populated with real assertions.
+`each` with a window; a `mount()` of a `ui/` primitive; an `onDispose()`; a
+scoped stylesheet that relies on tokens from `global.css` (§9a); and both test
+files populated with real assertions.
 
 Two constraints:
 
@@ -814,7 +919,7 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
 
 - `examples/dashboard` runs from a plain `index.html` with no build step and
   holds 60fps under a synthetic 1000 msg/sec feed into a 500-row table.
-- Every cell of the import matrix is enforced, plus L002, L005, L006 and L008,
+- Every cell of the import matrix is enforced, plus L002, L005, L006, L008 and L009,
   each with a failing-case test; `SHR-T001` reports as a warning only.
 - Error messages state the allowed import set, not a rule number.
 - `resource()` passes tests for: abort on key change, dedup, out-of-order
