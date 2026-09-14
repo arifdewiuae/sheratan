@@ -113,6 +113,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [ ] `[must]` Retry with exponential backoff
 - [ ] `[must]` Errors are values; `AbortError` never becomes `error()`
 - [ ] `[must]` `invalidate()`, `abort()`
+- [ ] `[must]` `is(status)` type guard: `is("ready")` narrows `data()` to `T`; reads `status()` only (SPEC §6)
 
 **`mutation()`** (SPEC §6)
 - [ ] Basic: `run`, `status`, `error`, `optimistic`/`rollback` as transitions, `onSuccess`, serialized by default
@@ -276,3 +277,4 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 |---|---|---|
 | 2026-09-14 | Task tracker created from SPEC v0.1, PLAN, EVAL v0.1 | Single place to track progress against gates |
 | 2026-09-14 | CSS scoping via native `@scope` + `@layer`, checked by `SHR-L009`; no hashes, no Shadow DOM (SPEC §9a) | Hashing needs a build step (breaks "type stripping only"); Shadow DOM breaks forms, focus and global base styles |
+| 2026-09-14 | `resource()` keeps separate `status`/`data`/`error` signals; narrowing via `is()` type guard, no union accessor (SPEC §6) | Per-hole reactivity stays fine-grained; one way to read async state |

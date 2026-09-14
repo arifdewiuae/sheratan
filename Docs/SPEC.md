@@ -425,6 +425,24 @@ user.error();    // Error | undefined
 user.invalidate();
 ```
 
+**Separate signals, not one union.** `status()`, `data()` and `error()` are
+independent signals, so a hole that renders a spinner reads only `status()`
+and is not woken when data changes. A single `user()` returning
+`{ status, data, error }` would narrow better but wake every reader on every
+change. Only the separate form exists; no union accessor is offered alongside.
+
+Narrowing comes from one type-guard method, since TypeScript cannot narrow
+`data()` from a separate `status() === 'ready'` comparison:
+
+```ts
+if (user.is('ready'))   user.data();    // T — `this is Ready<T>`
+if (user.is('error'))   user.error();   // Error
+if (user.is('refreshing')) user.data(); // T — previous value retained
+```
+
+`is()` reads `status()` only, so it has the same reactivity as the comparison.
+Comparing `status()` directly remains legal but leaves `data()` as `T | undefined`.
+
 Guarantees: in-flight request is aborted when the key changes; identical keys
 are de-duplicated; out-of-order responses are discarded, never applied; errors
 are values, not thrown. `resource()` may only be constructed inside
