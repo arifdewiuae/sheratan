@@ -193,6 +193,8 @@
   .tree code { font-size: 13px; }
   .tree span { font-size: 14px; color: var(--t55); }
   .tree .dir { color: var(--t45); }
+  .tree .row.test code { color: var(--t45); }
+  .tree .row.test span { color: var(--t45); }
   @media (max-width: 520px) { .tree .row { grid-template-columns: 1fr; gap: 2px; } }
   .flow svg { width: 100%; height: auto; display: block; color: var(--ink); }
   .flow text { font: 400 11px var(--mono); fill: currentColor; }
@@ -239,7 +241,6 @@
       <span class="wordmark">sheratan</span>
     </a>
     <div class="links">
-      <span data-link="howItWorks" data-text="How it works" class="soon">How it works</span>
       <span data-link="docs" data-text="Docs" class="soon">Docs</span>
       <span data-link="github" data-text="GitHub" class="soon">GitHub</span>
     </div>
@@ -253,8 +254,8 @@
       <h1>Architectural boundaries, <b>enforced.</b></h1>
       <p class="sub">A frontend framework with one legal way to structure an app, checked by a tool whose errors carry their own fix, with async and live data built into the core.</p>
       <div class="cta">
-        <span data-link="howItWorks" data-text="How it works" data-style="btn solid" class="btn soon">How it works</span>
-        <span data-link="github" data-text="GitHub" data-style="btn line" class="btn soon">GitHub</span>
+        <span data-link="github" data-text="View on GitHub" data-style="btn solid" class="btn soon">View on GitHub</span>
+        <span data-link="docs" data-text="Docs" data-style="btn line" class="btn soon">Docs</span>
       </div>
       <div class="install"><span>$</span> sheratan create my-app <span>— arrives with v0.1</span></div>
     </div>
@@ -361,6 +362,8 @@
           <div class="row"><code>orders.effects.ts</code><span>fetch, storage, timers, streams</span></div>
           <div class="row"><code>orders.view.ts</code><span>(state) ⇒ template</span></div>
           <div class="row"><code>index.ts</code><span>the only public surface</span></div>
+          <div class="row test"><code>orders.state.test.ts</code><span>generated — pure, no mocks</span></div>
+          <div class="row test"><code>orders.effects.test.ts</code><span>generated — one fake transport</span></div>
         </div>
         <figure class="flow" style="margin:0">
           <svg viewBox="0 0 440 180" role="img" aria-label="Effects call one transition in state; the view reads state; the view emits intents back to effects.">
@@ -392,7 +395,7 @@
       <div class="rulehead"><div class="label">04 — Live data in the core</div><div class="line"></div></div>
       <div class="two">
         <h2>Async and streams <b>are primitives,</b> not a stack.</h2>
-        <p class="lead"><code>resource()</code> aborts on key change, de-duplicates, discards out-of-order responses, revalidates stale data and retries with backoff. <code>stream()</code> folds messages into one commit per frame. Views update per hole with no virtual DOM, and everything a module creates is disposed with it.</p>
+        <p class="lead"><code>resource()</code> gives you <code>status</code>, <code>data</code> and <code>error</code>, aborts on key change and on unmount, de-duplicates, discards out-of-order responses, revalidates stale data and retries with backoff. <code>stream()</code> takes WebSockets or Server-Sent Events and folds messages into one commit per frame. Views update per hole with no virtual DOM, and everything a module creates is disposed with it.</p>
       </div>
       <div class="two">
 <pre class="code">const user = resource({
@@ -461,8 +464,8 @@ const dispose = render(view,
     <div class="label">β Arietis</div>
     <p>Aš-šaraṭān, "the two signs". For centuries this star and its neighbour marked the vernal equinox, the fixed point where one season ends and the next begins and the whole year is measured from. Sheratan borrows the name for the same kind of line: a boundary drawn precisely, and kept.</p>
     <div class="cta" style="justify-content:center">
-      <span data-link="howItWorks" data-text="How it works" data-style="btn solid" class="btn soon">How it works</span>
-      <span data-link="github" data-text="GitHub" data-style="btn line" class="btn soon">GitHub</span>
+      <span data-link="github" data-text="View on GitHub" data-style="btn solid" class="btn soon">View on GitHub</span>
+        <span data-link="docs" data-text="Docs" data-style="btn line" class="btn soon">Docs</span>
     </div>
   </div>
 
@@ -473,7 +476,6 @@ const dispose = render(view,
       <span class="wordmark" style="font-size:11px;letter-spacing:0.3em;text-indent:0.3em;font-weight:500">sheratan</span>
     </a>
     <div class="links">
-      <span data-link="howItWorks" data-text="How it works" class="soon">How it works</span>
       <span data-link="docs" data-text="Docs" class="soon">Docs</span>
       <span data-link="github" data-text="GitHub" class="soon">GitHub</span>
     </div>
@@ -484,7 +486,6 @@ const dispose = render(view,
 <script>
   // Set a URL to turn a "soon" label into a real link everywhere on the page.
   const LINKS = {
-    howItWorks: 'how-it-works.html',
     docs: null,
     github: 'https://github.com/arifdewiuae/sheratan',
   };
