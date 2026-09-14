@@ -1,0 +1,272 @@
+# Sheratan — Task Tracker
+
+Source of truth for *what* and *why*: [SPEC.md](SPEC.md), [PLAN.md](PLAN.md), [EVAL.md](EVAL.md).
+This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins or gets amended.
+
+**Rule:** a week that doesn't close cuts scope, not the deadline. Cut `[stretch]` first, never `[must]`.
+
+## Legend
+
+| Tag | Meaning |
+|---|---|
+| `[must]` | In PLAN's must-list — survives any schedule slip |
+| `[stretch]` | "If time remains" in PLAN's cut list — first to go |
+| *(no tag)* | Planned for the week; cut before `[must]`, after `[stretch]` |
+| `[gate]` | Go/no-go checkpoint with a pre-agreed failure action |
+
+## Status
+
+| Week | Focus | Status | Gate result |
+|---|---|---|---|
+| Pre-flight | Names, repo | ⬜ Not started | — |
+| 0 | Falsification | ⬜ Not started | — |
+| 1 | Core | ⬜ Not started | — |
+| 2 | Async, ownership, trace | ⬜ Not started | — |
+| 3 | Checker, CLI, template | ⬜ Not started | — |
+| 4 | Agent surface, reference app | ⬜ Not started | — |
+| 5 | Re-measure, package, launch | ⬜ Not started | — |
+| +8 wks | Outside production use | ⬜ Not started | — |
+
+Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · ⛔ Stopped
+
+---
+
+## Pre-flight
+
+- [ ] Verify GitHub org handle `sheratan` is available and claim it
+- [ ] Verify and register `sheratan.dev` — it goes into checker `docs` links and can't change later (SPEC header, §8)
+- [ ] Reserve `sheratan` on npm (free as of 2026-09-14)
+- [ ] `git init`; monorepo skeleton: `packages/{core,check,cli}`, `examples/dashboard`, `docs/` (SPEC §11)
+- [ ] Commit SPEC / PLAN / EVAL / TASKS as the baseline
+
+---
+
+## Week 0 — Falsification (2–3 days, before the core)
+
+Goal: test the central hypothesis while it costs three days. Harness timebox: 2 days (EVAL "Scope discipline").
+
+**Setup**
+- [ ] `llms.txt` v0: API, import matrix, reactivity trap as the first item, canonical module (SPEC §10)
+- [ ] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro)
+- [ ] Freeze and version 12 eval tasks over the reference-app domain, each with a hidden test suite (EVAL §2.1)
+- [ ] Split: 6 headline tasks + 6 held-out
+- [ ] Fix the documentation token budget for both arms **and write it down** before the first run (EVAL §2.1)
+- [ ] Control arm: React 19 + TanStack Query + Zustand, pass = tests green + ESLint + tsc clean
+- [ ] Eval harness skeleton: `bunx sheratan-eval agent` (5 seeds, 10-iteration cap, non-convergence recorded)
+- [ ] Check what exactly Lit does *not* cover for `resource` and trace (PLAN risks)
+
+**Self-repair sub-eval** (EVAL §2.3)
+- [ ] Working file with injected violation: I/O inside a view
+- [ ] Working file with injected violation: direct state write from effects
+- [ ] Working file with injected violation: deep import of another module
+- [ ] Hand-written structured checker JSON (code, message, `fix`, `docs`) for each
+- [ ] Run: agent gets only the JSON; record one-turn fix yes/no
+
+**Comparison**
+- [ ] Run ≥ 3 tasks on both arms; record iterations to green, first-attempt pass, violations, tokens, wall-clock
+- [ ] Commit raw logs
+
+- [ ] `[gate]` One-turn self-repair **≥ 80%** AND median iterations on ≥ 3 tasks **no worse than React** → otherwise **close the project**
+
+---
+
+## Week 1 — Core
+
+**Reactivity** (SPEC §5)
+- [ ] `[must]` Tests written *before* implementation: glitch-freedom, diamond dependencies, batching
+- [ ] `[must]` `signal`, `computed`, `watch` (auto-tracked, returns disposer)
+- [ ] `[must]` Batching; glitch-free propagation
+- [ ] `[must]` Scheduler: DOM writes coalesced per animation frame, last value wins; `flush()` for tests
+- [ ] Structural update helper for immutable state (SPEC §5 Immutability)
+
+**Rendering** (SPEC §9)
+- [ ] `[must]` `html` tagged templates: parse once into `<template>`, holes as direct node refs
+- [ ] `[must]` View update model: view runs once; one micro-watcher per hole
+- [ ] `[must]` Attribute (`.prop`) and event (`@event`) bindings
+- [ ] Holes escaped as text by default; `unsafeHTML()` directive
+- [ ] `[must]` Keyed `each` (no virtualization); per-row watchers, rows not rebuilt on cell change
+- [ ] `[must]` `render()` + ownership/disposal of the subtree
+- [ ] `[must]` Widget mode: `render(view, el)` owns only its subtree, no `document` assumptions, disposes cleanly (SPEC §10d)
+- [ ] `[must]` Zero dependencies, plain ESM, runs from `index.html` via `<script type="module">`
+
+**Measure**
+- [ ] 500-row list reconciliation benchmark with constant reordering
+- [ ] Verify `app.ts` / nested factory ergonomics on a larger module tree (SPEC §14)
+
+- [ ] `[gate]` Counter and list run from the filesystem with no build step
+- [ ] `[gate]` 500-row reordering within **2× of Solid** → otherwise fix reconciliation before anything else (EVAL Gates)
+
+> Fallback if the core slips: thin layer over third-party signals — emergency only, costs zero-deps and the trace hook (PLAN risks).
+
+---
+
+## Week 2 — Async, ownership, trace
+
+**`resource()`** (SPEC §6)
+- [ ] `[must]` Reactive `key`; abort in-flight request on key change
+- [ ] `[must]` De-duplication of identical keys
+- [ ] `[must]` Out-of-order responses discarded
+- [ ] `[must]` Stale-while-revalidate (`staleAfter`, `refreshing` status, previous data retained)
+- [ ] `[must]` Retry with exponential backoff
+- [ ] `[must]` Errors are values; `AbortError` never becomes `error()`
+- [ ] `[must]` `invalidate()`, `abort()`
+
+**`mutation()`** (SPEC §6)
+- [ ] Basic: `run`, `status`, `error`, `optimistic`/`rollback` as transitions, `onSuccess`, serialized by default
+- [ ] `[stretch]` Anything beyond the basic variant
+
+**Ownership & lifecycle** (SPEC §5b)
+- [ ] `[must]` Owner tree; children from `mount()` disposed recursively
+- [ ] `[must]` `onDispose()`
+- [ ] `[must]` Disposal order: watchers → subscriptions → nodes
+- [ ] `[must]` Post-disposal async is a no-op (owner flag on transitions)
+- [ ] `[must]` Leak test: 1000 mount/unmount cycles → live subscription count returns to 0
+
+**Streams & windowing**
+- [ ] `[stretch]` `stream()`: subscribe/teardown on key change and disposal, per-frame folding, `reduceMany`, `status()` reconnect (SPEC §6)
+- [ ] `[stretch]` Windowed `each`: fixed row set rewritten in place; row-height policy supplied by caller (SPEC §9)
+
+**Debuggability**
+- [ ] `[stretch]` Causal trace: write → computed → patch, ring buffer (500), sampling, `__sheratan.trace()` JSON, absent in prod (SPEC §7)
+- [ ] Structured runtime errors: `code`, `fix`, `docs`
+- [ ] `declare()` legal-transition dev assertion (SPEC §5)
+
+- [ ] `[gate]` Correct and leak-free **first**: race tests pass, 1000 cycles leave zero live subscriptions → otherwise fix ownership before measuring anything
+- [ ] `[gate]` Trace is readable by eye (if trace not cut)
+
+---
+
+## Week 3 — Checker, CLI, `create` template
+
+**Checker** (SPEC §4, §8) — TypeScript Compiler API, devDependency, `typescript` as peer
+- [ ] `[must]` Import matrix: every cell enforced, each with a failing-case test
+- [ ] `[must]` Messages state the allowed set, not a rule number
+- [ ] `SHR-L002` I/O globals in `*.view.ts`
+- [ ] `SHR-L005` direct state mutation from effects (static) + dev-build runtime assertion via write provenance (SPEC §13)
+- [ ] `SHR-L006` file set matches declared module kind (`view` / `full`)
+- [ ] `SHR-L008` acyclic module import graph
+- [ ] `SHR-T001` missing state/effects tests — **warning only**
+- [ ] Banned `shared/` directory; `ui/` nesting max one level
+- [ ] Inline arrow function in template → error; `unsafeHTML` with non-literal argument → flagged
+- [ ] Contract method returning a Promise without `AbortSignal` → error (SPEC §5b)
+- [ ] Reactivity-trap warning where detectable (SPEC §9)
+- [ ] Template errors in the same JSON shape (SPEC §13)
+
+**CLI** (SPEC §10)
+- [ ] `[must]` `sheratan check` — human formatter + `--json` (versioned, documented schema)
+- [ ] `[must]` `sheratan generate module <name>` (scaffolds both test files)
+- [ ] `[must]` `sheratan generate resource <name> --in <module>`
+- [ ] `sheratan generate stream <name> --in <module>`
+- [ ] `sheratan create <app>`
+- [ ] `sheratan dev` — type stripping only, on Vite or Bun (no custom dev server) (SPEC §10c)
+- [ ] Logic as plain functions (`checkProject()`, `scaffoldModule()`…); CLI is a thin wrapper
+
+**`create` template** (SPEC §10b)
+- [ ] Design tokens: CSS custom properties, dark mode via `prefers-color-scheme`, `@layer`
+- [ ] `[stretch]` `ui/` primitives copied into the project (Button, Input, Select, Modal, Table, Toast) on `<dialog>` / popover / `<details>`
+- [ ] Canonical module covering every rule: 4 files, contract service via factory, `resource`, `stream`, `computed` projection, atomic transition, windowed `each`, `mount()` of a `ui/` primitive, `onDispose`, populated tests
+- [ ] Correct code only — no commented-out "wrong way"
+- [ ] CI: canonical module passes `sheratan check` and exercises every rule code
+
+- [ ] `[gate]` `sheratan create` yields a working app, and `sheratan check` catches every defined violation
+
+---
+
+## Week 4 — Agent surface & reference app
+
+**Agent surface** (SPEC §10) — CLI only, no MCP server
+- [ ] `sheratan explain <code> [--json]` with contrastive right/wrong examples
+- [ ] `sheratan trace [--json]` pulls trace from the dev server
+- [ ] `--json` on every command
+- [ ] `SKILL.md`: when to use, scaffolding, reading checker output, reading a trace, "one way" table
+- [ ] Final `llms.txt` ≤ ~8k tokens
+
+**Routing in core** (SPEC §9b)
+- [ ] `location` signal
+- [ ] Delegated `<a>` click interception (same origin, primary button, no modifiers/`target`/`download`) — opt-in in widget mode
+- [ ] `navigate()` (effects only)
+- [ ] Flat `match()` over `URLPattern`
+- [ ] Scroll and focus restoration on back/forward
+
+**Reference app** (SPEC §11, §12)
+- [ ] `[must]` `examples/dashboard`: modules/ + services/ + `app.ts` + `e2e/`
+- [ ] Streams, 500-row virtualized table, error states, forms
+- [ ] Runs from plain `index.html`, no build
+- [ ] Built without `@sheratan/router` (validates routing boundary)
+- [ ] Answer SPEC §14: compiler needed? nested layouts needed? `app.ts` wall? → record in Decisions log
+
+**Performance eval** (EVAL §1.2)
+- [ ] `bunx sheratan-eval perf` harness
+- [ ] Scenarios: ticker flood, live table, reordering list, virtualized 100k, multi-stream
+- [ ] Baselines: React 19 + TanStack Query, Vue, Svelte 5, Solid — 5 runs, median + spread
+
+**Docs**
+- [ ] Getting started page
+- [ ] Rules page
+- [ ] Error code index (served at `sheratan.dev/errors/<code>`)
+
+- [ ] `[gate]` scaffold → check → fix loop works live from Claude Code using the CLI alone
+- [ ] `[gate]` 60fps under 1000 msg/sec into a 500-row table (only after keyed reconciliation is real) → otherwise scheduler/renderer is wrong, headline claim dies
+
+---
+
+## Week 5 — Re-measure, package, launch
+
+**Measure** (EVAL §2, 2-day timebox)
+- [ ] Re-run Week 0 agent eval unchanged on the real runtime — same tasks, same budget
+- [ ] Commit raw logs of every run
+- [ ] `sheratan-eval agent --arm react` reproducible by a stranger
+- [ ] Size: `core` < 10 KB gzipped, 0 runtime deps, 1 package in user `package.json` (EVAL §1.3)
+- [ ] Video: app running from a file with empty `node_modules`
+
+**Package**
+- [ ] README: results table (model + date), training-data confound, "no bundler, no config — type stripping only", SSR is a no, `typescript` peer dep
+- [ ] MIT license
+- [ ] CI
+- [ ] Publish to npm
+
+**Launch**
+- [ ] 5-minute demo: agent violates a layer → checker catches → agent self-repairs
+- [ ] 10–12 slide deck: problem, four gaps, mechanism, measurement, demo, link
+- [ ] Long-form post with reproducible numbers; GitHub, Show HN, communities
+- [ ] Submit CFPs now (deadlines 3–5 months out); title: "Architectural violations as compile errors"
+- [ ] Check current Dubai JS / GDG meetup list; submit a 10-minute lightning talk
+
+- [ ] `[gate]` Self-repair ≥ 80% in one turn → otherwise ship, but lead with performance, not the AI claim
+
+---
+
+## Post-launch — Week 5 + 8 weeks
+
+- [ ] `[gate]` At least one person outside your circle built a real project on Sheratan and wrote about it themselves (not stars, not likes)
+      → otherwise archive the repo, keep the eval data and talk as the artifact
+
+---
+
+## Not in MVP — do not start, even if it looks easy
+
+Custom dev server · Krausest PR · nested layouts / `@sheratan/router` · ten polished `ui/` primitives · declared view transitions · SSR · MCP server · optional template compiler
+
+---
+
+## Spec gaps to resolve
+
+Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, then log below.
+
+- [ ] **Rule numbering.** PLAN Week 3 says "L001–L006, all six violations"; SPEC defines the import matrix + L002/L005/L006/L008 + T001. L001/L003/L004/L007 are undefined (L001 appears only in the §8 JSON example).
+- [ ] **`stream()` priority.** Cut list marks it "if time", but SPEC §12 DoD, the canonical module (§10b) and the dashboard all require it.
+- [ ] **Windowed `each` priority.** Marked stretch, but DoD requires a 500-row *virtualized* table and the canonical module needs `each` with a window.
+- [ ] **Causal trace priority.** Marked stretch, but DoD says "causal trace renders for the reference app" and Week 2 gate says "trace readable".
+- [ ] **Unscheduled must-items.** Widget mode and routing have no week in PLAN — tentatively placed in Week 1 and Week 4 here.
+- [ ] **Solid baseline for Week 1 gate.** "Within 2× of Solid" needs a Solid implementation, while Krausest is deferred — define the minimal comparison.
+- [ ] **`resource()` placement rule.** SPEC §6 says construction outside effects is enforced by L005, but L005 is about state mutation — needs its own code or rewording.
+- [ ] **`onDispose()` placement.** SPEC §5b says effects-only; no rule code enforces it.
+- [ ] **Week 2 gate wording.** PLAN's cut-list note refers to "Week 2 gate: correct, then 60fps"; EVAL puts 60fps at Week 2–3 — pick one.
+
+---
+
+## Decisions log
+
+| Date | Decision | Why |
+|---|---|---|
+| 2026-09-14 | Task tracker created from SPEC v0.1, PLAN, EVAL v0.1 | Single place to track progress against gates |

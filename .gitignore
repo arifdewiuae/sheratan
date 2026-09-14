@@ -1,0 +1,5 @@
+.DS_Store
+node_modules/
+
+# Personal planning notes (timeline, go/kill criteria) — kept local
+Docs/PLAN.md
