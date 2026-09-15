@@ -2,10 +2,23 @@
   "name": "sheratan-monorepo",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": ">=24.15.0"
+  },
   "scripts": {
-    "test": "npm test --workspaces --if-present"
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm -r --if-present test",
+    "coverage": "pnpm -r --if-present coverage",
+    "security": "pnpm audit --audit-level low && pnpm audit signatures",
+    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm coverage && pnpm security"
+  },
+  "devDependencies": {
+    "@sheratan/eslint-config": "workspace:*",
+    "@types/node": "24.13.4",
+    "eslint": "10.10.0",
+    "typescript": "7.0.2"
   }
 }

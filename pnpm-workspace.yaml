@@ -1,0 +1,23 @@
+packages:
+  - packages/*
+  - tooling/*
+
+# Supply chain. The runtime has zero dependencies (SPEC A4); these settings
+# guard the dev toolchain and CI, which is where an attack would land.
+
+# Refuse versions published less than 3 days ago. Hijacked releases are
+# usually detected and unpublished within hours.
+minimumReleaseAge: 4320
+
+# Fail when a package's publish trust drops (e.g. provenance → none), the
+# usual signature of a stolen token.
+trustPolicy: no-downgrade
+
+# Transitive dependencies may not come from git or tarball URLs.
+blockExoticSubdeps: true
+
+# No dependency lifecycle script runs unless listed here as true.
+strictDepBuilds: true
+allowBuilds: {}
+
+engineStrict: true

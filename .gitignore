@@ -1,5 +1,35 @@
-.DS_Store
+# Dependencies (pnpm only; pnpm-lock.yaml is committed)
 node_modules/
+.pnpm-store/
+package-lock.json
+yarn.lock
+
+# Build and test output
+dist/
+coverage/
+*.tsbuildinfo
+*.lcov
+lcov.info
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
 
 # Personal planning notes (timeline, go/kill criteria) — kept local
 Docs/PLAN.md
