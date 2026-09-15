@@ -193,7 +193,7 @@ Template rules, checked off the AST of `html` literals (§9, §13):
 |------|----------|------|
 | `SHR-V001` | error | No inline function in a template hole; handlers are named intents |
 | `SHR-V002` | warning | `unsafeHTML()` with a non-literal argument |
-| `SHR-V003` | warning | Reactivity trap: a signal read above the template and interpolated as a plain value, where detectable |
+| `SHR-V003` | warning | Reactivity trap: a signal or computed *called* inside a template hole (`${s.total()}`) instead of passed (`${s.total}`) (§9) |
 | `SHR-V004` | error | Malformed template: unclosed tag, unknown attribute or binding |
 
 | Code | Severity | Rule |
@@ -228,6 +228,21 @@ state.ordersLoaded({ orders, customers });   // one transition, one commit
 
 Arbitrary interdependent logic inside the transition is fine — it is a pure
 function. Complexity belongs in transitions; orchestration belongs in effects.
+
+A transition is a plain function exported by `*.state.ts`; there is no
+`transition()` wrapper. One that writes more than one signal wraps its writes in
+`batch()`, so watchers see the commit, never the steps:
+
+```ts
+// orders.state.ts
+export const ordersLoaded = ({ orders, customers }) => batch(() => {
+  ordersById.set(orders);
+  customersById.set(customers);
+});
+```
+
+Intent handlers already run inside a batch (§9), so a transition called from
+one commits once either way.
 
 ### State holds only what cannot be derived
 
@@ -414,8 +429,11 @@ Legal in `*.effects.ts` only (`SHR-L004`).
 ### Three rules that prevent leaks
 
 1. **Post-disposal async is a no-op.** A response arriving after unmount must
-   not throw and must not write to a discarded state. A transition invoked from
-   a dead owner does nothing, checked by an owner flag.
+   not throw and must not write to a discarded state. Watchers and template
+   holes of a disposed owner are unlinked, so a late write reaches nothing and
+   renders nothing. Making the write itself a no-op needs a way to recognise a
+   transition, which plain-function transitions (§4) do not give — open, see
+   TASKS "Spec gaps".
 2. **Disposal order:** stop watchers → tear down subscriptions → remove nodes.
    Any other order lets a final stream message write into detached DOM.
 3. **Cancellation is not failure.** `AbortError` must not become
@@ -574,14 +592,27 @@ Tagged template literals — works with no build step:
 ```ts
 export const view = (s: TodoState) => html`
   <ul>
-    ${each(s.items, (item) => html`<li>${item.title}</li>`)}
+    ${each(s.items, (item) => {
+      const title = computed(() => item().title);
+      return html`<li>${title} <button @click=${intent.remove}>×</button></li>`;
+    })}
   </ul>
   <button @click=${intent.add}>Add</button>
 `;
 ```
 
-Keyed list reconciliation, event binding via `@event`, attribute binding via
-`.prop`.
+Keyed list reconciliation, event binding via `@event`, property binding via
+`.prop`, attribute binding via a bare name.
+
+**`each(list, row)`.** `list` is a signal or computed of an array (or a plain
+array, rendered once). Rows are keyed by `item.id` for objects and by value for
+primitives; an object without `id`, or a duplicate key, is an error. There is
+no key option. The row function runs **once per key** and receives an
+**accessor for the row's item**, not the item: when a new object arrives under
+the same key the accessor updates, and only the holes whose values changed are
+written. Cells read the item through computeds in the row, the same rule as any
+other derived value (§9 "Holes take signals by reference"). `${item().title}`
+reads once and is the trap.
 
 `each` takes an optional `window` parameter: instead of creating and destroying
 nodes on scroll, it keeps a fixed set of rows and rewrites values in place.
@@ -598,11 +629,27 @@ The view function runs **once**, at mount. It is not re-run on state change and
 there is no re-render.
 
 At mount the template is parsed once into a `<template>`, hole positions are
-recorded as direct node references, and each hole gets its own micro-watcher:
+recorded as direct node references, and each hole that receives a signal or
+computed gets its own micro-watcher:
 
 ```ts
-// html`<span>${s.total()}</span>` becomes roughly
+// html`<span>${s.total}</span>` becomes roughly
 watch(() => { textNode.data = String(s.total()); });
+```
+
+**Holes take signals by reference.** JavaScript evaluates every `${…}` before
+the `html` tag runs, so a hole cannot observe a call made inside it: in
+`${s.total()}` the runtime receives a plain number and cannot know which signal
+produced it. Without a compiler there is exactly one way for a hole to be
+reactive: it receives the signal or computed itself, `${s.total}`, and the
+runtime reads it inside the hole's watcher. A plain value in a hole is rendered
+once. An expression — `${s.total() * 2}`, a ternary choosing between templates
+— is a derivation, and derivations are named computeds (§4): in state when they
+shape data, in the view when they choose markup:
+
+```ts
+const body = computed(() => s.status() === 'error' ? errorBox : table);
+html`<main>${body}</main>`
 ```
 
 A signal write therefore wakes only the watchers for the holes that read it and
@@ -612,15 +659,34 @@ entirely on this: if the view function rebuilt 500 `<li>` descriptions per
 tick, the number would be unreachable. `each` creates per-row watchers and
 reconciles by key; rows are not rebuilt when a cell value changes.
 
-**The trap agents will hit:** `${s.total()}` inside a hole is reactive;
-`const t = s.total()` above the template is read once at mount and never
-updates. First item in `llms.txt`, and a checker warning where detectable
-(`SHR-V003`).
+**The trap agents will hit:** `${s.total}` is reactive; `${s.total()}` reads
+once at mount and never updates — and so does `const t = s.total()` above the
+template, for the same reason. It looks like every other framework and is
+wrong here. First item in `llms.txt`, and a checker warning (`SHR-V003`): a
+call expression inside a hole is visible on the AST, so unlike the old
+formulation this one is detectable exactly.
 
 ### Intents
 
 `@click=${intent.add}` is sugar for a named handler exported by the view's
-module, invoked with a typed payload; the raw `Event` is not passed on. Views
+module, invoked with a typed payload; the raw `Event` is not passed on.
+
+| Event | Payload |
+|---|---|
+| `submit` | form fields as an object (`Object.fromEntries(new FormData(form))`); default prevented |
+| `input`, `change` | the control's `value`, or `checked` for a checkbox |
+| anything else | `undefined` |
+
+Inside an `each` row the handler receives a **second argument: the row's
+current item**, read when the event fires, from the innermost row. That is how
+a row's button names its order without an inline arrow:
+
+```ts
+html`<button @click=${intent.ship}>Ship</button>`   // in a row
+ship: (_payload, order) => …                         // in effects
+```
+
+Every handler runs inside `batch()`. Views
 declare intents, effects implement them, and the wiring is generated by
 `sheratan generate`. An inline arrow function in a template is a checker error
 (`SHR-V001`) — that is where logic starts leaking back into views.
@@ -839,8 +905,8 @@ sheratan dev
 
 - **`llms.txt`** at the repo and docs root: full API surface, the import
   matrix, canonical module example, error-code index, and — first item — the
-  reactivity trap (`${s.total()}` inside the template hole is reactive;
-  `const t = s.total()` above the template is not). Must fit in ~8k tokens.
+  reactivity trap (`${s.total}` in a hole is reactive; `${s.total()}` is read
+  once). Must fit in ~8k tokens.
 - **Skill** (`SKILL.md`): when to use, how to scaffold via the CLI, how to read
   checker output, how to read a trace, the "one way to do each thing" table.
 - **Generation over recall.** Agents call `sheratan generate` instead of writing
@@ -907,8 +973,10 @@ comment thread: user code is TypeScript, and browsers do not run TypeScript.
 The honest formulation, and the only one to use in the README:
 
 - **`core` requires no build.** It ships as plain ESM and can be used from a
-  `<script type="module">` with an empty `node_modules`. The zero-build demo is
-  JavaScript.
+  `<script type="module">` with an empty `node_modules`, served by **any static
+  file server** (`python3 -m http.server`, `npx serve`). Not from `file://`:
+  browsers refuse ES module scripts from an opaque origin, and a `file://`
+  build would be a second way to load core. The zero-build demo is JavaScript.
 - **TypeScript projects need type stripping.** `sheratan dev` strips types and
   serves ESM — no bundling, no transform of the templates, no plugin
   configuration. Under Bun or Deno, which run TypeScript natively, even that
@@ -962,7 +1030,7 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
 (must) survive a schedule slip; everything else is cuttable.
 
 
-- `examples/dashboard` runs from a plain `index.html` with no build step and
+- `examples/dashboard` runs from a plain `index.html` on a static file server with no build step and
   holds 60fps under a synthetic 1000 msg/sec feed into a 500-row table.
 - Every cell of the import matrix is enforced (`SHR-L001`), plus L002–L009 and
   V001–V004, each with a failing-case test; `SHR-V002`, `SHR-V003` and
@@ -1001,9 +1069,12 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
 - **`SHR-L005` is not a compile-time guarantee, and the positioning must not
   claim it is.** Static analysis catches direct writes but loses the trail
   through ordinary indirection. A signal held in a variable, passed to a `lib/`
-  helper, destructured — that is a TypeScript limitation, not a checker bug. Backstop: dev builds already record write provenance for the
-  causal trace, so asserting "the writer is a transition" is nearly free.
-  Checker before run, assertion on first run — both report `SHR-L005`.
+  helper, destructured — that is a TypeScript limitation, not a checker bug.
+  Statically, a transition is any function exported by `*.state.ts` (§4), and
+  L005 flags a `.set()` on state reached from `*.effects.ts`. Backstop: dev
+  builds record write provenance for the causal trace; with plain-function
+  transitions the assertion has to identify the writer by call site rather
+  than by a marker — open, see TASKS "Spec gaps". Both report `SHR-L005`.
 
 ## 14. To be settled by the reference app
 

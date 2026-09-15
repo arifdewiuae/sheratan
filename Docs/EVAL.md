@@ -69,10 +69,10 @@ table.** One sentence, one screenshot of the frame chart.
 | `core` gzipped | < 10 KB |
 | Runtime dependencies | 0 |
 | Packages in user `package.json` for a full app | 1 |
-| Time from `git clone` to rendered app | no install, no build — open `index.html` |
+| Time from `git clone` to rendered app | no install, no build — serve the folder with any static server |
 
-That last row is a demo, not a number: a video of an app running from a file,
-with an empty `node_modules`.
+That last row is a demo, not a number: a video of an app served as plain files
+(`python3 -m http.server`) with an empty `node_modules`.
 
 ---
 

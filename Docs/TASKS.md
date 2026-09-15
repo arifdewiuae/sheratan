@@ -96,7 +96,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [ ] 500-row list reconciliation benchmark with constant reordering
 - [ ] Verify `app.ts` / nested factory ergonomics on a larger module tree (SPEC §14)
 
-- [ ] `[gate]` Counter and list run from the filesystem with no build step
+- [ ] `[gate]` Counter and list run from a static file server (`python3 -m http.server`) with no build step
 - [ ] `[gate]` 500-row reordering within **2× of Solid** → otherwise fix reconciliation before anything else (EVAL Gates)
 
 > Fallback if the core slips: thin layer over third-party signals — emergency only, costs zero-deps and the trace hook (PLAN risks).
@@ -223,7 +223,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [ ] Commit raw logs of every run
 - [ ] `sheratan-eval agent --arm react` reproducible by a stranger
 - [ ] Size: `core` < 10 KB gzipped, 0 runtime deps, 1 package in user `package.json` (EVAL §1.3)
-- [ ] Video: app running from a file with empty `node_modules`
+- [ ] Video: app served as plain files with empty `node_modules`
 
 **Package**
 - [ ] README: results table (model + date), training-data confound, "no bundler, no config — type stripping only", SSR is a no, `typescript` peer dep
@@ -268,6 +268,12 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [x] **`resource()` placement rule.** SPEC §6 says construction outside effects is enforced by L005, but L005 is about state mutation — needs its own code or rewording. Resolved: `SHR-L004`, effects-only APIs.
 - [x] **`onDispose()` placement.** SPEC §5b says effects-only; no rule code enforces it. Resolved: `SHR-L004`.
 - [ ] **Week 2 gate wording.** PLAN's cut-list note refers to "Week 2 gate: correct, then 60fps"; EVAL puts 60fps at Week 2–3 — pick one.
+- [x] **Intent payload inside `each` rows.** SPEC §9 bans inline arrows in holes and says intents get a typed payload, not the raw `Event`, but doesn't say how a row button tells `intent.ship` *which* order. Blocks T04. Week 0 runtime passes form-derived payloads only (submit → form entries, input/change → value or `checked`, else `undefined`). Resolved in SPEC §9: a handler inside a row receives the innermost row's current item as a second argument.
+- [x] **Row reactivity in `each`.** SPEC §9 says rows are not rebuilt when a cell changes, but a row receives a plain item. Week 0 runtime re-renders a row when its item object changes identity at the same key; fine-grained cells need a per-row accessor design before the 500-row benchmark. Resolved in SPEC §9: the row function runs once per key and receives an item accessor; cells are computeds in the row.
+- [x] **`each` key.** Unspecified. Week 0 runtime keys objects by `id` (throws without one) and primitives by value. Resolved: `id` for objects, value for primitives, no key option.
+- [x] **How transitions commit atomically.** SPEC §4 requires one transition = one commit, but no API marks a transition. Week 0 runtime exports `batch()` and runs every intent inside one. A `transition()` wrapper would also give L005 something to recognise and the owner flag (§5b rule 1) somewhere to live. Resolved in SPEC §4: plain exported functions; multi-write transitions wrap in `batch()`.
+- [x] **"Runs from the filesystem".** Chrome refuses ES module scripts from `file://`, so the Week 1 gate needs either "any static server" wording or a `file://`-loadable build — the second breaks A4. Resolved: "any static file server" in SPEC §10c/§12, EVAL, TASKS.
+- [ ] **Recognising a transition at run time.** With plain-function transitions (SPEC §4) nothing marks a function as a transition, so §5b rule 1 ("a transition from a dead owner does nothing") and the §13 `SHR-L005` dev assertion have no mechanism. Options: call-site provenance from the trace, or accept that late writes reach no watchers and drop the rule.
 - [x] **CSS scoping.** SPEC said `adoptedStyleSheets` on the component root, which is global on `document`. Resolved in SPEC §9a: native `@scope` + `@layer`, enforced by `SHR-L009`.
 
 ---
@@ -281,3 +287,8 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-14 | `resource()` keeps separate `status`/`data`/`error` signals; narrowing via `is()` type guard, no union accessor (SPEC §6) | Per-hole reactivity stays fine-grained; one way to read async state |
 | 2026-09-14 | Eval task set v1 frozen: 7 parity / 5 differentiator, no router in either arm, T05 rate check kept as a declared advantage | Tasks written before any runtime can't flatter it; a single-page dashboard keeps the control stack unchanged |
 | 2026-09-15 | Rule codes fixed (SPEC §4): one `SHR-L001` for all import-matrix cells; L003 layout, L004 effects-only APIs, L007 contract `AbortSignal`; template family `V001`–`V004`; `R` reserved for runtime; codes never reused | Self-repair JSON needs a stable code for all three violation classes; per-cell codes would add ~20 codes without adding information the message doesn't already carry |
+| 2026-09-15 | Template holes take signals by reference: `${s.total}` is reactive, `${s.total()}` reads once (`SHR-V003`); expressions become named computeds (SPEC §9) | Tag arguments are evaluated before the tag runs, so `${s.total()}` cannot be reactive without a compiler; re-running the view per frame would break the 500-row claim; arrows in holes contradict `SHR-V001` |
+| 2026-09-15 | `each` rows get one item accessor, run once per key; cells are computeds in the row (SPEC §9) | Rows are never rebuilt when a cell changes, without a proxy per row; the hole rule stays the same everywhere |
+| 2026-09-15 | Handlers inside an `each` row receive the innermost row's current item as a second argument (SPEC §9) | A row's button can name its item without an inline arrow (`SHR-V001`) or a new directive |
+| 2026-09-15 | Transitions are plain exported functions; multi-write ones use `batch()` (SPEC §4) | No new API. Cost, logged as a gap: nothing marks a transition at run time |
+| 2026-09-15 | "No build" means any static file server, not `file://` (SPEC §10c, EVAL) | Browsers refuse ES module scripts from `file://`; a `file://` build would be a second way to load core |
