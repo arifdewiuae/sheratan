@@ -68,6 +68,21 @@ test('computed returning an equal value stops propagation', () => {
   stop();
 });
 
+test('a throwing computed rethrows, then recomputes on the next read', () => {
+  const a = signal(0);
+  const inverse = computed(() => {
+    if (a() === 0) throw new RangeError('zero');
+
+    return 1 / a();
+  });
+
+  assert.throws(() => inverse(), RangeError);
+  assert.throws(() => inverse(), RangeError, 'still dirty, so it runs again');
+
+  a.set(4);
+  assert.equal(inverse(), 0.25);
+});
+
 test('dynamic dependencies: an abandoned branch no longer triggers', () => {
   const flag = signal(true);
   const x = signal('x');

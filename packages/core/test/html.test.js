@@ -109,6 +109,20 @@ test('null, undefined and false render nothing', () => {
   assert.equal(text(), 'x');
 });
 
+test('a DOM node in a child hole is inserted as-is and replaced when the hole changes', () => {
+  const badge = document.createElement('em');
+  badge.textContent = 'new';
+  const v = signal(badge);
+
+  render(() => html`<p>${v}</p>`, host);
+  assert.equal($('p > em'), badge, 'the same node, not a copy');
+
+  v.set('plain');
+  flush();
+  assert.equal($('em'), null);
+  assert.equal(text(), 'plain');
+});
+
 test('events: handler gets a payload, never the raw Event', () => {
   const calls = [];
   const clicked = (p) => calls.push(['click', p]);
@@ -137,6 +151,16 @@ test('events: handler gets a payload, never the raw Event', () => {
     ['submit', { qty: '12', gift: 'on' }],
   ]);
   assert.equal(submit.defaultPrevented, true);
+});
+
+test('events: disposal removes listeners, so a retained node no longer calls the handler', () => {
+  let calls = 0;
+  const dispose = render(() => html`<button @click=${() => calls++}>go</button>`, host);
+  const button = $('button');
+
+  dispose();
+  button.click();
+  assert.equal(calls, 0);
 });
 
 test('holes inside a tag must be whole attribute values', () => {
