@@ -1,0 +1,20 @@
+{
+  "name": "sheratan",
+  "version": "0.0.0",
+  "description": "Architectural boundaries, enforced. Signals, templates and async in the core.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "devDependencies": {
+    "happy-dom": "^20.14.5"
+  }
+}
