@@ -47,7 +47,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 
 **Setup**
 - [x] `llms.txt` v0: API, import matrix, reactivity trap as the first item, canonical module (SPEC §10) — [llms.txt](../llms.txt), ~4.0–4.7k tokens estimated (recount with the evaluated model's counter before the first run); canonical module executed end to end
-- [x] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro) — `packages/core`: signals, scheduler, `html`, keyed `each`, `render`; 526 lines, 38 tests
+- [x] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro) — `packages/core`: signals, scheduler, `html`, keyed `each`, `render`; TypeScript, 1561 non-blank lines, 69 tests, 4.8 KB brotli
 - [x] Freeze and version 12 eval tasks (EVAL §2.1) — [EVAL-TASKS.md](EVAL-TASKS.md), tag `eval-tasks-v1`, SHA-256 `7a19d6474fbcb1a417d60fb3c2be815c908d8cb68bd50a7a60a3a5a9a317f1ce`
 - [x] Split: 6 headline tasks + 6 held-out (EVAL-TASKS §2)
 - [x] Fix the documentation token budget for both arms **and write it down** before the first run — 8,000 tokens (EVAL-TASKS §1.5)
@@ -73,24 +73,24 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 ## Week 1 — Core
 
 **Reactivity** (SPEC §5)
-- [ ] `[must]` Tests written *before* implementation: glitch-freedom, diamond dependencies, batching
-- [ ] `[must]` `signal`, `computed`, `watch` (auto-tracked, returns disposer)
-- [ ] `[must]` Batching; glitch-free propagation
-- [ ] `[must]` Scheduler: DOM writes coalesced per animation frame, last value wins; `flush()` for tests
+- [x] `[must]` Tests written *before* implementation: glitch-freedom, diamond dependencies, batching
+- [x] `[must]` `signal`, `computed`, `watch` (auto-tracked, returns disposer) — doubly-linked edges, O(1) link/unlink
+- [x] `[must]` Batching; glitch-free propagation
+- [x] `[must]` Scheduler: DOM writes coalesced per animation frame, last value wins; `flush()` for tests
 - [ ] Structural update helper for immutable state (SPEC §5 Immutability)
 
 **Rendering** (SPEC §9)
-- [ ] `[must]` `html` tagged templates: parse once into `<template>`, holes as direct node refs
-- [ ] `[must]` View update model: view runs once; one micro-watcher per hole
-- [ ] `[must]` Attribute (`.prop`) and event (`@event`) bindings
+- [x] `[must]` `html` tagged templates: parse once into `<template>`, holes as precomputed paths (no per-mount scan)
+- [x] `[must]` View update model: view runs once; one micro-watcher per hole
+- [x] `[must]` Attribute (`.prop`) and event (`@event`) bindings
 - [ ] Holes escaped as text by default; `unsafeHTML()` directive
-- [ ] `[must]` Keyed `each` (no virtualization); per-row watchers, rows not rebuilt on cell change
+- [x] `[must]` Keyed `each` (no virtualization); per-row watchers, rows not rebuilt on cell change; minimum DOM moves via LIS
 - [ ] Style scoping (SPEC §9a): runtime sets `data-module` / `data-ui` on roots at mount; CSS module scripts attached via `adoptedStyleSheets`
 - [ ] Verify `@scope` + `@layer` browser support matrix before templates depend on it (SPEC §9a)
 - [ ] Widget mode: tokens scoped to `[data-sheratan-root]`, never `:root` of the host page
-- [ ] `[must]` `render()` + ownership/disposal of the subtree
-- [ ] `[must]` Widget mode: `render(view, el)` owns only its subtree, no `document` assumptions, disposes cleanly (SPEC §10d)
-- [ ] `[must]` Zero dependencies, plain ESM, runs from `index.html` via `<script type="module">`
+- [x] `[must]` `render()` + ownership/disposal of the subtree
+- [x] `[must]` Widget mode: `render(view, el)` owns only its subtree, no `document` assumptions, disposes cleanly (SPEC §10d)
+- [x] `[must]` Zero dependencies, plain ESM, runs from `index.html` via `<script type="module">`
 
 **Measure**
 - [ ] 500-row list reconciliation benchmark with constant reordering
@@ -274,6 +274,8 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [x] **How transitions commit atomically.** SPEC §4 requires one transition = one commit, but no API marks a transition. Week 0 runtime exports `batch()` and runs every intent inside one. A `transition()` wrapper would also give L005 something to recognise and the owner flag (§5b rule 1) somewhere to live. Resolved in SPEC §4: plain exported functions; multi-write transitions wrap in `batch()`.
 - [x] **"Runs from the filesystem".** Chrome refuses ES module scripts from `file://`, so the Week 1 gate needs either "any static server" wording or a `file://`-loadable build — the second breaks A4. Resolved: "any static file server" in SPEC §10c/§12, EVAL, TASKS.
 - [ ] **Recognising a transition at run time.** With plain-function transitions (SPEC §4) nothing marks a function as a transition, so §5b rule 1 ("a transition from a dead owner does nothing") and the §13 `SHR-L005` dev assertion have no mechanism. Options: call-site provenance from the trace, or accept that late writes reach no watchers and drop the rule.
+- [ ] **Devtools surface.** Dev-build-only additions that belong with the causal trace (SPEC §7), not before it: a Chrome custom formatter so a signal prints as its value rather than `ƒ read()`, a Performance-panel track for drains and frame flushes, and debug names from the trace's write provenance. Decide the shape when §7 is built.
+- [ ] **Public repository before v1.0.0.** Dependency review in CI switches itself on when the repository stops being private; the release checklist has to include making it public (or buying Advanced Security).
 - [ ] **Checker on TypeScript 7.** SPEC §8 builds `packages/check` on the TypeScript compiler API. TS 7 (native) exposes only an unstable IPC API (`typescript/unstable/*`), not the TS 5/6 JS API. Decide before Week 3: pin the checker to TS 6's API, target TS 7's API, or parse with a standalone parser.
 - [ ] **Immutability rule code.** The checker rule for statically visible mutation of a signal's value (TASKS decision 2026-09-15) needs a code and a row in SPEC §4's table.
 - [x] **CSS scoping.** SPEC said `adoptedStyleSheets` on the component root, which is global on `document`. Resolved in SPEC §9a: native `@scope` + `@layer`, enforced by `SHR-L009`.
@@ -301,4 +303,10 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-15 | pnpm replaces npm: dependency build scripts blocked, `minimumReleaseAge` 3 days, `trustPolicy: no-downgrade`, no exotic transitive sources | Supply chain: install scripts and freshly hijacked releases are the main npm attack vectors |
 | 2026-09-15 | Quality gates in CI on every push/PR: lint (zero warnings), typecheck, build, `node:test` with coverage ≥ 100% lines/functions and 95% branches, `pnpm audit` + registry signatures, dependency review; actions pinned to commit SHAs | Rules in AGENTS.md hold only if a machine checks them |
 | 2026-09-15 | Reactive core rebuilt on the alien-signals design (doubly-linked edges, flag bits, iterative propagation); own implementation, not the TC39 API shape and not a dependency | O(1) link/unlink with no per-run allocation; TC39 Signals is Stage 1; A4 forbids a runtime dependency |
+| 2026-09-16 | Oxlint (type-aware, on TS 7 via tsgolint) + oxfmt replace ESLint, typescript-eslint and the second TypeScript; `@stylistic` and `eslint-plugin-jsdoc` load as JS plugins | One toolchain, one compiler; a full type-aware lint of the repo runs in about half a second |
+| 2026-09-16 | Two builds behind export conditions: `dist/dev` (tsc, source + declaration maps) and `dist/prod` (esbuild, minified, message table dropped so errors carry a code and a docs URL) | Message text is the biggest byte cost in a small runtime, and A3 only requires the code |
+| 2026-09-16 | Size budget in CI (`size-budget.json`, brotli, per scenario; 4.8 KB for the whole runtime today) | "Small" has to be measured on every commit or it stops being true |
+| 2026-09-16 | Internal field name mangling deliberately not done | It would cost the readability the code rules ask for; revisit only if the size budget comes under pressure, and with a measurement |
+| 2026-09-16 | `llms.txt`'s API table is generated from TSDoc and checked in CI | The agent-facing docs cannot drift from the declarations the package ships |
+| 2026-09-16 | Platform APIs instead of code where they exist: `Element.moveBefore` for row moves (falls back to `insertBefore`), `Symbol.dispose` on every disposer (`using stop = watch(…)`) | A moved row keeps focus, selection and media state; `using` removes a class of forgotten teardown |
 | 2026-09-15 | Immutability enforced, not requested: `DeepReadonly` reads in types, incremental deep freeze of plain objects/arrays on `set()`, checker rule for visible mutation (SPEC §5) | A rule an agent must remember is a rule an agent breaks; freezing only new nodes keeps the cost at what the caller already allocated |

@@ -28,19 +28,24 @@ hole gets the computed.
 import { signal, computed, watch, batch, onDispose, flush, html, each, render } from 'sheratan';
 ```
 
+<!-- generated from TSDoc by packages/core/scripts/llms.ts -->
+
 | API | Meaning |
 |---|---|
-| `signal(v)` | Writable value. Read `x()`, write `x.set(v)`. Equal writes (`Object.is`) do nothing. |
-| `computed(() => …)` | Derived value, lazy and cached. Read `c()`. |
-| `watch(() => …)` | Runs now and again when what it read changes. Returns a disposer. Effects only. |
-| `batch(() => …)` | Writes inside commit once. Returns the callback's value. |
-| `onDispose(fn)` | Teardown for `addEventListener`, `setInterval`, sockets. Effects only (SHR-L004). |
-| `html\`…\`` | Template. Holes: children, `name=${}` attribute, `.prop=${}` property, `@event=${}` handler. |
-| `each(list, row)` | Keyed list. See §5. |
-| `render(view, el)` | Mount `view()` into `el`. Returns a disposer that removes only its own nodes. |
-| `flush()` | Apply pending DOM updates now. Use in tests after a write. |
+| `signal<T>(initial: T): Signal<T>` | A writable value. Read it by calling it, write it with `.set()`. Writing an equal value (`Object.is`) notifies nobody, and the value is frozen, so state can only be replaced, never mutated (SPEC §5 Immutability). |
+| `computed<T>(fn: () => T): Accessor<DeepReadonly<T>>` | A derived value: evaluated on first read, cached until a source changes. Every expression over state is a named computed — that is the one way to derive (SPEC §9 "Holes take signals by reference"). |
+| `watch(fn: () => void): Disposer` | Runs `fn` now, and again whenever something it read changes. Returns the disposer; the owning module disposes it automatically (SPEC §5b). |
+| `batch<T>(fn: () => T): T` | Writes inside `fn` commit once, when the outermost batch ends. |
+| `onDispose(fn: () => void): void` | Registers teardown for a subscription the runtime cannot see, such as `addEventListener` or `setInterval`. Legal in `*.effects.ts` only (SHR-L004). |
+| `flush(): void` | Applies pending DOM updates now, for tests and for code that must read layout immediately after a write. |
+| `html(strings: TemplateStringsArray, ...values: unknown[]): Template` | Markup with holes. A hole is reactive only when it receives the signal itself: `${total}` updates, `${total()}` is read once (SPEC §9, SHR-V003). |
+| `each<T>(list: Accessor<readonly T[]> \| readonly T[], row: (item: Accessor<T>) => Template): Each` | A keyed list. Objects key by `id`, primitives by value; the row function runs once per key. |
+| `render(view: () => Template, host: Element): Disposer` | Mounts `view` into `host`. It owns only the nodes it inserts, so it can live inside an app built with something else, and the disposer removes exactly those nodes. |
 
-Types: `Signal<T>` (callable + `.set`), `Accessor<T>` (`() => T`), `Template`.
+<!-- end generated -->
+
+Types: `Signal<T>` (callable + `.set`), `Accessor<T>` (`() => T`), `DeepReadonly<T>`,
+`Template`, `Each`, `Disposer` (a teardown that also works with `using`).
 
 **Scheduling.** Computeds update synchronously. DOM updates wait for the next
 animation frame; many writes in one frame produce one DOM write with the last

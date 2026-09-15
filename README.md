@@ -66,8 +66,11 @@ Requires Node (version in `.nvmrc`) and pnpm (version pinned in `package.json`).
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm check   # lint, typecheck, build, tests with coverage gate, dependency audit
+pnpm check   # format, lint, typecheck, build, tests + coverage gate, package checks, audit
 ```
+
+The runtime is 4.8 KB brotli with zero dependencies, and every commit is
+measured against `packages/core/size-budget.json`.
 
 All changes go through pull requests into `develop`; `main` is for releases.
 Read [AGENTS.md](AGENTS.md) before opening one.

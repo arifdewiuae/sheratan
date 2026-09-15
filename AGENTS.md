@@ -32,24 +32,30 @@ The design axioms in SPEC §3 override convenience:
 ```sh
 pnpm install --frozen-lockfile   # never npm or yarn; the lockfile is pnpm-lock.yaml
 pnpm check                       # everything CI runs, in CI order — must be green before a PR
-pnpm lint                        # eslint, zero warnings allowed
+pnpm format                      # oxfmt, writes
+pnpm format:check                # oxfmt, fails on a diff
+pnpm lint                        # oxlint, type-aware, zero warnings allowed
 pnpm typecheck                   # tsc (TypeScript 7) per package
-pnpm build                       # emit dist/ per package
+pnpm build                       # dist/dev (tsc) + dist/prod (esbuild) per package
 pnpm test                        # node:test
 pnpm coverage                    # tests + coverage gate (fails below threshold)
+pnpm verify                      # consumer types, publint, attw, size budget, llms.txt freshness
 pnpm security                    # pnpm audit + registry signature verification
 ```
 
 Single test file: `node --test packages/core/test/html.test.ts`.
+Fix lint and formatting: `pnpm exec oxlint --type-aware --fix && pnpm format`.
+Re-record the size budget after an intended change: `pnpm --filter sheratan exec node scripts/size.ts --update`.
 Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 
 ## Repository map
 
 | Path | What |
 |---|---|
-| `packages/core/src/` | Runtime: reactive graph (`reactive`), templates and `each`/`render` (`html`), public entry (`index`), test-only entry (`internal`) |
+| `packages/core/src/` | Runtime. Graph (`graph`, `signal`, `computed`, `watch`, `scheduler`, `owner`), templates (`template`, `instantiate`, `each`, `lis`, `render`, `dom`), errors (`codes`, `messages`, `env`, `env.prod`, `errors`), entries (`index` public, `internal` test-only) |
 | `packages/core/test/` | `node:test` suites; DOM via happy-dom |
-| `tooling/eslint-config/` | The one ESLint config. Owns the TypeScript 6 copy typescript-eslint needs (see Toolchain) |
+| `packages/core/scripts/` | Build (`build-prod`), package checks (`verify-types`, `size`), docs (`llms`) |
+| `.oxlintrc.json`, `.oxfmtrc.json` | The one lint config and the one formatter config |
 | `Docs/` | SPEC, EVAL, EVAL-TASKS, TASKS, brand identity |
 | `llms.txt` | The API as an agent should learn it. Updated with every public API change |
 | `site/` | Static landing page (GitHub Pages, deployed from `main`) |
@@ -66,14 +72,15 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 ## Toolchain decisions
 
 - **TypeScript 7** (native Go compiler, `typescript@7`) compiles and typechecks everything.
-- **TypeScript 6.0 lives only in `tooling/eslint-config`.** typescript-eslint's type-aware rules need the JavaScript compiler API, which TS 7 doesn't expose. pnpm's isolated layout keeps that copy private to the lint package.
-  - Remove it once typescript-eslint supports TS 7.
-  - Until then, `tsconfig.base.json` uses only options that behave identically in both.
+- **Oxlint** (`--type-aware`, via tsgolint on TS 7) is the linter, with `@stylistic` and `eslint-plugin-jsdoc` loaded as JS plugins for the two rules it has no native equivalent for. **oxfmt** formats. ESLint and typescript-eslint are gone, and with them the second TypeScript.
+- **Known compiler gap:** TS 7.0.2 applies `rewriteRelativeImportExtensions` to emitted JavaScript but not to emitted declarations. `scripts/build-prod.ts` rewrites `./x.ts` → `./x.js` in `dist/dev/*.d.ts`, and `scripts/verify-types.ts` type-checks a consumer file so a regression fails the build. Drop both when the compiler fixes it.
 - **pnpm**, for supply-chain safety. The settings live in `pnpm-workspace.yaml`; don't relax them without a TASKS decision entry:
   - dependency lifecycle scripts are blocked (`strictDepBuilds`, empty `allowBuilds`)
   - `minimumReleaseAge` is 3 days
   - `trustPolicy: no-downgrade`
   - `blockExoticSubdeps`
+- **Builds:** `dist/dev` is `tsc` output — readable, with source maps and declaration maps into the TypeScript, which is why `src/` ships too. `dist/prod` is one minified esbuild bundle where `env.ts` is swapped for `env.prod.ts`, so error messages fall away and errors carry a code plus a docs URL. The `exports` map picks between them with the `development` condition.
+- **Size budget:** `size-budget.json` holds brotli sizes per scenario; the build fails above them plus 2%. Re-record only for an intended change, and say why in the PR.
 - **Pin exact versions** (`--save-exact`). Adding a dependency to `packages/core` `dependencies` is forbidden (SPEC A4). Dev dependencies need a reason in the PR.
 - **GitHub Actions are pinned to full commit SHAs** with a `# vX.Y.Z` comment. Dependabot updates them. Never use a tag or branch ref, and never set `continue-on-error`.
 
@@ -93,6 +100,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 
   A bare union of string literals isn't a usable runtime constant, and a literal compared in logic (`kind === 'event'`) is a bug waiting for a typo.
 - No `any` and no non-null `!` in `src`. Narrow with checks; `unknown` at boundaries.
+- A type assertion is for an invariant the compiler cannot see — an index the algorithm has just proved is in range — never for silencing a real mismatch. `noUncheckedIndexedAccess` stays on, which is why they appear in the graph and list code at all.
 - `import type` for type-only imports. Relative imports carry the `.ts` extension (rewritten on emit).
 
 ## Code rules
@@ -138,14 +146,15 @@ worsens a bound below needs a TASKS decision entry and a benchmark.
 | Signal read / write (no observers) | O(1) | |
 | Dependency link / unlink | O(1) | Doubly-linked edge lists (alien-signals design); edges reused across re-runs, no per-run allocation when deps are unchanged |
 | Re-run with changed deps | O(changed) | Stale tail edges purged after the run |
-| Write propagation | O(affected subgraph) | Iterative push of Pending/Dirty flags; explicit stack, no recursion depth limit |
+| Write propagation | O(affected subgraph) | Iterative push of Pending/Dirty flags on an explicit stack: a 100k-deep graph propagates without touching the call stack. Evaluation still recurses through the user's own functions, which pull-based derivation cannot avoid |
 | Computed read | O(1) cached; O(sources checked) when pending | Pull re-validation stops at the first dirty source |
 | Owner child add / remove | O(1) | Intrusive linked list |
 | Row lookup for an event handler | O(1) | Inherited at owner creation, never walked |
 | Template parse | O(markup), **once per call site** | Cached by the `TemplateStringsArray` |
 | Template instantiate | O(clone + path steps to holes) | Hole paths precomputed at parse; marker attributes stripped from the template; no per-mount scan, string parse or `Map` |
 | Hole update | O(1) DOM writes per changed hole | One frame watcher per reactive hole |
-| `each` reconcile | O(n) diff, O(n log n) moves, **minimum DOM moves** | Key `Map`; common prefix/suffix skipped; longest increasing subsequence decides which rows stay |
+| `each` reconcile | O(n) diff, O(n log n) moves, **minimum DOM moves** | Key `Map`; common prefix/suffix skipped; longest increasing subsequence decides which rows stay; `moveBefore` where the browser has it, so a moved row keeps focus and media state |
+| Freezing a new state value | O(new nodes) | Subtrees that are already frozen are skipped, so structural sharing pays only for what it allocated |
 | Dispose a subtree | O(owned nodes + edges) | |
 
 Rules:
@@ -160,16 +169,16 @@ Rules:
 - **Coverage gate:** 100% lines, 100% functions and ≥ 95% branches for `packages/core/src`. Unreachable defensive code gets deleted, not excluded.
 - **Test behaviour through the public API.** Use `internal` only for what the public API can't observe: live subscription count, owners, frame watchers.
 - **Every error path has a test that asserts the error code.**
+- **Host capabilities are tested both ways** (`test/host.test.ts`): with and without `requestAnimationFrame`, with and without `moveBefore`.
 - **Time:** use `flush()` or fake timers. Never sleep, except the one test proving the scheduler runs unaided.
 - **Leaks:** a mount/dispose loop returns `liveSubscriptions()` to its starting value. Add one for any new owner-scoped resource.
 
 ## Documentation obligations
 
 A change to the public API updates, in the same PR:
-1. TSDoc
-2. `llms.txt`
-3. the SPEC section it implements
-4. an export-surface test, which lists the exact public names (SPEC A5)
+1. TSDoc — `llms.txt`'s API table is generated from it (`pnpm --filter sheratan llms`), and CI fails when it is stale
+2. the SPEC section it implements
+3. the export-surface test, which lists the exact public names (SPEC A5)
 
 A behaviour change updates the relevant SPEC section. A resolved gap gets ticked in TASKS with where it was resolved.
 
@@ -195,6 +204,6 @@ for LLM apps. For a framework, this is what applies.
 | §16 evals | Remapped | `Docs/EVAL.md` performance and agent-authoring evals, with go/no-go gates |
 | §17 CI/CD | Applies | `ci.yml`: SHA-pinned actions, frozen lockfile, lint → typecheck → build → coverage → audit, dependency review on PRs, daily audit |
 | §17a package hygiene | Applies (pnpm) | Toolchain decisions above |
-| §17b / §17c clean code | Applies | Code rules above, enforced by `tooling/eslint-config` |
+| §17b / §17c clean code | Applies | Code rules above, enforced by `.oxlintrc.json` and `.oxfmtrc.json` |
 | §18 Vercel | N/A | Site is on GitHub Pages |
 | §21 README | Applies | Quickstart and repository map in `README.md` |

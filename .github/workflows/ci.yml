@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   check:
-    name: Lint, typecheck, build, test, coverage, audit
+    name: Format, lint, typecheck, build, test, coverage, package, audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -40,6 +40,9 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
+      - name: Format
+        run: pnpm format:check
+
       - name: Lint
         run: pnpm lint
 
@@ -51,6 +54,9 @@ jobs:
 
       - name: Test with coverage gate
         run: pnpm coverage
+
+      - name: Package checks (consumer types, publint, attw, size budget, llms.txt)
+        run: pnpm verify
 
       - name: Audit advisories and registry signatures
         run: pnpm security
