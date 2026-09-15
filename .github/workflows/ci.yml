@@ -55,9 +55,12 @@ jobs:
       - name: Audit advisories and registry signatures
         run: pnpm security
 
+
   dependency-review:
     name: Dependency review
-    if: github.event_name == 'pull_request'
+    # Needs GitHub Advanced Security on private repositories, so it switches
+    # on by itself once the repository is public (planned for v1.0.0).
+    if: github.event_name == 'pull_request' && !github.event.repository.private
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
