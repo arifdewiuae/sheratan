@@ -337,8 +337,8 @@
   "severity": "error",
   "file": "modules/todo/todo.view.ts",
   "range": { "line": 3, "column": 1 },
-  "message": "View imports effects. Views are
-              pure functions of state.",
+  "message": "view cannot import effects;
+              allowed: lib, ui, own state.",
   "fix": "Move the call into todo.effects.ts
           and expose the result via todo.state.ts.",
   "docs": "https://sheratan.dev/errors/L001"

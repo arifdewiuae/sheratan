@@ -128,7 +128,7 @@ app.ts              composition root
 e2e/                end-to-end tests
 ```
 
-`shared/` is a banned directory name. It groups by ownership ("used in more
+`shared/` is a banned directory name (`SHR-L003`). It groups by ownership ("used in more
 than one place") rather than by purpose, and becomes a second application
 without rules. Everything that would go there belongs to one of the categories
 above.
@@ -139,7 +139,7 @@ above.
 - **`ui/` components are folders, not files:** `ui/button/button.view.ts`,
   `button.css`, `button.test.ts`, `index.ts`. They have no state and no
   effects, so they are not modules. Nesting inside `ui/` is at most one level —
-  the component itself. Namespacing is by prefix (`ui/form-input/`,
+  the component itself (`SHR-L003`). Namespacing is by prefix (`ui/form-input/`,
   `ui/data-table/`), never by subdirectory.
 - A component used by exactly one module lives **inside that module**, not in
   `ui/`. Most "hundreds of components" are local things parked in a shared
@@ -167,20 +167,45 @@ rather than a numbered list.
 | `*.view.ts` | `lib/`, `ui/`, own state, module instances received as parameters |
 | `app.ts` | everything (composition root) |
 
-Error codes are cells in this matrix, and messages state the allowed set rather
-than citing a rule number: *"view cannot import services; allowed: lib, ui, own
-state."* For self-repair this beats a link to a rule.
+Every cell of this matrix reports as **one code, `SHR-L001`**. The message names
+the cell and states the allowed set rather than citing a rule number: *"view
+cannot import services; allowed: lib, ui, own state."* For self-repair this
+beats a link to a rule. A deep import — reaching past another module's
+`index.ts` into its state, effects or view — is an `SHR-L001` cell like any
+other.
 
-Three constraints the matrix cannot express:
+Constraints the matrix cannot express:
 
 | Code | Rule |
 |------|------|
 | `SHR-L002` | `*.view.ts` must not call an I/O global (`fetch`, `localStorage`, `document`, timers) |
+| `SHR-L003` | Project layout: no `shared/` directory; `ui/` nests at most one level (below) |
+| `SHR-L004` | Effects-only APIs — `resource()`, `mutation()`, `stream()`, `onDispose()`, `navigate()` — are called only inside `*.effects.ts` |
 | `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts` |
-| `SHR-L008` | The module import graph must be acyclic |
 | `SHR-L006` | Module file set matches its declared kind (below) |
+| `SHR-L007` | Every `Promise`-returning method in a `*.contract.ts` takes an `AbortSignal` (§5b) |
+| `SHR-L008` | The module import graph must be acyclic |
 | `SHR-L009` | Module and `ui/` stylesheets are wrapped in one `@scope` with a lower boundary; `global.css` holds only `tokens` and `base` (§9a) |
-| `SHR-T001` | **warning** — module has no `*.state.test.ts` / `*.effects.test.ts` |
+
+Template rules, checked off the AST of `html` literals (§9, §13):
+
+| Code | Severity | Rule |
+|------|----------|------|
+| `SHR-V001` | error | No inline function in a template hole; handlers are named intents |
+| `SHR-V002` | warning | `unsafeHTML()` with a non-literal argument |
+| `SHR-V003` | warning | Reactivity trap: a signal read above the template and interpolated as a plain value, where detectable |
+| `SHR-V004` | error | Malformed template: unclosed tag, unknown attribute or binding |
+
+| Code | Severity | Rule |
+|------|----------|------|
+| `SHR-T001` | warning | Module has no `*.state.test.ts` / `*.effects.test.ts` |
+
+**Code scheme.** The letter is the family: `L` structure and layers, `V` view
+templates, `T` tests; `R` is reserved for structured runtime errors. Numbers
+are stable — never renumbered, never reused; a retired code stays reserved.
+A violation caught at run time by a dev-build assertion reports under the same
+code as its static check (`SHR-L005`, §13). The docs URL is the code without
+the prefix: `sheratan.dev/errors/L001`.
 
 `SHR-L008` exists because of shared modules specifically: without it,
 `session` and `orders` will import each other within a week.
@@ -384,7 +409,7 @@ External subscriptions the runtime cannot see — `addEventListener` on `window`
 onDispose(() => window.removeEventListener('resize', onResize));
 ```
 
-Legal in `*.effects.ts` only.
+Legal in `*.effects.ts` only (`SHR-L004`).
 
 ### Three rules that prevent leaks
 
@@ -402,7 +427,7 @@ Legal in `*.effects.ts` only.
 Every `Promise`-returning method in a `*.contract.ts` takes an `AbortSignal`.
 An adapter that ignores it makes cancellation cosmetic: the response is
 discarded but the request still runs. Checked: a contract method returning a
-promise without a `signal` parameter is an error.
+promise without a `signal` parameter is an error (`SHR-L007`).
 
 Cancellation triggers: key change, owner disposal, explicit `resource.abort()`.
 
@@ -446,7 +471,7 @@ Comparing `status()` directly remains legal but leaves `data()` as `T | undefine
 Guarantees: in-flight request is aborted when the key changes; identical keys
 are de-duplicated; out-of-order responses are discarded, never applied; errors
 are values, not thrown. `resource()` may only be constructed inside
-`*.effects.ts` (enforced by `SHR-L005`).
+`*.effects.ts` (enforced by `SHR-L004`, as are `mutation()` and `stream()`).
 
 ### `mutation()` — writes in the core
 
@@ -533,7 +558,7 @@ Error format is fixed and stable:
   "severity": "error",
   "file": "modules/todo/todo.view.ts",
   "range": { "line": 3, "column": 1 },
-  "message": "View imports effects. Views are pure functions of state.",
+  "message": "view cannot import effects; allowed: lib, ui, own state.",
   "fix": "Move the call into todo.effects.ts and expose the result via todo.state.ts.",
   "docs": "https://sheratan.dev/errors/L001"
 }
@@ -589,7 +614,8 @@ reconciles by key; rows are not rebuilt when a cell value changes.
 
 **The trap agents will hit:** `${s.total()}` inside a hole is reactive;
 `const t = s.total()` above the template is read once at mount and never
-updates. First item in `llms.txt`, and a checker warning where detectable.
+updates. First item in `llms.txt`, and a checker warning where detectable
+(`SHR-V003`).
 
 ### Intents
 
@@ -597,13 +623,14 @@ updates. First item in `llms.txt`, and a checker warning where detectable.
 module, invoked with a typed payload; the raw `Event` is not passed on. Views
 declare intents, effects implement them, and the wiring is generated by
 `sheratan generate`. An inline arrow function in a template is a checker error
-— that is where logic starts leaking back into views.
+(`SHR-V001`) — that is where logic starts leaking back into views.
 
 ### Escaping and `unsafeHTML`
 
 Every hole is escaped as text by default; interpolated values never become
 markup. Injecting markup requires the explicit `unsafeHTML(value)` directive,
-which the checker flags whenever its argument is not a literal. Agents
+which the checker flags whenever its argument is not a literal (`SHR-V002`,
+a warning: sanitized markup is a legitimate non-literal). Agents
 interpolate user data without thinking, so the default must be the safe one.
 
 ### CSS without a build step
@@ -749,7 +776,7 @@ what therefore ships in core:
 - delegated click interception for `<a>` (same origin, primary button, no
   Ctrl/Cmd/Shift, no `target`, no `download`) — trivial, and always written
   wrong when left to the user
-- `navigate()`, callable only from `*.effects.ts`
+- `navigate()`, callable only from `*.effects.ts` (`SHR-L004`)
 - scroll and focus restoration on back/forward
 - **flat path matching** — a thin wrapper over `URLPattern`, roughly thirty
   lines, and a plain `computed` rather than new machinery:
@@ -937,8 +964,9 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
 
 - `examples/dashboard` runs from a plain `index.html` with no build step and
   holds 60fps under a synthetic 1000 msg/sec feed into a 500-row table.
-- Every cell of the import matrix is enforced, plus L002, L005, L006, L008 and L009,
-  each with a failing-case test; `SHR-T001` reports as a warning only.
+- Every cell of the import matrix is enforced (`SHR-L001`), plus L002–L009 and
+  V001–V004, each with a failing-case test; `SHR-V002`, `SHR-V003` and
+  `SHR-T001` report as warnings only.
 - Error messages state the allowed import set, not a rule number.
 - `resource()` passes tests for: abort on key change, dedup, out-of-order
   discard, stale-while-revalidate, retry with backoff.
@@ -959,8 +987,8 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
   Reliable instead: typed holes (`string | number | Node | Directive`) plus
   generics on `each` and `mount`, dev-time runtime validation at first parse
   (unknown attributes, unclosed tags), and the checker parsing template
-  literals off the AST to emit template errors in the same JSON shape as layer
-  errors. The optional compiler stays on the roadmap for template
+  literals off the AST to emit template errors (`SHR-V001`–`V004`) in the same
+  JSON shape as layer errors. The optional compiler stays on the roadmap for template
   precompilation (start-up speed); typing arrives with it as a side effect.
 
 - **SSR: a stated no, not a "later".** Sheratan targets app-shaped UIs behind
@@ -975,7 +1003,7 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
   through ordinary indirection. A signal held in a variable, passed to a `lib/`
   helper, destructured — that is a TypeScript limitation, not a checker bug. Backstop: dev builds already record write provenance for the
   causal trace, so asserting "the writer is a transition" is nearly free.
-  Checker before run, assertion on first run.
+  Checker before run, assertion on first run — both report `SHR-L005`.
 
 ## 14. To be settled by the reference app
 

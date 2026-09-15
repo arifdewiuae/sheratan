@@ -143,7 +143,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 ## Week 3 — Checker, CLI, `create` template
 
 **Checker** (SPEC §4, §8) — TypeScript Compiler API, devDependency, `typescript` as peer
-- [ ] `[must]` Import matrix: every cell enforced, each with a failing-case test
+- [ ] `[must]` Import matrix (`SHR-L001`): every cell enforced, each with a failing-case test
 - [ ] `[must]` Messages state the allowed set, not a rule number
 - [ ] `SHR-L002` I/O globals in `*.view.ts`
 - [ ] `SHR-L005` direct state mutation from effects (static) + dev-build runtime assertion via write provenance (SPEC §13)
@@ -151,11 +151,12 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [ ] `SHR-L008` acyclic module import graph
 - [ ] `SHR-L009` style scoping over `.css`: single `@scope` with lower boundary, root matches module name, `global.css` only `tokens`/`base`, no `:root` tokens in module sheets, no `!important` outside `base` — failing-case test per violation (SPEC §9a)
 - [ ] `SHR-T001` missing state/effects tests — **warning only**
-- [ ] Banned `shared/` directory; `ui/` nesting max one level
-- [ ] Inline arrow function in template → error; `unsafeHTML` with non-literal argument → flagged
-- [ ] Contract method returning a Promise without `AbortSignal` → error (SPEC §5b)
-- [ ] Reactivity-trap warning where detectable (SPEC §9)
-- [ ] Template errors in the same JSON shape (SPEC §13)
+- [ ] `SHR-L003` banned `shared/` directory; `ui/` nesting max one level
+- [ ] `SHR-L004` `resource` / `mutation` / `stream` / `onDispose` / `navigate` outside `*.effects.ts`
+- [ ] `SHR-V001` inline arrow function in template → error; `SHR-V002` `unsafeHTML` with non-literal argument → warning
+- [ ] `SHR-L007` contract method returning a Promise without `AbortSignal` → error (SPEC §5b)
+- [ ] `SHR-V003` reactivity-trap warning where detectable (SPEC §9)
+- [ ] `SHR-V004` malformed template errors in the same JSON shape (SPEC §13)
 
 **CLI** (SPEC §10)
 - [ ] `[must]` `sheratan check` — human formatter + `--json` (versioned, documented schema)
@@ -258,14 +259,14 @@ Custom dev server · Krausest PR · nested layouts / `@sheratan/router` · ten p
 
 Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, then log below.
 
-- [ ] **Rule numbering.** PLAN Week 3 says "L001–L006, all six violations"; SPEC defines the import matrix + L002/L005/L006/L008 + T001. L001/L003/L004/L007 are undefined (L001 appears only in the §8 JSON example).
+- [x] **Rule numbering.** PLAN Week 3 says "L001–L006, all six violations"; SPEC defines the import matrix + L002/L005/L006/L008 + T001. L001/L003/L004/L007 are undefined (L001 appears only in the §8 JSON example). Resolved in SPEC §4: L001 = every import-matrix cell, holes filled with L003/L004/L007, template rules as `V001`–`V004`.
 - [ ] **`stream()` priority.** Cut list marks it "if time", but SPEC §12 DoD, the canonical module (§10b) and the dashboard all require it.
 - [ ] **Windowed `each` priority.** Marked stretch, but DoD requires a 500-row *virtualized* table and the canonical module needs `each` with a window.
 - [ ] **Causal trace priority.** Marked stretch, but DoD says "causal trace renders for the reference app" and Week 2 gate says "trace readable".
 - [ ] **Unscheduled must-items.** Widget mode and routing have no week in PLAN — tentatively placed in Week 1 and Week 4 here.
 - [ ] **Solid baseline for Week 1 gate.** "Within 2× of Solid" needs a Solid implementation, while Krausest is deferred — define the minimal comparison.
-- [ ] **`resource()` placement rule.** SPEC §6 says construction outside effects is enforced by L005, but L005 is about state mutation — needs its own code or rewording.
-- [ ] **`onDispose()` placement.** SPEC §5b says effects-only; no rule code enforces it.
+- [x] **`resource()` placement rule.** SPEC §6 says construction outside effects is enforced by L005, but L005 is about state mutation — needs its own code or rewording. Resolved: `SHR-L004`, effects-only APIs.
+- [x] **`onDispose()` placement.** SPEC §5b says effects-only; no rule code enforces it. Resolved: `SHR-L004`.
 - [ ] **Week 2 gate wording.** PLAN's cut-list note refers to "Week 2 gate: correct, then 60fps"; EVAL puts 60fps at Week 2–3 — pick one.
 - [x] **CSS scoping.** SPEC said `adoptedStyleSheets` on the component root, which is global on `document`. Resolved in SPEC §9a: native `@scope` + `@layer`, enforced by `SHR-L009`.
 
@@ -279,3 +280,4 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-14 | CSS scoping via native `@scope` + `@layer`, checked by `SHR-L009`; no hashes, no Shadow DOM (SPEC §9a) | Hashing needs a build step (breaks "type stripping only"); Shadow DOM breaks forms, focus and global base styles |
 | 2026-09-14 | `resource()` keeps separate `status`/`data`/`error` signals; narrowing via `is()` type guard, no union accessor (SPEC §6) | Per-hole reactivity stays fine-grained; one way to read async state |
 | 2026-09-14 | Eval task set v1 frozen: 7 parity / 5 differentiator, no router in either arm, T05 rate check kept as a declared advantage | Tasks written before any runtime can't flatter it; a single-page dashboard keeps the control stack unchanged |
+| 2026-09-15 | Rule codes fixed (SPEC §4): one `SHR-L001` for all import-matrix cells; L003 layout, L004 effects-only APIs, L007 contract `AbortSignal`; template family `V001`–`V004`; `R` reserved for runtime; codes never reused | Self-repair JSON needs a stable code for all three violation classes; per-cell codes would add ~20 codes without adding information the message doesn't already carry |
