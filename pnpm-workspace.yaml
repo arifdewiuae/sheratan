@@ -1,6 +1,5 @@
 packages:
   - packages/*
-  - tooling/*
 
 # Supply chain. The runtime has zero dependencies (SPEC A4); these settings
 # guard the dev toolchain and CI, which is where an attack would land.
@@ -18,6 +17,9 @@ blockExoticSubdeps: true
 
 # No dependency lifecycle script runs unless listed here as true.
 strictDepBuilds: true
-allowBuilds: {}
+# esbuild's postinstall only re-verifies the platform binary it already gets
+# through optionalDependencies, so it stays blocked.
+allowBuilds:
+  esbuild: false
 
 engineStrict: true

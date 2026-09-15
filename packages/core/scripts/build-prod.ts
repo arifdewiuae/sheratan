@@ -1,0 +1,75 @@
+// The production build: one minified ESM file whose errors carry a code and a
+// docs link instead of message text (SPEC A3). The development build is what
+// `tsc` emits — readable, with source maps into the TypeScript.
+
+import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { build, type Plugin } from 'esbuild';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const outfile = resolve(root, 'dist/prod/index.js');
+const declarations = resolve(root, 'dist/dev');
+
+// TypeScript 7.0.2 applies `rewriteRelativeImportExtensions` to emitted
+// JavaScript but not to emitted declarations, which keep `./x.ts` and fail to
+// resolve for consumers. scripts/verify-types.ts is the check that catches it.
+async function rewriteDeclarationExtensions(): Promise<void> {
+  const files = (await readdir(declarations)).filter((file) => file.endsWith('.d.ts'));
+
+  await Promise.all(
+    files.map(async (file) => {
+      const path = resolve(declarations, file);
+      const source = await readFile(path, 'utf8');
+      const fixed = source.replaceAll(/(from\s+'\.[^']*)\.ts'/g, "$1.js'");
+
+      if (fixed !== source) await writeFile(path, fixed);
+    }),
+  );
+}
+
+await rewriteDeclarationExtensions();
+
+// Swapping the environment module drops the message table from the bundle.
+const productionEnv: Plugin = {
+  name: 'sheratan-production-env',
+  setup(current) {
+    current.onResolve({ filter: /env\.ts$/ }, (args) => ({
+      path: resolve(dirname(args.importer), 'env.prod.ts'),
+    }));
+  },
+};
+
+await build({
+  entryPoints: [resolve(root, 'src/index.ts')],
+  outfile,
+  bundle: true,
+  format: 'esm',
+  target: 'es2022',
+  platform: 'browser',
+  minify: true,
+  sourcemap: true,
+  legalComments: 'none',
+  plugins: [productionEnv],
+});
+
+const bundle = await readFile(outfile, 'utf8');
+const leaked = 'onDispose() needs an owner';
+
+if (bundle.includes(leaked)) {
+  throw new Error(`Production bundle still carries development messages: ${leaked}`);
+}
+
+if (!bundle.includes('sheratan.dev/errors/')) {
+  throw new Error('Production bundle lost the docs link errors point at.');
+}
+
+// The package entry is ESM-only; state it next to the output so a consumer
+// unpacking dist/ sees it too.
+await writeFile(
+  resolve(root, 'dist/prod/package.json'),
+  `${JSON.stringify({ type: 'module' }, null, 2)}\n`,
+);
+
+process.stdout.write(`built ${outfile} (${String(Buffer.byteLength(bundle))} bytes)\n`);

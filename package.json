@@ -7,18 +7,23 @@
     "node": ">=24.15.0"
   },
   "scripts": {
-    "lint": "eslint . --max-warnings 0",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint --type-aware --deny-warnings",
     "typecheck": "pnpm -r --if-present typecheck",
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test",
     "coverage": "pnpm -r --if-present coverage",
+    "verify": "pnpm -r --if-present verify",
     "security": "pnpm audit --audit-level low && pnpm audit signatures",
-    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm coverage && pnpm security"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm coverage && pnpm verify && pnpm security"
   },
   "devDependencies": {
-    "@sheratan/eslint-config": "workspace:*",
-    "@types/node": "24.13.4",
-    "eslint": "10.10.0",
+    "@stylistic/eslint-plugin": "5.10.0",
+    "eslint-plugin-jsdoc": "64.3.10",
+    "oxfmt": "0.67.0",
+    "oxlint": "1.82.0",
+    "oxlint-tsgolint": "7.0.2001",
     "typescript": "7.0.2"
   }
 }
