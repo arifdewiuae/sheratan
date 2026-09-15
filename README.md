@@ -22,8 +22,11 @@
 
 ---
 
-> **Pre-release.** There is no code to install yet. This repository holds the
-> specification, the evaluation plan and the website while the MVP is built.
+> **Pre-release.** Nothing is published to npm yet. This repository holds the
+> specification, the evaluation plan, the website and the core runtime while the
+> MVP is built.
+
+[![CI](https://github.com/arifdewiuae/sheratan/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/arifdewiuae/sheratan/actions/workflows/ci.yml)
 
 ## The idea
 
@@ -47,11 +50,27 @@ linters) and what Sheratan won't do, is in [the spec](Docs/SPEC.md).
 
 | Path | What |
 |---|---|
+| `packages/core/` | The runtime: signals, templates, `each`, `render`. Zero runtime dependencies |
+| `tooling/eslint-config/` | Shared lint config |
+| `llms.txt` | The API as an agent should learn it |
 | `Docs/SPEC.md` | Technical specification. The source of truth for implementation |
 | `Docs/EVAL.md` | Performance and agent-authoring evaluation plan, with go/no-go gates |
 | `Docs/TASKS.md` | Progress tracker for the MVP |
 | `Docs/sheratan-identity.html` | Brand identity |
-| `site/` | Website: plain HTML, no build. Open `site/index.html` |
+| `site/` | Website: plain HTML, no build. Serve `site/` with any static file server |
+| `AGENTS.md` | How to work in this repo: commands, code rules, complexity bounds, definition of done |
+
+## Development
+
+Requires Node (version in `.nvmrc`) and pnpm (version pinned in `package.json`).
+
+```sh
+pnpm install --frozen-lockfile
+pnpm check   # lint, typecheck, build, tests with coverage gate, dependency audit
+```
+
+All changes go through pull requests into `develop`; `main` is for releases.
+Read [AGENTS.md](AGENTS.md) before opening one.
 
 ## The name
 
