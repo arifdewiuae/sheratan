@@ -46,8 +46,8 @@ Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · 
 Goal: test the central hypothesis while it costs three days. Harness timebox: 2 days (EVAL "Scope discipline").
 
 **Setup**
-- [ ] `llms.txt` v0: API, import matrix, reactivity trap as the first item, canonical module (SPEC §10)
-- [ ] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro)
+- [x] `llms.txt` v0: API, import matrix, reactivity trap as the first item, canonical module (SPEC §10) — [llms.txt](../llms.txt), ~4.0–4.7k tokens estimated (recount with the evaluated model's counter before the first run); canonical module executed end to end
+- [x] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro) — `packages/core`: signals, scheduler, `html`, keyed `each`, `render`; 526 lines, 38 tests
 - [x] Freeze and version 12 eval tasks (EVAL §2.1) — [EVAL-TASKS.md](EVAL-TASKS.md), tag `eval-tasks-v1`, SHA-256 `7a19d6474fbcb1a417d60fb3c2be815c908d8cb68bd50a7a60a3a5a9a317f1ce`
 - [x] Split: 6 headline tasks + 6 held-out (EVAL-TASKS §2)
 - [x] Fix the documentation token budget for both arms **and write it down** before the first run — 8,000 tokens (EVAL-TASKS §1.5)
@@ -292,3 +292,5 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-15 | Handlers inside an `each` row receive the innermost row's current item as a second argument (SPEC §9) | A row's button can name its item without an inline arrow (`SHR-V001`) or a new directive |
 | 2026-09-15 | Transitions are plain exported functions; multi-write ones use `batch()` (SPEC §4) | No new API. Cost, logged as a gap: nothing marks a transition at run time |
 | 2026-09-15 | "No build" means any static file server, not `file://` (SPEC §10c, EVAL) | Browsers refuse ES module scripts from `file://`; a `file://` build would be a second way to load core |
+| 2026-09-15 | Any module file may `import type` from `services/*.contract.ts`; `index.ts` row added to the matrix (SPEC §4) | Contracts are the shared domain vocabulary; type imports are erased; `lib/` types or per-module copies were worse |
+| 2026-09-15 | Module wiring: `index.ts` exports `kind` and a factory returning a view function; state is a factory; view is `(state, intents)` (SPEC §4) | State and watchers are created inside `render()`'s owner and disposed with it; the view gets intents without importing effects |

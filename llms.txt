@@ -1,0 +1,351 @@
+# sheratan
+
+> A frontend framework with one legal way to structure an app. Signals and
+> tagged templates, no virtual DOM, no bundler. A checker enforces the module
+> rules and reports every violation as JSON with a code and a fix.
+> This is llms.txt v0: it covers what the runtime ships today.
+
+## 1. The trap — read this first
+
+A template hole is reactive only when it receives the signal itself.
+JavaScript evaluates `${…}` before `html` runs, so a *call* inside a hole
+hands the runtime a plain value that never updates.
+
+```ts
+html`<span>${s.total}</span>`          // ✓ updates
+html`<span>${s.total()}</span>`        // ✗ read once at mount (SHR-V003)
+html`<span>${s.total() * 2}</span>`    // ✗ read once; make a computed
+const t = s.total(); html`${t}`        // ✗ read once, same reason
+```
+
+This looks like every other framework and is wrong here. Any expression — maths,
+formatting, a ternary choosing markup — becomes a named `computed`, and the
+hole gets the computed.
+
+## 2. API
+
+```ts
+import { signal, computed, watch, batch, onDispose, flush, html, each, render } from 'sheratan';
+```
+
+| API | Meaning |
+|---|---|
+| `signal(v)` | Writable value. Read `x()`, write `x.set(v)`. Equal writes (`Object.is`) do nothing. |
+| `computed(() => …)` | Derived value, lazy and cached. Read `c()`. |
+| `watch(() => …)` | Runs now and again when what it read changes. Returns a disposer. Effects only. |
+| `batch(() => …)` | Writes inside commit once. Returns the callback's value. |
+| `onDispose(fn)` | Teardown for `addEventListener`, `setInterval`, sockets. Effects only (SHR-L004). |
+| `html\`…\`` | Template. Holes: children, `name=${}` attribute, `.prop=${}` property, `@event=${}` handler. |
+| `each(list, row)` | Keyed list. See §5. |
+| `render(view, el)` | Mount `view()` into `el`. Returns a disposer that removes only its own nodes. |
+| `flush()` | Apply pending DOM updates now. Use in tests after a write. |
+
+Types: `Signal<T>` (callable + `.set`), `Accessor<T>` (`() => T`), `Template`.
+
+**Scheduling.** Computeds update synchronously. DOM updates wait for the next
+animation frame; many writes in one frame produce one DOM write with the last
+value. In unit tests call `flush()` before asserting on the DOM.
+
+**Immutability.** Never mutate a value held in a signal. Write a new object or
+array: `items.set([...items(), next])`, `items.set(items().map(o => o.id === id ? { ...o, status } : o))`.
+
+## 3. Holes
+
+| Value in the hole | Result |
+|---|---|
+| signal or computed (`${s.name}`) | reactive |
+| string, number | text, escaped — never markup |
+| `null`, `undefined`, `false` | nothing (attribute: removed) |
+| `true` in an attribute | empty attribute (`hidden=""`) |
+| `html` template | nested markup |
+| a computed returning a template or `null` | conditional markup |
+| `each(…)` | keyed list |
+
+An attribute hole must be the whole value: `class=${cls}` or `class="${cls}"`.
+`class="row ${x}"` throws — make `cls` a computed.
+
+Conditional markup is a computed in the view:
+
+```ts
+const body = computed(() => {
+  if (s.status() === 'loading') return html`<p data-testid="loading">Loading…</p>`;
+  if (s.status() === 'error') return html`<p data-testid="error">${s.error}</p>`;
+  return table;
+});
+return html`<main>${body}</main>`;
+```
+
+## 4. Events and intents
+
+Views never act; they emit intents. An event hole takes a named handler —
+never an inline arrow (SHR-V001). The handler receives a payload, not the Event:
+
+| Event | Payload |
+|---|---|
+| `submit` | form fields as an object; default is prevented |
+| `input`, `change` | the control's `value` (a string), or `checked` for a checkbox |
+| anything else | `undefined` |
+
+Inside an `each` row a handler also gets a **second argument: the row's
+current item** (innermost row). Every handler runs inside `batch()`.
+
+```ts
+html`<button @click=${intent.ship}>Ship</button>`   // inside a row
+// effects:  ship: (_payload, order: Order) => { … }
+```
+
+## 5. Lists
+
+`each(list, row)`: `list` is a signal/computed of an array (or a plain array,
+rendered once). Objects are keyed by `id` (required, unique); primitives by
+value. `row` runs **once per key** and receives an **accessor** for the item.
+A new object with the same `id` updates that row's cells in place; the row is
+not rebuilt. Read fields through computeds:
+
+```ts
+each(s.orders, (order) => {
+  const status = computed(() => order().status);
+  return html`<li data-testid="order-row">
+    <span data-testid="status">${status}</span>
+    <button data-testid="ship" @click=${intent.ship}>Mark shipped</button>
+  </li>`;
+})
+```
+
+`${order().status}` inside the row is the trap again.
+
+## 6. Module rules
+
+The unit of code is a module: a folder under `modules/`.
+
+```
+modules/<name>/
+  <name>.state.ts     signals, computeds, transitions. No I/O, no DOM.
+  <name>.effects.ts   everything impure: calls to services, timers, watchers.
+  <name>.view.ts      (state, intents) => html. No I/O, no writes.
+  index.ts            the module's only public surface; declares its kind.
+services/
+  api.contract.ts     interface the modules depend on
+  api.http.ts         adapter: URLs, fetch, parsing
+lib/                  pure helpers, no app knowledge
+ui/<component>/       stateless reusable components
+app.ts                composition root: builds services, mounts modules
+```
+
+`index.ts` declares `export const kind = 'full'` (all four files) or `'view'`
+(view + index only). No `shared/` folder. A component used by one module lives
+inside that module.
+
+**Import matrix** — the whole rule set for imports (SHR-L001):
+
+| From | May import |
+|---|---|
+| `lib/` | nothing |
+| `ui/` | `lib/`, `ui/` |
+| `services/` | `lib/`, `services/` |
+| `*.state.ts` | `lib/`, own module |
+| `*.effects.ts` | `lib/`, `services/` contracts, own state, other modules' `index.ts` |
+| `*.view.ts` | `lib/`, `ui/`, own state |
+| `index.ts` | own module files |
+| `app.ts` | everything |
+
+Any module file may also `import type` from `services/*.contract.ts` — that is
+where domain types like `Customer` live. A value import from `services/` in
+state, view or index is SHR-L001.
+
+`sheratan` itself may be imported anywhere, but `watch` and `onDispose` belong in
+effects. Data flows one way: effects → state → view.
+
+**Transitions.** A transition is a plain function exported from the state
+factory. It is the only thing that writes signals. One that writes several
+signals wraps them in `batch()`. An effect that gathers several results calls
+**one** transition with all of them — two calls render an in-between state.
+
+**State holds only what cannot be derived.** Filters, joins, counts, formatted
+values and "is anything selected" are computeds, never stored.
+
+**Cancellable I/O.** Every Promise-returning contract method takes an
+`AbortSignal` (SHR-L007). Effects abort in-flight work in `onDispose`.
+
+## 7. Canonical module
+
+```ts
+// services/api.contract.ts
+export interface Customer { id: string; name: string; company: string; country: string }
+export interface Api {
+  listCustomers(opts: { signal: AbortSignal }): Promise<Customer[]>;
+}
+
+// services/api.http.ts
+import type { Api } from './api.contract.ts';
+export const createHttpApi = (base: string): Api => ({
+  async listCustomers({ signal }) {
+    const res = await fetch(`${base}/customers`, { signal });
+    if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
+    return res.json();
+  },
+});
+
+// modules/customers/customers.state.ts
+import { signal, computed, batch } from 'sheratan';
+import type { Customer } from '../../services/api.contract.ts';
+
+export const createCustomersState = () => {
+  const status = signal<'loading' | 'error' | 'ready'>('loading');
+  const rows = signal<Customer[]>([]);
+  const error = signal<string | undefined>(undefined);
+  return {
+    status, rows, error,
+    count: computed(() => rows().length),
+    loadStarted: () => batch(() => { status.set('loading'); error.set(undefined); }),
+    loaded: (list: Customer[]) => batch(() => { rows.set(list); status.set('ready'); }),
+    failed: (message: string) => batch(() => { error.set(message); status.set('error'); }),
+  };
+};
+export type CustomersState = ReturnType<typeof createCustomersState>;
+
+// modules/customers/customers.effects.ts
+import { onDispose } from 'sheratan';
+import type { Api } from '../../services/api.contract.ts';
+import type { CustomersState } from './customers.state.ts';
+
+export const createCustomersEffects = (api: Api, state: CustomersState) => {
+  let inflight: AbortController | undefined;
+  onDispose(() => inflight?.abort());
+  const load = async () => {
+    inflight?.abort();
+    const controller = (inflight = new AbortController());
+    state.loadStarted();
+    try {
+      state.loaded(await api.listCustomers({ signal: controller.signal }));
+    } catch (err) {
+      if (controller.signal.aborted) return;        // cancellation is not failure
+      state.failed((err as Error).message);
+    }
+  };
+  return { load, retry: load };
+};
+
+// modules/customers/customers.view.ts
+import { html, computed, each } from 'sheratan';
+import type { CustomersState } from './customers.state.ts';
+
+export interface CustomersIntents { retry(): void }
+
+export const customersView = (s: CustomersState, intent: CustomersIntents) => {
+  const table = html`<table>
+    <thead><tr><th>Name</th><th>Company</th><th>Country</th></tr></thead>
+    <tbody>${each(s.rows, (c) => {
+      const name = computed(() => c().name);
+      const company = computed(() => c().company);
+      const country = computed(() => c().country);
+      return html`<tr data-testid="customer-row"><td>${name}</td><td>${company}</td><td>${country}</td></tr>`;
+    })}</tbody>
+  </table>`;
+  const body = computed(() => {
+    if (s.status() === 'loading') return html`<p data-testid="loading">Loading…</p>`;
+    if (s.status() === 'error') return html`<div data-testid="error">
+      <p>${s.error}</p><button data-testid="retry" @click=${intent.retry}>Retry</button></div>`;
+    return table;
+  });
+  return html`<section><h1>Customers (${s.count})</h1>${body}</section>`;
+};
+
+// modules/customers/index.ts
+import type { Api } from '../../services/api.contract.ts';
+import { createCustomersState } from './customers.state.ts';
+import { createCustomersEffects } from './customers.effects.ts';
+import { customersView } from './customers.view.ts';
+
+export const kind = 'full';
+export const createCustomers = (api: Api) => () => {
+  const state = createCustomersState();
+  const effects = createCustomersEffects(api, state);
+  effects.load();
+  return customersView(state, effects);
+};
+
+// app.ts
+import { render } from 'sheratan';
+import { createHttpApi } from './services/api.http.ts';
+import { createCustomers } from './modules/customers/index.ts';
+
+render(createCustomers(createHttpApi('/api')), document.getElementById('app')!);
+```
+
+Why it is shaped this way: `index.ts` returns a function, so state and effects
+are created inside `render()` and everything they start is disposed with it.
+The view declares the intents it needs; the effects object satisfies them.
+
+## 8. Tests
+
+State is pure and needs no mocks. Effects get a fake `Api` object.
+
+```ts
+const s = createCustomersState();
+s.loaded([{ id: '1', name: 'Ada', company: 'X', country: 'UK' }]);
+assert.equal(s.count(), 1);
+assert.equal(s.status(), 'ready');
+```
+
+Tests are `<name>.state.test.ts` and `<name>.effects.test.ts` next to the
+module (SHR-T001 warns when missing). End-to-end tests live in `e2e/`.
+
+## 9. Wrong → right
+
+| Wrong | Right | Code |
+|---|---|---|
+| `${s.total()}` in a hole | `${s.total}` | V003 |
+| `${a() + b()}` in a hole | `const sum = computed(() => a() + b())`, then `${sum}` | V003 |
+| `@click=${() => intent.ship(id)}` | `@click=${intent.ship}` inside the row; handler reads its 2nd argument | V001 |
+| `fetch(…)` in a view or state | contract method in `services/`, called from effects | L002 / L001 |
+| `state.rows.set(list)` in effects | a transition: `state.loaded(list)` | L005 |
+| `import { x } from '../orders/orders.state.ts'` | `import { … } from '../orders/index.ts'` (effects only) | L001 |
+| view imports effects | the view receives intents as a parameter | L001 |
+| `state.a(x); state.b(y);` after one await | one transition taking `{ x, y }` | — |
+| storing a filtered list in a signal | `computed(() => rows().filter(…))` | — |
+| `order().status` read directly in a row hole | `computed(() => order().status)` | V003 |
+| `listCustomers(): Promise<…>` without a signal | `listCustomers(opts: { signal: AbortSignal })` | L007 |
+| `items().push(x)` | `items.set([...items(), x])` | — |
+| `watch`/`onDispose` in a view | move to effects | L004 |
+
+## 10. Checker output
+
+`sheratan check --json` prints one object per violation:
+
+```json
+{
+  "code": "SHR-L001",
+  "severity": "error",
+  "file": "modules/todo/todo.view.ts",
+  "range": { "line": 3, "column": 1 },
+  "message": "view cannot import effects; allowed: lib, ui, own state.",
+  "fix": "Move the call into todo.effects.ts and expose the result via todo.state.ts.",
+  "docs": "https://sheratan.dev/errors/L001"
+}
+```
+
+Apply the `fix`; the `message` names the allowed set.
+
+| Code | Rule |
+|---|---|
+| SHR-L001 | import not allowed by the matrix, including deep imports past another module's `index.ts` |
+| SHR-L002 | I/O global (`fetch`, `localStorage`, `document`, timers) in a view |
+| SHR-L003 | `shared/` folder, or `ui/` nested more than one level |
+| SHR-L004 | `watch`, `onDispose` (and later `resource`, `mutation`, `stream`, `navigate`) outside effects |
+| SHR-L005 | effects write a signal directly instead of calling a transition |
+| SHR-L006 | module files don't match its declared `kind` |
+| SHR-L007 | Promise-returning contract method without an `AbortSignal` |
+| SHR-L008 | circular imports between modules |
+| SHR-L009 | module stylesheet not wrapped in its `@scope` |
+| SHR-V001 | inline function in a template hole (error) |
+| SHR-V002 | `unsafeHTML` with a non-literal argument (warning) |
+| SHR-V003 | signal called inside a hole (warning) |
+| SHR-V004 | malformed template (error) |
+| SHR-T001 | module has no state/effects tests (warning) |
+
+## Not in v0
+
+`resource()`, `mutation()`, `stream()`, `mount()`, `unsafeHTML`, routing and
+windowed `each` are specified but not shipped. Use plain `fetch` through a
+service with an `AbortController`, as in §7.

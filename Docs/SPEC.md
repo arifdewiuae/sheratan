@@ -165,7 +165,15 @@ rather than a numbered list.
 | `*.state.ts` | `lib/`, own module |
 | `*.effects.ts` | `lib/`, `services/` contracts, own state, other modules' `index.ts` |
 | `*.view.ts` | `lib/`, `ui/`, own state, module instances received as parameters |
+| `index.ts` | own module files |
 | `app.ts` | everything (composition root) |
+
+Plus one exception for every module file: **`import type` from
+`services/*.contract.ts`** is always allowed. Contracts are the app's shared
+vocabulary (`Customer`, `Order`), type imports are erased at run time, and the
+alternatives — domain types in `lib/`, or a copy per module — either give `lib/`
+app knowledge or duplicate shapes that drift. A value import from `services/`
+is still `SHR-L001`.
 
 Every cell of this matrix reports as **one code, `SHR-L001`**. The message names
 the cell and states the allowed set rather than citing a rule number: *"view
@@ -212,6 +220,31 @@ the prefix: `sheratan.dev/errors/L001`.
 
 Data flows in exactly one direction: `effects → state → view`. Views emit
 intents; they never act.
+
+### Wiring a module
+
+```ts
+// index.ts
+export const kind = 'full';                      // or 'view' (SHR-L006)
+export const createCustomers = (api: Api) => () => {
+  const state = createCustomersState();          // signals, computeds, transitions
+  const effects = createCustomersEffects(api, state);
+  effects.load();
+  return customersView(state, effects);          // (state, intents) => html
+};
+
+// app.ts
+render(createCustomers(createHttpApi('/api')), document.getElementById('app')!);
+```
+
+- `index.ts` exports the kind and **a factory returning a view function**.
+  `render()` calls that function inside its owner, so state, watchers and
+  `onDispose` created there belong to the mount and die with it.
+- State is a factory (`create<Name>State()`), so every mount and every test
+  starts fresh.
+- The view is `(state, intents) => html`. It declares the intents it needs as a
+  `<Name>Intents` interface; the effects object satisfies it structurally, so
+  the view never imports effects.
 
 ### Atomic transitions
 
