@@ -1,0 +1,5 @@
+{
+  "//": "Sheratan needs no extension of its own yet: `html` tagged templates highlight with lit-html, and the editor's TypeScript already understands the rest. A Sheratan extension arrives with the checker, which is what would give templates real diagnostics (Docs/TASKS.md, Week 3).",
+  "recommendations": ["bierner.lit-html", "oxc.oxc-vscode"],
+  "unwantedRecommendations": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+}
