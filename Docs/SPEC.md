@@ -612,6 +612,27 @@ messages arriving faster than a frame are folded and committed once per frame
 reconnection state is exposed as `ticks.status()` so views can show staleness
 instead of silently rendering old numbers.
 
+A stream is read like any other value — `ticks()` — with `ticks.status()` and
+`ticks.error()` beside it, rather than a `data()` accessor: unlike a resource
+it always has a value, because `initial` is one.
+
+`status()` is `'connecting' | 'open' | 'closed'`. A `subscribe` that returns a
+teardown directly is open the moment it returns; one that returns a *promise*
+of a teardown stays `'connecting'` until it resolves, and messages that arrive
+during the handshake are still folded. A subscription that resolves after its
+key changed is torn down as soon as it exists.
+
+`subscribe` is handed `close(reason?)` as well as `emit`. An adapter whose
+source ends calls it, and the stream goes `'closed'` with the last value still
+readable, so a view can show stale numbers and say they are stale. The teardown
+still runs on unmount. A `subscribe` that throws, or whose promise rejects, is
+the same `'closed'` state with the error in `error()` — never a throw.
+
+A new key tears the subscription down, resubscribes, and resets the value to
+`initial`: the fold belonged to the key that went away. Messages from a
+torn-down subscription are ignored, so an adapter that keeps emitting cannot
+corrupt the new key's fold.
+
 ## 7. Causal trace
 
 The runtime records a causal chain for every update, behind a flag in

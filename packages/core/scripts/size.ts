@@ -57,12 +57,14 @@ const SCENARIOS: Record<string, readonly string[]> = {
     'render',
     'resource',
     'signal',
+    'stream',
     'watch',
   ],
   'state only': ['signal', 'computed', 'batch'],
   widget: ['signal', 'computed', 'html', 'render'],
   'widget with lists': ['signal', 'computed', 'html', 'render', 'each'],
   'widget with async': ['signal', 'computed', 'html', 'render', 'resource', 'onDispose'],
+  'widget with live data': ['signal', 'computed', 'html', 'render', 'each', 'stream', 'onDispose'],
 };
 
 const measured = await Promise.all(

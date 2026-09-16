@@ -5,6 +5,7 @@
 // in `run()`: a superseded response is discarded, a cancelled one is not a
 // failure, and the request itself is aborted rather than merely ignored.
 
+import { isAbort, sameKey, toError } from './async.ts';
 import { onDispose } from './owner.ts';
 import { batch } from './scheduler.ts';
 import { signal } from './signal.ts';
@@ -16,9 +17,6 @@ const RETRY_BASE_MS = 100;
 
 /** Exponential backoff doubles the wait on every attempt. */
 const BACKOFF_FACTOR = 2;
-
-/** The `name` every host rejects a cancelled request with. */
-const ABORT_ERROR = 'AbortError';
 
 /** Where a resource is, between its first request and a value or an error. */
 export const ResourceStatus = {
@@ -100,21 +98,6 @@ export interface LoadedResource<T> extends Resource<T> {
 /** A resource that failed: what `is('error')` proves. */
 export interface FailedResource<T> extends Resource<T> {
   error(): Error;
-}
-
-/** Keys compare by contents, so a rebuilt array with the same parts is the same key. */
-function sameKey(left: readonly unknown[], right: readonly unknown[]): boolean {
-  return left.length === right.length && left.every((part, index) => Object.is(part, right[index]));
-}
-
-/** Cancellation is not failure (SPEC §5b rule 3), so it has to be recognisable. */
-function isAbort(error: unknown): boolean {
-  return error instanceof Error && error.name === ABORT_ERROR;
-}
-
-/** Errors are values, and a value has to be an Error even when a string was thrown. */
-function toError(thrown: unknown): Error {
-  return thrown instanceof Error ? thrown : new Error(String(thrown));
 }
 
 function delayFor(tries: number, backoff: Backoff): number {
