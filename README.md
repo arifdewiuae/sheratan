@@ -65,8 +65,15 @@ bundled and gzipped the same way ([method](Docs/comparison/README.md)):
 | Angular 19 | 5 | 145.5 kB |
 
 The whole of Sheratan is smaller than the smallest single piece of any of them.
+
+Size is the easiest axis to verify, not the one that matters. The one this
+project exists for is the other table: **none of those five is designed to be
+written by a model.** One legal structure instead of five conventions,
+violations that come back as JSON with the code to write instead, and docs
+generated from the declarations so they cannot drift from them.
 [What is being matched, what Sheratan does not have, and the caveats](Docs/COMPARISON.md)
-— including that there is no router and no server rendering yet.
+— including that there is no router, no server rendering, and no proof yet that
+any of it makes an agent measurably better.
 
 ## Repository
 

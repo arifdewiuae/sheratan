@@ -6,6 +6,10 @@ Sheratan is one package. The question this answers is what another stack has to
 install, and ship, to reach the same feature set — not "which framework is
 smaller", which is a question about nothing.
 
+Size is the least interesting axis here, and it is first only because it is the
+easiest to verify. The one that the project exists for is
+[authorability by an agent](#the-axis-nobody-else-competes-on), below.
+
 Every row is bundled by the same esbuild call, minified the same way and gzipped
 at the same level, importing only the APIs that stack needs for the capabilities
 in the matrix below. Nothing imports a package's whole surface, including ours.
@@ -42,24 +46,51 @@ treats virtualization and the async request lifecycle as somebody else's
 problem, which is defensible — and which is why "React is 3 kB" is a number
 about `createElement`, not about an application.
 
+## The axis nobody else competes on
+
+Sheratan exists because a code-generating agent does not fail for want of a
+linter. It fails because there are too many legal ways to do the same thing, and
+because when it gets one wrong nothing tells it what to write instead. None of
+the five frameworks above is designed for that reader.
+
+| | Sheratan | Solid · Svelte · Vue · React · Angular |
+|---|---|---|
+| One legal structure, so there is nothing to choose wrong | Yes — the module contract (SPEC §4) | No. Structure is convention, and every project has a different one |
+| Violations as machine-readable JSON with a `fix` an agent can apply | Specified (SPEC §8); lint rules stand in today | No equivalent. ESLint reports a rule name, not the code to write instead |
+| Docs shipped **for the model**, generated from the declarations and CI-checked against them | Yes — [`llms.txt`](../llms.txt), built today | No. Human docs, versioned separately from the code, drift silently |
+| Why the DOM changed, as JSON | Specified (SPEC §7) | Devtools extensions — human-readable, agent-opaque |
+| `--json` on every CLI command | Specified (SPEC §10) | Partial at best |
+| One package decision instead of five | Yes | State, data, virtualization, routing and forms are all open choices |
+
+**What of that is built today: `llms.txt`, and the lint rules standing in for the
+checker.** The checker, the CLI, the trace and `SKILL.md` are specified and
+unwritten. And the claim that any of it makes an agent measurably better is
+**unproven** — that is exactly what [EVAL](EVAL.md)'s Week 0 gate exists to
+test, and it has not been run. This section describes a design, not a result.
+
 ## What Sheratan does not have
 
 Publishing the first table without this one would be dishonest.
 
 | | Sheratan | The others |
 |---|---|---|
-| Server rendering / hydration | **No**, and not planned for v0 (SPEC §13 keeps the door open) | All five |
-| Router | Specified, not built (SPEC §9b) | All five, in wide use |
-| Forms, animation, i18n, component libraries | None | Years of ecosystem |
+| Router | **Not built.** Specified in SPEC §9b — `location` as a signal, delegated `<a>` interception, `navigate()`, flat `match()` over `URLPattern`. Basic routing belongs in core; anything nested is a separate package | All five ship or bless one, in wide use |
+| Server rendering / hydration | **No, by decision** (SPEC §13), and post-MVP at the earliest. The target niche is authenticated app UIs (SPEC §1), where it matters least — but it does rule out public, SEO-facing pages | All five |
+| Component library ecosystem | None | MUI, Vuetify, shadcn, Angular Material, and the rest |
+| Forms, animation, i18n | Separate packages, as they should be | Also separate packages — **except Angular**, which ships `@angular/forms`, `@angular/animations` and `@angular/localize` first-party |
 | Production use | Pre-release; nothing on npm | Millions of applications |
-| Browser devtools extension | No — the causal trace is JSON from the dev build (SPEC §7) | React, Vue, Svelte, Angular |
+| Browser devtools extension | Not built, and planned as a *second* surface: the causal trace is JSON first, because an extension is readable by a human and opaque to an agent (TASKS "Devtools surface") | React, Vue, Svelte, Angular |
 
-And the other direction, where the comparison has no column because nobody else
-has one: an **architecture checker** that fails the build on a layering
-violation and returns a machine-readable `fix` (SPEC §8), a **causal trace**
-from write to DOM patch (SPEC §7), and **no build step** — the same app runs
-from any static file server as plain ESM (SPEC §10c). None of those three cost a
-byte in production.
+One line in that table is not a gap at all, and it is worth separating. Forms,
+animation and i18n are third-party in React, Vue, Svelte and Solid too, so
+counting them against a core is a category error. What is genuinely missing is
+the **ecosystem** — the component libraries, and the years of answers on the
+internet.
+
+The other direction, where the comparison has no column because nobody else has
+one: **no build step** — the same app runs from any static file server as plain
+ESM, with type stripping and no bundler (SPEC §10c) — alongside the checker and
+the trace above. None of those costs a byte in production.
 
 ## Caveats
 
@@ -79,8 +110,12 @@ Read these before quoting the table.
    which shakes far worse than ESM. That is a real cost of using them, not a
    measurement artefact.
 6. **Sheratan's own number is its whole runtime.** There is no second package to
-   add later for state, data or lists; there is also no router yet, and adding
-   one will move this number.
+   add later for state, data or lists. There is also no router yet: SPEC §9b
+   budgets `match()` at roughly thirty lines over `URLPattern`, but until it is
+   written that is an estimate, and it will move this number.
+7. **Bytes are the easy axis, not the important one.** Every row here would be
+   unchanged if one of these frameworks shipped a checker and machine-readable
+   fixes tomorrow, and that would matter far more than the kilobytes.
 
 ## Versions
 
