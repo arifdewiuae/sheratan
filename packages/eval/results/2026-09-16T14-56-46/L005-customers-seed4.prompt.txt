@@ -1,0 +1,64 @@
+This project has a checker that enforces its architecture. It reports these errors:
+
+[
+  {
+    "code": "SHR-L005",
+    "severity": "error",
+    "file": "modules/customers/customers.effects.ts",
+    "range": {
+      "line": 44,
+      "column": 7
+    },
+    "message": "effects may not write state directly: `state.rows.set(…)` changes a signal that *.state.ts owns.",
+    "fix": "Add a transition to this module's *.state.ts that makes this change, and call that transition here instead. One transition is one commit.",
+    "docs": "https://sheratan.dev/errors/L005"
+  },
+  {
+    "code": "SHR-L005",
+    "severity": "error",
+    "file": "modules/customers/customers.effects.ts",
+    "range": {
+      "line": 45,
+      "column": 7
+    },
+    "message": "effects may not write state directly: `state.error.set(…)` changes a signal that *.state.ts owns.",
+    "fix": "Add a transition to this module's *.state.ts that makes this change, and call that transition here instead. One transition is one commit.",
+    "docs": "https://sheratan.dev/errors/L005"
+  },
+  {
+    "code": "SHR-L005",
+    "severity": "error",
+    "file": "modules/customers/customers.effects.ts",
+    "range": {
+      "line": 46,
+      "column": 7
+    },
+    "message": "effects may not write state directly: `state.status.set(…)` changes a signal that *.state.ts owns.",
+    "fix": "Add a transition to this module's *.state.ts that makes this change, and call that transition here instead. One transition is one commit.",
+    "docs": "https://sheratan.dev/errors/L005"
+  }
+]
+
+The file tree is:
+
+hosts/app.ts
+hosts/modules/customers/customers.effects.ts
+hosts/modules/customers/customers.state.ts
+hosts/modules/customers/customers.view.ts
+hosts/modules/customers/index.ts
+hosts/modules/new-order/index.ts
+hosts/modules/new-order/new-order.effects.ts
+hosts/modules/new-order/new-order.state.ts
+hosts/modules/new-order/new-order.view.ts
+hosts/modules/notifications/index.ts
+hosts/modules/notifications/notifications.effects.ts
+hosts/modules/notifications/notifications.state.ts
+hosts/modules/notifications/notifications.view.ts
+hosts/modules/orders/index.ts
+hosts/modules/orders/orders.effects.ts
+hosts/modules/orders/orders.state.ts
+hosts/modules/orders/orders.view.ts
+hosts/services/api.contract.ts
+hosts/services/api.fixture.ts
+
+Make the checker pass. Do not change what the application does.

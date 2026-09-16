@@ -1,0 +1,38 @@
+This project has a checker that enforces its architecture. It reports these errors:
+
+[
+  {
+    "code": "SHR-L001",
+    "severity": "error",
+    "file": "modules/customers/customers.effects.ts",
+    "range": {
+      "line": 7,
+      "column": 44
+    },
+    "message": "`customers` reached into `notifications`'s internals: `../notifications/notifications.effects.ts` is not that module's public surface."
+  }
+]
+
+The file tree is:
+
+hosts/app.ts
+hosts/modules/customers/customers.effects.ts
+hosts/modules/customers/customers.state.ts
+hosts/modules/customers/customers.view.ts
+hosts/modules/customers/index.ts
+hosts/modules/new-order/index.ts
+hosts/modules/new-order/new-order.effects.ts
+hosts/modules/new-order/new-order.state.ts
+hosts/modules/new-order/new-order.view.ts
+hosts/modules/notifications/index.ts
+hosts/modules/notifications/notifications.effects.ts
+hosts/modules/notifications/notifications.state.ts
+hosts/modules/notifications/notifications.view.ts
+hosts/modules/orders/index.ts
+hosts/modules/orders/orders.effects.ts
+hosts/modules/orders/orders.state.ts
+hosts/modules/orders/orders.view.ts
+hosts/services/api.contract.ts
+hosts/services/api.fixture.ts
+
+Make the checker pass. Do not change what the application does.

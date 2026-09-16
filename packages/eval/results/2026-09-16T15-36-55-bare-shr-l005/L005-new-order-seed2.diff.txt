@@ -1,0 +1,299 @@
+===== modules/new-order/new-order.effects.ts
+// Effects: the only impure file (SPEC §4). It calls the contract and then
+// invokes one transition; it never decides what the data means.
+
+import { onDispose } from 'sheratan';
+
+import type { Api, Rejected } from '../../services/api.contract.ts';
+import type { NotificationsEffects } from '../notifications/index.ts';
+import type { FieldErrors, NewOrderState } from './new-order.state.ts';
+
+/** What this module can do. The view declares the same shape for itself. */
+export interface NewOrderEffects {
+  submit(this: void): void;
+  chooseCustomer(this: void, value: string): void;
+  typeQuantity(this: void, value: string): void;
+  typeNote(this: void, value: string): void;
+}
+
+function rejectionOf(error: unknown): FieldErrors | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+
+  const body = error as Partial<Rejected>;
+
+  return typeof body.errors === 'object' ? body.errors : undefined;
+}
+
+function failureOf(error: unknown): FieldErrors {
+  const rejected = rejectionOf(error);
+
+  if (rejected !== undefined) return rejected;
+
+  return { form: error instanceof Error ? error.message : 'unknown error' };
+}
+
+/** Wires the state to the API, and gives the mount its teardown. */
+export function createNewOrderEffects(
+  api: Api,
+  state: NewOrderState,
+  notifications: NotificationsEffects,
+): NewOrderEffects {
+  const controller = new AbortController();
+
+  onDispose(() => {
+    controller.abort();
+  });
+
+  const options = async (): Promise<void> => {
+    try {
+      const rows = await api.customers(controller.signal);
+
+      if (!controller.signal.aborted) state.customersLoaded(rows);
+    } catch {
+      // The select simply stays empty; T03 asserts on validation, not on this.
+    }
+  };
+
+  const send = async (): Promise<void> => {
+    const draft = state.draft();
+
+    state.sending();
+
+    try {
+      const id = await api.createOrder(draft, controller.signal);
+
+      if (!controller.signal.aborted) state.created(id);
+    } catch (error: unknown) {
+      if (controller.signal.aborted) return;
+
+      const found = failureOf(error);
+
+      state.failed(found);
+
+      if (found['form'] !== undefined) notifications.raise(found['form']);
+    }
+  };
+
+  void options();
+
+  return {
+    submit(): void {
+      // A second click while the first is in flight is not a second order.
+      if (state.pending()) return;
+      if (!state.checked()) return;
+
+      void send();
+    },
+
+    chooseCustomer(value: string): void {
+      state.customerChosen(Number(value));
+    },
+
+    typeQuantity(value: string): void {
+      state.quantityTyped(value);
+    },
+
+    typeNote(value: string): void {
+      state.noteTyped(value);
+    },
+  };
+}
+
+===== modules/new-order/new-order.state.ts
+// State: signals and pure transitions. No I/O, no DOM (SPEC §4).
+
+import { batch, computed, signal, type Accessor } from 'sheratan';
+
+import type { Customer, OrderDraft } from '../../services/api.contract.ts';
+
+/** The bounds T03 states. Rejected before a request is ever made. */
+const MIN_QUANTITY = 1;
+const MAX_QUANTITY = 1000;
+const MAX_NOTE = 200;
+
+const NO_CUSTOMER = 0;
+const NO_ORDER = 0;
+const EMPTY = '';
+
+/** One message per field, keyed by field name, as the server sends them. */
+export type FieldErrors = Readonly<Record<string, string>>;
+
+const NO_ERRORS: FieldErrors = {};
+
+const NO_CUSTOMERS: readonly Customer[] = [];
+
+/** Readable state plus the transitions that may change it. */
+export interface NewOrderState {
+  /** The options the select offers, loaded by effects. */
+  readonly customers: Accessor<readonly Customer[]>;
+  readonly customerId: Accessor<number>;
+  readonly quantity: Accessor<string>;
+  readonly note: Accessor<string>;
+  readonly errors: Accessor<FieldErrors>;
+  readonly pending: Accessor<boolean>;
+  readonly createdId: Accessor<number>;
+  readonly wasCreated: Accessor<boolean>;
+  /** The draft as the contract wants it, derived rather than stored. */
+  readonly draft: Accessor<OrderDraft>;
+
+  customersLoaded(rows: readonly Customer[]): void;
+  customerChosen(id: number): void;
+  quantityTyped(value: string): void;
+  noteTyped(value: string): void;
+  /** Validates the current draft, records the errors, and says whether to send. */
+  checked(): boolean;
+  sending(): void;
+  /** Records the server's rejection of the last attempt to send the form. */
+  failed(errors: FieldErrors): void;
+  created(id: number): void;
+}
+
+function quantityError(value: string): string {
+  const parsed = Number(value);
+
+  if (value.trim() === EMPTY) return 'Quantity is required.';
+  if (!Number.isInteger(parsed)) return 'Quantity must be a whole number.';
+
+  if (parsed < MIN_QUANTITY || parsed > MAX_QUANTITY) {
+    return `Quantity must be between ${String(MIN_QUANTITY)} and ${String(MAX_QUANTITY)}.`;
+  }
+
+  return EMPTY;
+}
+
+function validate(customerId: number, quantity: string, note: string): FieldErrors {
+  const found: Record<string, string> = {};
+  const quantityMessage = quantityError(quantity);
+
+  if (customerId === NO_CUSTOMER) found['customerId'] = 'Choose a customer.';
+  if (quantityMessage !== EMPTY) found['quantity'] = quantityMessage;
+
+  if (note.length > MAX_NOTE) {
+    found['note'] = `Note must be ${String(MAX_NOTE)} characters or fewer.`;
+  }
+
+  return found;
+}
+
+/** What the person typed, separated from what the server said about it. */
+interface Fields {
+  readonly customers: Signal<readonly Customer[]>;
+  readonly customerId: Signal<number>;
+  readonly quantity: Signal<string>;
+  readonly note: Signal<string>;
+}
+
+function createFields(): Fields {
+  return {
+    customers: signal(NO_CUSTOMERS),
+    customerId: signal(NO_CUSTOMER),
+    quantity: signal(EMPTY),
+    note: signal(EMPTY),
+  };
+}
+
+/** What the server said about the last attempt to send the form. */
+interface Submission {
+  readonly errors: Signal<FieldErrors>;
+  readonly pending: Signal<boolean>;
+  readonly createdId: Signal<number>;
+}
+
+function createSubmission(): Submission {
+  return {
+    errors: signal(NO_ERRORS),
+    pending: signal(false),
+    createdId: signal(NO_ORDER),
+  };
+}
+
+/** The transitions that only record what the person typed. */
+type Typing = Pick<
+  NewOrderState,
+  'customersLoaded' | 'customerChosen' | 'quantityTyped' | 'noteTyped'
+>;
+
+function createTyping(fields: Fields): Typing {
+  return {
+    customersLoaded(rows: readonly Customer[]): void {
+      fields.customers.set(rows);
+    },
+
+    customerChosen(id: number): void {
+      fields.customerId.set(id);
+    },
+
+    quantityTyped(value: string): void {
+      fields.quantity.set(value);
+    },
+
+    noteTyped(value: string): void {
+      fields.note.set(value);
+    },
+  };
+}
+
+/** Clears the form and records the receipt in one commit, never half of it. */
+function reset(fields: Fields, submission: Submission, id: number): void {
+  batch(() => {
+    submission.pending.set(false);
+    fields.customerId.set(NO_CUSTOMER);
+    fields.quantity.set(EMPTY);
+    fields.note.set(EMPTY);
+    submission.errors.set(NO_ERRORS);
+    submission.createdId.set(id);
+  });
+}
+
+/** Builds the module's state. Called once per mount, inside the mount's scope. */
+export function createNewOrderState(): NewOrderState {
+  const fields = createFields();
+  const submission = createSubmission();
+  const { customers, customerId, quantity, note } = fields;
+  const { errors, pending, createdId } = submission;
+
+  return {
+    customers,
+    customerId,
+    quantity,
+    note,
+    errors,
+    pending,
+    createdId,
+    wasCreated: computed(() => createdId() !== NO_ORDER),
+    draft: computed(() => ({
+      customerId: customerId(),
+      quantity: Number(quantity()),
+      note: note(),
+    })),
+
+    ...createTyping(fields),
+
+    checked(): boolean {
+      const found = validate(customerId(), quantity(), note());
+
+      errors.set(found);
+
+      return Object.keys(found).length === 0;
+    },
+
+    sending(): void {
+      batch(() => {
+        pending.set(true);
+        errors.set(NO_ERRORS);
+        createdId.set(NO_ORDER);
+      });
+    },
+
+    failed(found: FieldErrors): void {
+      batch(() => {
+        pending.set(false);
+        errors.set(found);
+      });
+    },
+
+    created(id: number): void {
+      reset(fields, submission, id);
+    },
+  };
+}
