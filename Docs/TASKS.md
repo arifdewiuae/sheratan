@@ -290,7 +290,17 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [ ] **Devtools surface.** Dev-build-only additions that belong with the causal trace (SPEC §7), not before it: a Chrome custom formatter so a signal prints as its value rather than `ƒ read()`, a Performance-panel track for drains and frame flushes, and debug names from the trace's write provenance. Decide the shape when §7 is built.
 - [ ] **Public repository before v1.0.0.** Dependency review in CI switches itself on when the repository stops being private; the release checklist has to include making it public (or buying Advanced Security).
 - [ ] **Checker on TypeScript 7.** SPEC §8 builds `packages/check` on the TypeScript compiler API. TS 7 (native) exposes only an unstable IPC API (`typescript/unstable/*`), not the TS 5/6 JS API. Decide before Week 3: pin the checker to TS 6's API, target TS 7's API, or parse with a standalone parser.
-- [ ] **The size budget's scenarios only half work.** First read (windowed `each`): `scripts/size.ts` bundles from the flattened `dist/prod/index.js`, and every scenario came within about 100 B of the whole runtime. Second read (`resource()`), after `dist/prod/package.json` started restating `sideEffects: false`: shaking now works for *some* exports and not others. Adding `resource` to the `everything` scenario moves it 5306 → 6072 B, so `resource` is dropped cleanly when unused — but `widget` (signal, computed, html, render) is only 52 B above `state only` (signal, computed, batch), which cannot be the true cost of the template engine. Something in the template or DOM modules is not shakeable, and finding it is worth more than the budget's wording. Decide after that: keep per-scenario numbers, or keep one number for the whole runtime.
+- [ ] **One prod build cannot be right for both a small import and a whole app.** Measured (gzip, esbuild + minify, 2026-09-16), bundling the same scenario from the flattened `dist/prod/index.js` against the module-preserved `dist/dev`:
+
+  | scenario | from `dist/prod` (flat) | from `dist/dev` (modules) |
+  |---|---|---|
+  | `signal` alone | 5492 B | **877 B** |
+  | state only | 5642 B | **1419 B** |
+  | widget | 5703 B | **5000 B** |
+  | widget with lists | 5727 B | **6358 B** ✗ |
+  | everything | 6600 B | **7241 B** ✗ |
+
+  The flat bundle minifies across module boundaries, so it wins for a real app by about 10%; it cannot be shaken finely, so it loses by 6× for a small import. The crossover sits between "widget" and "widget with lists" — roughly, anything that renders pays the whole runtime either way. So the earlier reading ("something in the template modules is not shakeable") was wrong: nothing is broken, the two builds simply trade off, and today's `exports` map offers only the one that suits whole apps. Decide: ship a third module-preserved prod condition for consumers who import a subset, or accept it and keep one number for the whole runtime instead of five scenarios that mostly restate it.
 - [ ] **Immutability rule code.** The checker rule for statically visible mutation of a signal's value (TASKS decision 2026-09-15) needs a code and a row in SPEC §4's table.
 - [x] **CSS scoping.** SPEC said `adoptedStyleSheets` on the component root, which is global on `document`. Resolved in SPEC §9a: native `@scope` + `@layer`, enforced by `SHR-L009`.
 
