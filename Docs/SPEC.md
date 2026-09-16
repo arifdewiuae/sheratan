@@ -799,8 +799,20 @@ module, invoked with a typed payload; the raw `Event` is not passed on.
 | Event | Payload |
 |---|---|
 | `submit` | form fields as an object (`Object.fromEntries(new FormData(form))`); default prevented |
-| `input`, `change` | the control's `value`, or `checked` for a checkbox |
-| anything else | `undefined` |
+| anything else | the element's `value`, or `checked` when its `type` is `checkbox`; `undefined` when it has neither |
+
+**The payload is read from the element the handler is on, not chosen by the
+event's name.** A component library announces changes under its own name —
+`sl-change`, `md-input` — and no table of event types can hold them all, so a
+name-keyed rule hands every one of them `undefined` while looking like it
+worked. Reading the element is one rule instead of a list that is always
+incomplete, and it makes a custom element a first-class control with no adapter.
+
+Two consequences worth stating. A `<button value="ascending">` reports
+`"ascending"`, so one intent can serve several buttons without a `data-`
+attribute. And a plain `<button>` reports `""` rather than `undefined`, because
+a button has a value and an empty one is still one; only an element with no
+`value` at all — a `<div>`, a `<li>` — reports nothing.
 
 Inside an `each` row the handler receives a **second argument: the row's
 current item**, read when the event fires, from the innermost row. That is how
