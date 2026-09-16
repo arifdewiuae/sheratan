@@ -128,7 +128,8 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 
 **Streams & windowing**
 - [ ] `[stretch]` `stream()`: subscribe/teardown on key change and disposal, per-frame folding, `reduceMany`, `status()` reconnect (SPEC §6)
-- [ ] `[stretch]` Windowed `each`: fixed row set rewritten in place; row-height policy supplied by caller (SPEC §9)
+- [x] `[stretch]` Windowed `each`: fixed row set rewritten in place; row-height policy supplied by caller (SPEC §9) — `each(list, row, window)`, positional pool + spacers, `packages/core/test/window.test.ts`, ADR 0003
+- [ ] `windowBy(element, rowHeight, overscan)`: the scroll listener every windowed list otherwise writes by hand. Needs element refs; until then the window is assembled in `*.effects.ts`, as `examples/hello` shows
 
 **Debuggability**
 - [ ] `[stretch]` Causal trace: write → computed → patch, ring buffer (500), sampling, `__sheratan.trace()` JSON, absent in prod (SPEC §7)
@@ -262,7 +263,7 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 
 - [x] **Rule numbering.** PLAN Week 3 says "L001–L006, all six violations"; SPEC defines the import matrix + L002/L005/L006/L008 + T001. L001/L003/L004/L007 are undefined (L001 appears only in the §8 JSON example). Resolved in SPEC §4: L001 = every import-matrix cell, holes filled with L003/L004/L007, template rules as `V001`–`V004`.
 - [ ] **`stream()` priority.** Cut list marks it "if time", but SPEC §12 DoD, the canonical module (§10b) and the dashboard all require it.
-- [ ] **Windowed `each` priority.** Marked stretch, but DoD requires a 500-row *virtualized* table and the canonical module needs `each` with a window.
+- [x] **Windowed `each` priority.** Marked stretch, but DoD requires a 500-row *virtualized* table and the canonical module needs `each` with a window. Resolved: built in Week 2 rather than deferred — `each(list, row, window)` in `packages/core/src/each.ts`, SPEC §9 amended to the shipped signature, ADR 0003 for the recycling trade-off.
 - [ ] **Causal trace priority.** Marked stretch, but DoD says "causal trace renders for the reference app" and Week 2 gate says "trace readable".
 - [ ] **Unscheduled must-items.** Widget mode and routing have no week in PLAN — tentatively placed in Week 1 and Week 4 here.
 - [ ] **Solid baseline for Week 1 gate.** "Within 2× of Solid" needs a Solid implementation, while Krausest is deferred — define the minimal comparison.
@@ -282,6 +283,7 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [ ] **Devtools surface.** Dev-build-only additions that belong with the causal trace (SPEC §7), not before it: a Chrome custom formatter so a signal prints as its value rather than `ƒ read()`, a Performance-panel track for drains and frame flushes, and debug names from the trace's write provenance. Decide the shape when §7 is built.
 - [ ] **Public repository before v1.0.0.** Dependency review in CI switches itself on when the repository stops being private; the release checklist has to include making it public (or buying Advanced Security).
 - [ ] **Checker on TypeScript 7.** SPEC §8 builds `packages/check` on the TypeScript compiler API. TS 7 (native) exposes only an unstable IPC API (`typescript/unstable/*`), not the TS 5/6 JS API. Decide before Week 3: pin the checker to TS 6's API, target TS 7's API, or parse with a standalone parser.
+- [ ] **The size budget's scenarios all measure the same thing.** `scripts/size.ts` bundles from `dist/prod/index.js`, which is already one flattened file, so esbuild can only shake whole modules and every scenario comes out within about 100 B of the whole runtime — bundling the same imports from `dist/dev` drops `signal` alone to 1774 B against 14364 B from prod. The budget is therefore accurate for what a consumer ships and fiction as a per-import breakdown. Decide: emit the prod build with modules preserved, measure `dist/dev` for the breakdown and `dist/prod` for the total, or drop the scenarios and keep one number. Found while re-recording the budget for windowed `each`.
 - [ ] **Immutability rule code.** The checker rule for statically visible mutation of a signal's value (TASKS decision 2026-09-15) needs a code and a row in SPEC §4's table.
 - [x] **CSS scoping.** SPEC said `adoptedStyleSheets` on the component root, which is global on `document`. Resolved in SPEC §9a: native `@scope` + `@layer`, enforced by `SHR-L009`.
 
@@ -317,6 +319,9 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-16 | Editor support is workspace recommendations (lit-html for `html` templates, oxc for lint and format), not an extension of our own | A Sheratan extension is worth writing when the checker can feed it real diagnostics (Week 3); before that it would only re-highlight what lit-html already does |
 | 2026-09-16 | Oxlint (type-aware, on TS 7 via tsgolint) + oxfmt replace ESLint, typescript-eslint and the second TypeScript; `@stylistic` and `eslint-plugin-jsdoc` load as JS plugins | One toolchain, one compiler; a full type-aware lint of the repo runs in about half a second |
 | 2026-09-16 | Two builds behind export conditions: `dist/dev` (tsc, source + declaration maps) and `dist/prod` (esbuild, minified, message table dropped so errors carry a code and a docs URL) | Message text is the biggest byte cost in a small runtime, and A3 only requires the code |
+| 2026-09-16 | Windowed `each` is positional: a recycled pool of rows plus spacers, with `{ start, count, rowHeight }` supplied by the caller (ADR 0003) | Keeping rows keyed while windowing still creates and destroys nodes on scroll, which is the cost virtualization exists to avoid; and `each` cannot measure — its first reconcile runs inside a detached fragment, and the test host has no layout |
+| 2026-09-16 | Windowed `each` costs 485 B brotli (4829 → 5314, +10%) and the budget was re-recorded rather than the feature trimmed | SPEC §12's DoD requires a virtualized 500-row table; folding the pool into `EachList` to share scaffolding would save roughly 100 B and cost the one-thing-per-class rule |
+| 2026-09-16 | `dist/prod/package.json` restates `sideEffects: false` | A bundler reads the package.json nearest the file it is shaking, so the root's promise never reached the shipped code |
 | 2026-09-16 | Size budget in CI (`size-budget.json`, brotli, per scenario; 4.8 KB for the whole runtime today) | "Small" has to be measured on every commit or it stops being true |
 | 2026-09-16 | Internal field name mangling deliberately not done | It would cost the readability the code rules ask for; revisit only if the size budget comes under pressure, and with a measurement |
 | 2026-09-16 | `llms.txt`'s API table is generated from TSDoc and checked in CI | The agent-facing docs cannot drift from the declarations the package ships |

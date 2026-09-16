@@ -66,10 +66,13 @@ if (!bundle.includes('sheratan.dev/errors/')) {
 }
 
 // The package entry is ESM-only; state it next to the output so a consumer
-// unpacking dist/ sees it too.
+// unpacking dist/ sees it too. `sideEffects` has to be restated as well: a
+// bundler reads the *nearest* package.json to the file it is shaking, so
+// without this one the root's promise never reaches the code it is about and
+// an app that imports only `signal` still ships the template engine.
 await writeFile(
   resolve(root, 'dist/prod/package.json'),
-  `${JSON.stringify({ type: 'module' }, null, 2)}\n`,
+  `${JSON.stringify({ type: 'module', sideEffects: false }, null, 2)}\n`,
 );
 
 process.stdout.write(`built ${outfile} (${String(Buffer.byteLength(bundle))} bytes)\n`);

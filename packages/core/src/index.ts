@@ -13,6 +13,6 @@ export { onDispose } from './owner.ts';
 export { watch } from './watch.ts';
 
 export type { Disposer } from './disposer.ts';
-export type { Each, Key } from './each.ts';
+export type { Each, EachWindow, Key } from './each.ts';
 export type { Template } from './template.ts';
 export type { Accessor, DeepReadonly, Signal } from './types.ts';

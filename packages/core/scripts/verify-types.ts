@@ -13,7 +13,7 @@ const entry = resolve(root, 'dist/dev/index.js');
 const directory = await mkdtemp(resolve(tmpdir(), 'sheratan-types-'));
 
 const consumer = `
-import { signal, computed, html, each, render, type Signal } from ${JSON.stringify(entry)};
+import { signal, computed, html, each, render, type Accessor, type EachWindow, type Signal } from ${JSON.stringify(entry)};
 
 const count: Signal<number> = signal(0);
 const items = signal([{ id: 1, title: 'a' }]);
@@ -23,7 +23,11 @@ const doubled = computed(() => count() * 2);
 // @ts-expect-error state is immutable (SPEC §5)
 items()[0].title = 'changed';
 
-const view = () => html\`<p>\${doubled}</p><ul>\${each(items, (item) => html\`<li>\${computed(() => item().title)}</li>\`)}</ul>\`;
+// The window is the caller's measurement, so it has to type-check as one.
+const viewport = computed((): EachWindow => ({ start: 0, count: 32, rowHeight: 28 }));
+const row = (item: Accessor<{ readonly title: string }>) => html\`<li>\${computed(() => item().title)}</li>\`;
+
+const view = () => html\`<p>\${doubled}</p><ul>\${each(items, row)}\${each(items, row, viewport)}</ul>\`;
 
 export const stop = render(view, document.body);
 `;

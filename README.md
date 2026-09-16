@@ -70,7 +70,7 @@ pnpm install --frozen-lockfile
 pnpm check   # format, lint, typecheck, build, tests + coverage gate, package checks, audit
 ```
 
-The runtime is 4.8 KB brotli with zero dependencies, and every commit is
+The runtime is 5.3 KB brotli with zero dependencies, and every commit is
 measured against `packages/core/size-budget.json`.
 
 Run the example — 500 rows under a synthetic 2000 values/second feed, re-sorted

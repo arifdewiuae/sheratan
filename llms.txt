@@ -39,7 +39,7 @@ import { signal, computed, watch, batch, onDispose, flush, html, each, render } 
 | `onDispose(fn: () => void): void` | Registers teardown for a subscription the runtime cannot see, such as `addEventListener` or `setInterval`. Legal in `*.effects.ts` only (SHR-L004). |
 | `flush(): void` | Applies pending DOM updates now, for tests and for code that must read layout immediately after a write. |
 | `html(strings: TemplateStringsArray, ...values: unknown[]): Template` | Markup with holes. A hole is reactive only when it receives the signal itself: `${total}` updates, `${total()}` is read once (SPEC §9, SHR-V003). |
-| `each<T>(list: Accessor<readonly T[]> \| readonly T[], row: (item: Accessor<T>) => Template): Each` | A keyed list. Objects key by `id`, primitives by value; the row function runs once per key. |
+| `each<T>(list: Accessor<readonly T[]> \| readonly T[], row: (item: Accessor<T>) => Template, window?: Accessor<EachWindow>): Each` | A keyed list. Objects key by `id`, primitives by value; the row function runs once per key. A `window` makes it positional instead: a fixed pool of rows, rewritten in place as the window moves, with spacers holding the rest open. |
 | `render(view: () => Template, host: Element): Disposer` | Mounts `view` into `host`. It owns only the nodes it inserts, so it can live inside an app built with something else, and the disposer removes exactly those nodes. |
 
 <!-- end generated -->
@@ -118,6 +118,28 @@ each(s.orders, (order) => {
 ```
 
 `${order().status}` inside the row is the trap again.
+
+**Long lists: `each(list, row, window)`.** A third argument renders only a
+slice. The window is yours to measure — a `scroll` listener in `*.effects.ts`
+— and `each` keeps a fixed pool of rows, rewriting their items as the window
+moves instead of creating and destroying nodes:
+
+```ts
+// dashboard.effects.ts
+const window = computed(() => ({
+  start: Math.max(0, Math.floor(scrollTop() / ROW_HEIGHT) - OVERSCAN),
+  count: VISIBLE + OVERSCAN * 2,
+  rowHeight: ROW_HEIGHT,
+}));
+
+// dashboard.view.ts
+each(s.rows, row, s.window)
+```
+
+A windowed list is **positional, not keyed**: a slot is recycled, so a row's
+node stays with the screen position rather than with its item, and `id` is not
+required or checked. An out-of-range window is clamped, not an error. Use the
+plain two-argument form unless the list is long enough to need this.
 
 ## 6. Module rules
 
@@ -351,6 +373,6 @@ Apply the `fix`; the `message` names the allowed set.
 
 ## Not in v0
 
-`resource()`, `mutation()`, `stream()`, `mount()`, `unsafeHTML`, routing and
-windowed `each` are specified but not shipped. Use plain `fetch` through a
-service with an `AbortController`, as in §7.
+`resource()`, `mutation()`, `stream()`, `mount()`, `unsafeHTML` and routing
+are specified but not shipped. Use plain `fetch` through a service with an
+`AbortController`, as in §7.

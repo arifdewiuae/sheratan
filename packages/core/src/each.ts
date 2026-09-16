@@ -1,9 +1,13 @@
 // Keyed lists (SPEC §9). The row function runs once per key and receives an
 // accessor for its item, so a new object under the same key updates the cells
 // that changed instead of rebuilding the row.
+//
+// With a window the list is positional instead: a fixed pool of rows is
+// rewritten in place as the window moves, and two spacers stand in for the
+// rows that are not in the DOM. The trade-off is in ADR 0003.
 
 import { ErrorCode } from './codes.ts';
-import { place, removeAll } from './dom.ts';
+import { NodeType, place, removeAll } from './dom.ts';
 import type { Disposer } from './disposer.ts';
 import { fail } from './errors.ts';
 import { instantiate } from './instantiate.ts';
@@ -20,6 +24,28 @@ export type Key = string | number;
 
 /** A keyed list in a child hole. */
 export type Each = Mountable;
+
+/**
+ * The slice of a list that exists in the DOM (SPEC §9). The caller measures and
+ * the framework renders: a scroll listener in the effects layer owns the
+ * container's height and the overscan, and hands the result over as one value.
+ *
+ * @example
+ * const window = computed(() => ({ start: firstVisible(), count: 32, rowHeight: 28 }));
+ */
+export interface EachWindow {
+  /** Index of the first row rendered. */
+  readonly start: number;
+  /** How many rows exist — the size of the pool. */
+  readonly count: number;
+  /** Row height in CSS pixels, for the spacers that hold the scrollbar open. */
+  readonly rowHeight: number;
+}
+
+/** What a list is built from: an array, or something reactive that returns one. */
+type Source<T> = Accessor<readonly T[]> | readonly T[];
+
+type Render<T> = (item: Accessor<T>) => Template;
 
 interface Row<T> {
   readonly item: Signal<T>;
@@ -41,6 +67,32 @@ function keyOf(item: unknown): Key {
   return id;
 }
 
+function itemsOf<T>(source: Source<T>): readonly T[] {
+  return typeof source === 'function' ? source() : source;
+}
+
+function buildRow<T>(renderRow: Render<T>, owner: OwnerNode | undefined, value: T): Row<T> {
+  const item = signal(value);
+  let fragment: DocumentFragment | undefined;
+
+  // A scope of the list's own, not of the watcher reconciling it, so a row
+  // survives every pass until its key disappears.
+  const dispose = root(() => {
+    const scope = getOwner();
+
+    if (scope !== undefined) scope.row = item;
+
+    fragment = instantiate(renderRow(item as Accessor<T>));
+  }, owner);
+
+  const built = fragment as DocumentFragment;
+
+  const nodes: ChildNode[] =
+    built.childNodes.length > 0 ? [...built.childNodes] : [document.createTextNode('')];
+
+  return { item, nodes, dispose, index: NEW_ROW };
+}
+
 function placeRow<T>(parent: Node, row: Row<T>, anchor: Node | null): void {
   for (const node of row.nodes) place(parent, node, anchor);
 }
@@ -51,9 +103,9 @@ function dropRow<T>(row: Row<T>): void {
 }
 
 class EachList<T> implements Mountable {
-  private readonly list: Accessor<readonly T[]> | readonly T[];
+  private readonly list: Source<T>;
 
-  private readonly renderRow: (item: Accessor<T>) => Template;
+  private readonly renderRow: Render<T>;
 
   private rows = new Map<Key, Row<T>>();
 
@@ -61,10 +113,7 @@ class EachList<T> implements Mountable {
 
   private owner: OwnerNode | undefined = undefined;
 
-  constructor(
-    list: Accessor<readonly T[]> | readonly T[],
-    renderRow: (item: Accessor<T>) => Template,
-  ) {
+  constructor(list: Source<T>, renderRow: Render<T>) {
     this.list = list;
     this.renderRow = renderRow;
   }
@@ -89,28 +138,6 @@ class EachList<T> implements Mountable {
     });
   }
 
-  private createRow(value: T): Row<T> {
-    const item = signal(value);
-    let fragment: DocumentFragment | undefined;
-
-    // A scope of the list's own, not of the watcher reconciling it, so a row
-    // survives every pass until its key disappears.
-    const dispose = root(() => {
-      const scope = getOwner();
-
-      if (scope !== undefined) scope.row = item;
-
-      fragment = instantiate(this.renderRow(item as Accessor<T>));
-    }, this.owner);
-
-    const built = fragment as DocumentFragment;
-
-    const nodes: ChildNode[] =
-      built.childNodes.length > 0 ? [...built.childNodes] : [document.createTextNode('')];
-
-    return { item, nodes, dispose, index: NEW_ROW };
-  }
-
   private next(items: readonly T[]): { order: Row<T>[]; rows: Map<Key, Row<T>> } {
     const order: Row<T>[] = [];
     const rows = new Map<Key, Row<T>>();
@@ -124,7 +151,7 @@ class EachList<T> implements Mountable {
 
       if (existing !== undefined) existing.item.set(item);
 
-      const row = existing ?? this.createRow(item);
+      const row = existing ?? buildRow(this.renderRow, this.owner, item);
 
       rows.set(key, row);
       order.push(row);
@@ -156,6 +183,159 @@ class EachList<T> implements Mountable {
 
     this.rows = new Map();
     this.order = [];
+  }
+}
+
+interface Spacers {
+  readonly before: HTMLElement;
+  readonly after: HTMLElement;
+}
+
+/** Which rows exist, once the caller's window is squared with the list. */
+interface Slice {
+  readonly first: number;
+  readonly count: number;
+  readonly total: number;
+}
+
+/** When a row has no element of its own to copy: legal anywhere a row was. */
+const NEUTRAL_TAG = 'div';
+
+/**
+ * A window is a measurement, and measurements run off the ends of a list — a
+ * rubber-banding scroll reports a negative offset, and a container taller than
+ * the data asks for more rows than exist. Clamping is the answer to both: the
+ * pool shows the nearest real rows rather than refusing to render.
+ */
+function sliceOf(window: EachWindow, total: number): Slice {
+  const count = Math.min(Math.max(window.count, 0), total);
+  const first = Math.min(Math.max(window.start, 0), total - count);
+
+  return { first, count, total };
+}
+
+/** A spacer has to be legal where the rows are: a row inside a `<ul>` is an `<li>`. */
+function tagOf<T>(row: Row<T>): string {
+  for (const node of row.nodes) {
+    if (node.nodeType === NodeType.Element) return (node as Element).tagName.toLowerCase();
+  }
+
+  return NEUTRAL_TAG;
+}
+
+/** Stands in for the rows that are not here, so the scrollbar tells the truth. */
+function spacer(tag: string): HTMLElement {
+  const element = document.createElement(tag);
+
+  element.setAttribute('role', 'presentation');
+  element.setAttribute('aria-hidden', 'true');
+  element.style.listStyle = 'none';
+
+  return element;
+}
+
+/**
+ * A windowed list is positional: `count` rows are built once, and moving the
+ * window rewrites their items instead of creating and destroying nodes. A slot
+ * is recycled, so a row's DOM node no longer follows its item — see
+ * `Docs/adr/0003-windowed-each-recycles-rows.md`.
+ */
+class WindowedList<T> implements Mountable {
+  private readonly list: Source<T>;
+
+  private readonly renderRow: Render<T>;
+
+  private readonly window: Accessor<EachWindow>;
+
+  private owner: OwnerNode | undefined = undefined;
+
+  private pool: Row<T>[] = [];
+
+  private spacers: Spacers | undefined = undefined;
+
+  constructor(list: Source<T>, renderRow: Render<T>, window: Accessor<EachWindow>) {
+    this.list = list;
+    this.renderRow = renderRow;
+    this.window = window;
+  }
+
+  [MOUNT](marker: Comment): void {
+    this.owner = getOwner();
+
+    onDispose(() => {
+      this.clear();
+    });
+
+    watchFrame(() => {
+      this.reconcile(marker, itemsOf(this.list), this.window());
+    });
+  }
+
+  private reconcile(marker: Comment, items: readonly T[], window: EachWindow): void {
+    const slice = sliceOf(window, items.length);
+
+    this.resize(marker, items, slice);
+    this.fill(items, slice.first);
+    this.space(marker, slice, window.rowHeight);
+  }
+
+  /** Grows or shrinks the pool. Moving the window does not come through here. */
+  private resize(marker: Comment, items: readonly T[], slice: Slice): void {
+    while (this.pool.length > slice.count) dropRow(this.pool.pop() as Row<T>);
+
+    const parent = marker.parentNode as Node;
+
+    while (this.pool.length < slice.count) {
+      // `sliceOf` has already proved this index is inside the list.
+      const value = items[slice.first + this.pool.length] as T;
+      const row = buildRow(this.renderRow, this.owner, value);
+
+      this.pool.push(row);
+      placeRow(parent, row, this.spacers?.after ?? marker);
+    }
+  }
+
+  /** Slot `i` shows `items[first + i]`; a slot whose item is unchanged notifies nobody. */
+  private fill(items: readonly T[], first: number): void {
+    for (const [slot, row] of this.pool.entries()) row.item.set(items[first + slot] as T);
+  }
+
+  private space(marker: Comment, slice: Slice, rowHeight: number): void {
+    const spacers = this.spacers ?? this.openSpacers(marker);
+
+    if (spacers === undefined) return;
+
+    const below = slice.total - slice.first - slice.count;
+
+    spacers.before.style.height = `${String(slice.first * rowHeight)}px`;
+    spacers.after.style.height = `${String(below * rowHeight)}px`;
+  }
+
+  /** Waits for a row: a spacer's tag is whatever the rows turned out to be. */
+  private openSpacers(marker: Comment): Spacers | undefined {
+    const first = this.pool[0];
+
+    if (first === undefined) return undefined;
+
+    const parent = marker.parentNode as Node;
+    const tag = tagOf(first);
+    const spacers: Spacers = { before: spacer(tag), after: spacer(tag) };
+
+    place(parent, spacers.before, first.nodes[0] as ChildNode);
+    place(parent, spacers.after, marker);
+    this.spacers = spacers;
+
+    return spacers;
+  }
+
+  /** Removes the rows this list owns; the scopes die with their owner. */
+  clear(): void {
+    for (const row of this.pool) removeAll(row.nodes);
+
+    if (this.spacers !== undefined) removeAll([this.spacers.before, this.spacers.after]);
+
+    this.pool = [];
+    this.spacers = undefined;
   }
 }
 
@@ -234,8 +414,9 @@ function patch<T>(marker: Comment, previous: readonly Row<T>[], next: readonly R
 }
 
 /**
- * A keyed list. Objects key by `id`, primitives by value; the row function
- * runs once per key.
+ * A keyed list. Objects key by `id`, primitives by value; the row function runs
+ * once per key. A `window` makes it positional instead: a fixed pool of rows,
+ * rewritten in place as the window moves, with spacers holding the rest open.
  *
  * @example
  * html`<ul>${each(items, (item) => html`<li>${computed(() => item().title)}</li>`)}</ul>`
@@ -243,6 +424,9 @@ function patch<T>(marker: Comment, previous: readonly Row<T>[], next: readonly R
 export function each<T>(
   list: Accessor<readonly T[]> | readonly T[],
   row: (item: Accessor<T>) => Template,
+  window?: Accessor<EachWindow>,
 ): Each {
-  return new EachList(list, row);
+  if (window === undefined) return new EachList(list, row);
+
+  return new WindowedList(list, row, window);
 }
