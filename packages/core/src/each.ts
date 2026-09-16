@@ -214,10 +214,23 @@ function sliceOf(window: EachWindow, total: number): Slice {
   return { first, count, total };
 }
 
-/** A spacer has to be legal where the rows are: a row inside a `<ul>` is an `<li>`. */
+/** What makes a tag a custom element's, and never a built-in's. */
+const CUSTOM_ELEMENT_MARK = '-';
+
+/**
+ * A spacer has to be legal where the rows are: a row inside a `<ul>` is an
+ * `<li>`. It must never be a *custom* element, though — creating one upgrades
+ * it, which runs the component's constructor and builds its shadow DOM, and a
+ * spacer that renders a component is not a spacer. A `<div>` in its place is at
+ * worst the wrong box; an `<x-card>` in its place is two extra live components.
+ */
 function tagOf<T>(row: Row<T>): string {
   for (const node of row.nodes) {
-    if (node.nodeType === NodeType.Element) return (node as Element).tagName.toLowerCase();
+    if (node.nodeType !== NodeType.Element) continue;
+
+    const tag = (node as Element).tagName.toLowerCase();
+
+    return tag.includes(CUSTOM_ELEMENT_MARK) ? NEUTRAL_TAG : tag;
   }
 
   return NEUTRAL_TAG;
