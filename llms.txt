@@ -1,4 +1,4 @@
-# sheratan
+# SHERATAN
 
 > A frontend framework with one legal way to structure an app. Signals and
 > tagged templates, no virtual DOM, no bundler. A checker enforces the module

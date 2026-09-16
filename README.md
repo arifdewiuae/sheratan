@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<h1 align="center">s h e r a t a n</h1>
+<h1 align="center">S H E R A T A N</h1>
 
 <p align="center">
   <b>Architectural boundaries, enforced.</b><br>
