@@ -228,6 +228,34 @@ A stream reads like any other value — `ticks()` — with `ticks.status()`
 - `close(reason?)` lets the adapter say the source ended. The last value stays
   readable, so a view can show it and mark it stale rather than blanking.
 
+## 5b. Debugging: the causal trace
+
+Development builds carry a trace of what caused what. It is off until you ask:
+
+```js
+__sheratan.start();            // in the browser console
+// … reproduce the problem …
+console.log(__sheratan.format());
+__sheratan.stop();
+```
+
+```
+write(100 → 150) @ dashboard/dashboard.effects.ts:24:7
+  └─ computed #1 recomputed
+      └─ computed #2 recomputed
+          └─ patched <h1>
+```
+
+`__sheratan.trace()` returns the same chains as JSON —
+`{ depth, dropped, entries: [{ at, cause, kind, source, from, to }] }` — which
+is the form to read when the answer has to be parsed rather than eyeballed.
+Steps sharing a `cause` are one chain.
+
+Worth knowing: a write the runtime makes itself (`each` rewriting a row) is
+nested under the write that caused it, not a chain of its own, and is attributed
+to `sheratan`. Past 1000 writes a second the trace samples and reports how many
+entries it `dropped`. None of this exists in a production build.
+
 ## 6. Module rules
 
 The unit of code is a module: a folder under `modules/`.

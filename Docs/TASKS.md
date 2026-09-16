@@ -139,12 +139,12 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [ ] `windowBy(element, rowHeight, overscan)`: the scroll listener every windowed list otherwise writes by hand. Needs element refs; until then the window is assembled in `*.effects.ts`, as `examples/hello` shows
 
 **Debuggability**
-- [ ] `[stretch]` Causal trace: write → computed → patch, ring buffer (500), sampling, `__sheratan.trace()` JSON, absent in prod (SPEC §7)
+- [x] `[stretch]` Causal trace: write → computed → patch, ring buffer (500), sampling, `__sheratan.trace()` JSON, absent in prod (SPEC §7) — `packages/core/src/trace.ts`, 12 tests; hooks in signal, computed, instantiate and scheduler; `trace.prod.ts` swapped in for production and the build fails if `__sheratan` survives
 - [x] Structured runtime errors — `SheratanError` carries a stable `code`, every message in `messages.ts` states what to write instead, and the production build swaps the table for `sheratan.dev/errors/<code>` (`src/errors.ts`, `src/env.prod.ts`). `fix` as a separate field is the checker's JSON shape (SPEC §8), not the runtime's
 - [ ] `declare()` legal-transition dev assertion (SPEC §5)
 
 - [ ] `[gate]` Correct and leak-free **first**: race tests pass, 1000 cycles leave zero live subscriptions → otherwise fix ownership before measuring anything
-- [ ] `[gate]` Trace is readable by eye (if trace not cut)
+- [x] `[gate]` Trace is readable by eye (if trace not cut) — **passed.** `__sheratan.format()` renders the chain as an indented tree; checked against a real update and fixed three things it exposed (objects printed as `[object Object]`, a 90-character file URL, and an `each` row write opening a chain of its own instead of continuing one)
 
 ---
 
@@ -271,7 +271,7 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [x] **Rule numbering.** PLAN Week 3 says "L001–L006, all six violations"; SPEC defines the import matrix + L002/L005/L006/L008 + T001. L001/L003/L004/L007 are undefined (L001 appears only in the §8 JSON example). Resolved in SPEC §4: L001 = every import-matrix cell, holes filled with L003/L004/L007, template rules as `V001`–`V004`.
 - [x] **`stream()` priority.** Cut list marks it "if time", but SPEC §12 DoD, the canonical module (§10b) and the dashboard all require it. Resolved: built in Week 2 rather than deferred — `packages/core/src/stream.ts`, 446 B brotli.
 - [x] **Windowed `each` priority.** Marked stretch, but DoD requires a 500-row *virtualized* table and the canonical module needs `each` with a window. Resolved: built in Week 2 rather than deferred — `each(list, row, window)` in `packages/core/src/each.ts`, SPEC §9 amended to the shipped signature, ADR 0003 for the recycling trade-off.
-- [ ] **Causal trace priority.** Marked stretch, but DoD says "causal trace renders for the reference app" and Week 2 gate says "trace readable".
+- [x] **Causal trace priority.** Marked stretch, but DoD says "causal trace renders for the reference app" and Week 2 gate says "trace readable". Resolved: built in Week 2 rather than deferred — `packages/core/src/trace.ts`, SPEC §7 amended to the shipped shape.
 - [ ] **Unscheduled must-items.** Widget mode and routing have no week in PLAN — tentatively placed in Week 1 and Week 4 here.
 - [ ] **Solid baseline for Week 1 gate.** "Within 2× of Solid" needs a Solid implementation, while Krausest is deferred — define the minimal comparison.
 - [x] **`resource()` placement rule.** SPEC §6 says construction outside effects is enforced by L005, but L005 is about state mutation — needs its own code or rewording. Resolved: `SHR-L004`, effects-only APIs.
@@ -346,6 +346,9 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-16 | `llms.txt`'s API table is generated from TSDoc and checked in CI | The agent-facing docs cannot drift from the declarations the package ships |
 | 2026-09-16 | A windowed `each` gives custom-element rows a plain `<div>` spacer instead of copying their tag | `document.createElement('sl-card')` upgrades it, so the two spacers became live components with their own shadow DOM and visible chrome. A spacer has to be layout and nothing else |
 | 2026-09-16 | `examples/hello`'s module styles move out of `global.css` into `modules/dashboard/dashboard.css`, with the `to ([data-module], [data-ui])` boundary SPEC §9a requires | `global.css` may hold only `tokens` and `base` (`SHR-L009`); the reference app was breaking the rule it exists to demonstrate, and the checker would have rejected it in Week 3 |
+| 2026-09-16 | The causal trace lives in a module the production build swaps for no-ops, not behind a `DEV` branch alone (SPEC §7) | esbuild folds the branch but keeps the module: the first attempt shipped the whole trace, `__sheratan` included, about 2 KB of unreachable code. The build now fails if the bundle still contains it |
+| 2026-09-16 | Previous values are kept as a short rendering, so SPEC §7's per-signal opt-in is dropped | The ring buffer already bounds retention to 500 entries, and storing text rather than the value retains nothing at all — the opt-in guarded a cost that no longer exists |
+| 2026-09-16 | `DEV` is typed `boolean` rather than a literal in both env modules | A type-aware linter reads `const DEV = true` as always truthy and rejects every `if (DEV)` guard; the type should say what is true of both builds |
 | 2026-09-16 | An intent's payload is read from the element the handler is on, not chosen by the event's name (SPEC §9 Intents) | A component library announces changes under its own name (`sl-change`, `md-input`), and a table of event types silently handed every one of them `undefined`. One rule instead of a list that is always incomplete; the cost is that a plain `<button>` now reports `""` rather than `undefined` |
 | 2026-09-16 | Platform APIs instead of code where they exist: `Element.moveBefore` for row moves (falls back to `insertBefore`), `Symbol.dispose` on every disposer (`using stop = watch(…)`) | A moved row keeps focus, selection and media state; `using` removes a class of forgotten teardown |
 | 2026-09-16 | `resource()` holds its own value: no cache shared between resources, and data shared between modules goes through a state module (ADR 0004) | A cache is a second place state lives, which A1 does not allow, and it is the part of a query library an app can least often use unchanged |

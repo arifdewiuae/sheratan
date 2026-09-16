@@ -4,7 +4,9 @@
 
 import { ErrorCode } from './codes.ts';
 import { fail } from './errors.ts';
+import { DEV } from './env.ts';
 import { Flags, type ReactiveNode } from './graph.ts';
+import { traceIdle, traceQueued, traceRunning } from './trace.ts';
 
 /** A watcher re-running this often in one drain is feeding itself. */
 const MAX_RERUNS_PER_DRAIN = 100;
@@ -72,6 +74,10 @@ export function enqueue(job: Job): void {
     job.reruns = 0;
   }
 
+  // A patch runs a frame after the write that caused it, so the chain is
+  // stamped here and read back in the drain (SPEC §7).
+  if (DEV) traceQueued(job);
+
   job.flags |= Flags.Queued;
 
   if ((job.flags & Flags.Frame) === 0) {
@@ -97,11 +103,16 @@ function drain(queue: Job[]): void {
       const job = queue[index] as Job;
 
       job.flags &= ~Flags.Queued;
+
+      if (DEV) traceRunning(job);
+
       job.update();
     }
   } finally {
     queue.splice(0, Math.min(index + 1, queue.length));
     batchDepth--;
+
+    if (DEV) traceIdle();
   }
 }
 

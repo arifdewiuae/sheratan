@@ -1,5 +1,6 @@
 // Derived state (SPEC §5): lazy, cached, and glitch-free.
 
+import { DEV } from './env.ts';
 import {
   checkDirty,
   type Derivation,
@@ -11,6 +12,7 @@ import {
   endTracking,
   track,
 } from './graph.ts';
+import { traceCompute } from './trace.ts';
 import { getOwner } from './owner.ts';
 import type { Accessor, DeepReadonly } from './types.ts';
 
@@ -49,6 +51,8 @@ class ComputedNode<T> implements Derivation {
       if (Object.is(next, this.value)) return false;
 
       this.value = next;
+
+      if (DEV) traceCompute(this);
 
       return true;
     } finally {
