@@ -5,7 +5,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { freshHost } from './dom.ts';
+import { dom, freshHost } from './dom.ts';
 import {
   computed,
   each,
@@ -263,6 +263,42 @@ test('an empty list renders no rows and no spacers', () => {
   flush();
   assert.deepEqual(shown(), [0, 1, 2, 3, 4, 5, 6, 7]);
   assert.deepEqual(heights(), ['0px', `${12 * ROW_HEIGHT}px`]);
+});
+
+test('a spacer is never a custom element, so it cannot become a component', () => {
+  let built = 0;
+
+  class Card extends (dom.HTMLElement as unknown as typeof HTMLElement) {
+    constructor() {
+      super();
+      built += 1;
+      this.attachShadow({ mode: 'open' }).innerHTML = '<i>chrome</i>';
+    }
+  }
+
+  dom.customElements.define('x-card', Card as unknown as never);
+
+  render(
+    () =>
+      html`<div>
+        ${each(seed(TOTAL), (item) => html`<x-card>${cell(item)}</x-card>`, port(0))}
+      </div>`,
+    host,
+  );
+
+  const tags = spacers().map((element) => element.tagName.toLowerCase());
+
+  assert.deepEqual(tags, ['div', 'div'], 'a spacer falls back to a neutral box');
+  assert.ok(built > 0, 'the rows really are components');
+
+  // The point of the tag rule: a spacer builds nothing. Counting constructor
+  // calls would not prove it here — happy-dom upgrades custom elements inside
+  // a <template>, which a real browser does not, because template contents
+  // belong to an inert document.
+  for (const element of spacers()) {
+    assert.equal(element.shadowRoot, null, 'a spacer has no component inside it');
+    assert.equal(element.textContent, '', 'and renders nothing');
+  }
 });
 
 test('a windowed list disposes clean: 200 cycles leak nothing', () => {
