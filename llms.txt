@@ -25,7 +25,7 @@ hole gets the computed.
 ## 2. API
 
 ```ts
-import { signal, computed, watch, batch, onDispose, flush, html, each, render } from 'sheratan';
+import { signal, computed, watch, batch, resource, stream, onDispose, flush, html, each, render } from 'sheratan';
 ```
 
 <!-- generated from TSDoc by packages/core/scripts/llms.ts -->
@@ -36,6 +36,8 @@ import { signal, computed, watch, batch, onDispose, flush, html, each, render } 
 | `computed<T>(fn: () => T): Accessor<DeepReadonly<T>>` | A derived value: evaluated on first read, cached until a source changes. Every expression over state is a named computed — that is the one way to derive (SPEC §9 "Holes take signals by reference"). |
 | `watch(fn: () => void): Disposer` | Runs `fn` now, and again whenever something it read changes. Returns the disposer; the owning module disposes it automatically (SPEC §5b). |
 | `batch<T>(fn: () => T): T` | Writes inside `fn` commit once, when the outermost batch ends. |
+| `resource<T, K extends readonly unknown[]>(options: ResourceOptions<T, K>): Resource<T>` | Async state on a reactive key. The request is aborted when the key changes, when `abort()` is called and when the owning module unmounts; an identical key is not refetched, a superseded response is discarded, and errors are values. Legal in `*.effects.ts` only (`SHR-L004`). |
+| `stream<T, M, K extends readonly unknown[]>(options: StreamOptions<T, M, K>): Stream<T>` | Push data on a reactive key. The subscription is torn down when the key changes and when the owning module unmounts; messages are folded as they arrive and the value is committed once per frame, so a flood coalesces instead of queueing. Legal in `*.effects.ts` only (`SHR-L004`). |
 | `onDispose(fn: () => void): void` | Registers teardown for a subscription the runtime cannot see, such as `addEventListener` or `setInterval`. Legal in `*.effects.ts` only (SHR-L004). |
 | `flush(): void` | Applies pending DOM updates now, for tests and for code that must read layout immediately after a write. |
 | `html(strings: TemplateStringsArray, ...values: unknown[]): Template` | Markup with holes. A hole is reactive only when it receives the signal itself: `${total}` updates, `${total()}` is read once (SPEC §9, SHR-V003). |
@@ -144,6 +146,83 @@ A windowed list is **positional, not keyed**: a slot is recycled, so a row's
 node stays with the screen position rather than with its item, and `id` is not
 required or checked. An out-of-range window is clamped, not an error. Use the
 plain two-argument form unless the list is long enough to need this.
+
+## 5a. Async: `resource()` and `stream()`
+
+Effects only. One primitive replaces a query library: it fetches on a reactive
+key, cancels what the key replaced, retries, and keeps showing the previous
+value while it revalidates.
+
+```ts
+// dashboard.effects.ts
+const user = resource({
+  key: () => ['user', state.userId()] as const,
+  fetch: ({ key, signal }) => api.getUser(key[1], signal),
+  staleAfter: 30_000,
+  retry: { attempts: 3, backoff: 'exponential' },
+});
+```
+
+```ts
+// dashboard.view.ts — three signals, so a spinner is not woken by the value
+html`${computed(() => (user.status() === 'loading' ? 'Loading…' : ''))}`
+```
+
+`status()` is `'idle' | 'loading' | 'ready' | 'error' | 'refreshing'`.
+`data()` is the value for the *current* key, or `undefined`. `error()` is why
+the last attempt failed. Narrow with `is()`, never by comparing `status()`:
+
+```ts
+if (user.is('ready')) user.data().name;      // data() is T here
+if (user.is('error')) user.error().message;  // error() is Error here
+```
+
+What it guarantees, so you never write it again:
+
+- The request is aborted — at the network level — when the key changes, when
+  `abort()` is called, and when the module unmounts.
+- A key whose contents are unchanged does not refetch, and `invalidate()`
+  during a request in flight is absorbed by it.
+- A response that arrives after a newer request started is discarded.
+- **Cancellation is never failure:** an `AbortError` does not reach `error()`.
+- `staleAfter` revalidates in the background: `'refreshing'` with `data()`
+  still readable, then `'ready'`. Leave it out and a key is fetched once.
+- `retry.attempts` counts the first try, so `3` is one try and two retries.
+  Backoff starts at 100 ms, and `'exponential'` doubles it.
+
+A resource holds its own value and nothing else's: there is no cache shared
+between modules. Two modules asking for the same key make two requests, and
+`invalidate()` on one does not touch the other.
+
+`resource()` is request/response. Push data — a socket, an event source, a
+`BroadcastChannel` — is `stream()`:
+
+```ts
+// dashboard.effects.ts
+const ticks = stream({
+  key: () => ['ticks', state.symbol()] as const,
+  subscribe: ({ key, emit, close }) => socket.open(key[1], { onMessage: emit, onEnd: close }),
+  reduce: (total, tick) => total + tick.size,   // must be O(1) per message
+  initial: 0,
+});
+```
+
+A stream reads like any other value — `ticks()` — with `ticks.status()`
+(`'connecting' | 'open' | 'closed'`) and `ticks.error()` beside it.
+
+- **`reduce` runs once per message; the value is written once per frame.** A
+  thousand messages a second cost a thousand O(1) folds and one DOM write.
+  That is why `reduce` must be O(1): an O(n) fold over a 500-row table blows
+  the frame budget no matter how good the scheduler is.
+- `reduceMany(previous, messages[])` is the escape hatch when per-message work
+  is impossible. It is handed the whole frame's batch, and the type admits
+  exactly one of the two reducers.
+- `subscribe` **must return a teardown** — that is how the runtime ends the
+  subscription on a key change and on unmount. It may return a promise of one,
+  and the status stays `'connecting'` until it resolves.
+- A new key tears down, resubscribes, and resets the value to `initial`.
+- `close(reason?)` lets the adapter say the source ended. The last value stays
+  readable, so a view can show it and mark it stale rather than blanking.
 
 ## 6. Module rules
 
@@ -377,6 +456,6 @@ Apply the `fix`; the `message` names the allowed set.
 
 ## Not in v0
 
-`resource()`, `mutation()`, `stream()`, `mount()`, `unsafeHTML` and routing
-are specified but not shipped. Use plain `fetch` through a service with an
-`AbortController`, as in §7.
+`mutation()`, `mount()`, `unsafeHTML` and routing are specified but not
+shipped. For a write, call the service from `*.effects.ts` and invoke
+one transition with the result, as in §7.

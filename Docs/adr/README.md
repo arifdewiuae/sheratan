@@ -13,3 +13,4 @@ revisit it. Numbered, never renumbered, superseded rather than edited.
 | [0001](0001-supply-chain-verification.md) | Where each supply-chain check runs |
 | [0002](0002-immutability-enforcement.md) | Immutability is enforced in three layers |
 | [0003](0003-windowed-each-recycles-rows.md) | A windowed `each` recycles rows, and the caller supplies the window |
+| [0004](0004-resource-has-no-shared-cache.md) | `resource()` owns its value; `staleAfter` revalidates on a timer |
