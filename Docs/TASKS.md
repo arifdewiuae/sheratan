@@ -54,22 +54,27 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [x] Freeze and version 12 eval tasks (EVAL §2.1) — [EVAL-TASKS.md](EVAL-TASKS.md), tag `eval-tasks-v1`, SHA-256 `7a19d6474fbcb1a417d60fb3c2be815c908d8cb68bd50a7a60a3a5a9a317f1ce`
 - [x] Split: 6 headline tasks + 6 held-out (EVAL-TASKS §2)
 - [x] Fix the documentation token budget for both arms **and write it down** before the first run — 8,000 tokens (EVAL-TASKS §1.5)
-- [ ] Control arm: React 19 + TanStack Query + Zustand, pass = tests green + ESLint + tsc clean
-- [ ] Eval harness skeleton: `bunx sheratan-eval agent` (5 seeds, 10-iteration cap, non-convergence recorded)
+- [~] Eval harness skeleton — `packages/eval` runs the self-repair sub-eval (5 seeds, raw logs, seeded case list). The task-eval half (`evalkit`, 10-iteration cap, non-convergence) is not built
 - [ ] Check what exactly Lit does *not* cover for `resource` and trace (PLAN risks)
 
-**Self-repair sub-eval** (EVAL §2.3)
-- [ ] Working file with injected violation: I/O inside a view
-- [ ] Working file with injected violation: direct state write from effects
-- [ ] Working file with injected violation: deep import of another module
-- [ ] Hand-written structured checker JSON (code, message, `fix`, `docs`) for each
-- [ ] Run: agent gets only the JSON; record one-turn fix yes/no
+**Self-repair sub-eval** (EVAL §2.3) — run 2026-09-16, [results](EVAL-RESULTS.md)
+- [x] Host app: four modules in the canonical shape (T01, T03, T04 and the toast T04 asks for) — `packages/eval/hosts`, 15 behaviour assertions taken from the hidden-test bullets
+- [x] Working file with injected violation: I/O inside a view — `SHR-L002`, four hosts
+- [x] Working file with injected violation: direct state write from effects — `SHR-L005`, four hosts
+- [x] Working file with injected violation: deep import of another module — `SHR-L001`, four hosts
+- [x] Structured checker JSON (code, message, `fix`, `docs`) for each — **generated** rather than hand-written, by the same code that judges the submission, so a run cannot pass on input that was worded kindly
+- [x] Every injection proved behaviour-preserving before it is used (`pnpm --filter @sheratan/eval check:cases`)
+- [x] Run: agent gets only the JSON; record one-turn fix yes/no — 12 cases × 5 seeds, `--restricted` (no shell, so no second attempt), raw logs committed
+- [x] **Control arm the spec did not ask for:** the same 12 cases with `fix`/`docs` stripped, and again with nothing but the file name, so the number says whether the *structured error* did the work
 
-**Comparison**
+**Comparison** — not started
+- [ ] Control arm: React 19 + TanStack Query + Zustand, pass = tests green + ESLint + tsc clean
 - [ ] Run ≥ 3 tasks on both arms; record iterations to green, first-attempt pass, violations, tokens, wall-clock
 - [ ] Commit raw logs
 
 - [ ] `[gate]` One-turn self-repair **≥ 80%** AND median iterations on ≥ 3 tasks **no worse than React** → otherwise **close the project**
+  - [x] **Self-repair: 60/60 (100%)** against a gate of 80%, `claude-sonnet-5`, 2026-09-16. The half EVAL §2.3 calls "the Week 0 gate" — the one whose failure closes the project — is **met**.
+  - [ ] Median iterations vs React: **unmeasured.** Needs `evalkit`, the hidden Playwright suites and the React arm. The gate is half-measured until it exists, and the project stays open on that basis, not on a complete result.
 
 ---
 

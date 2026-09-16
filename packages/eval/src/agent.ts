@@ -36,22 +36,65 @@ interface Result {
 }
 
 /**
+ * How much of the checker's output the agent is given. `full` is the gate.
+ * The other two are the control: if a bare "something is wrong" scores the
+ * same, the result is about the model and the violations, not about the
+ * structured error, and the claim in EVAL §2.3 is not supported by it.
+ */
+export const Told = {
+  /** Code, location, message, fix, docs — what `sheratan check --json` emits. */
+  Full: 'full',
+  /** The same, with `fix` and `docs` removed: a rule that states no remedy. */
+  NoFix: 'no-fix',
+  /** Only that the file has a problem. No code, no line, no explanation. */
+  Bare: 'bare',
+} as const;
+
+/** One of {@link Told}. */
+export type Told = (typeof Told)[keyof typeof Told];
+
+const ASK = 'Make the checker pass. Do not change what the application does.';
+
+function reported(findings: readonly Finding[], told: Told): string {
+  if (told === Told.Bare) {
+    const files = [...new Set(findings.map((one) => one.file))];
+
+    return `It reports a problem in:\n\n${files.join('\n')}`;
+  }
+
+  const shown =
+    told === Told.Full
+      ? findings
+      : findings.map(({ code, severity, file, range, message }) => ({
+          code,
+          severity,
+          file,
+          range,
+          message,
+        }));
+
+  return `It reports these errors:\n\n${JSON.stringify(shown, null, INDENT)}`;
+}
+
+/**
  * The prompt, identical for every case but for the tree and the findings. It
  * is deliberately plain: the checker output is supposed to do the work, and
  * anything else here would be measuring the prompt instead.
  */
-export function promptFor(files: readonly SourceFile[], findings: readonly Finding[]): string {
+export function promptFor(
+  files: readonly SourceFile[],
+  findings: readonly Finding[],
+  told: Told,
+): string {
   const tree = files.map((file) => `hosts/${file.path}`).join('\n');
 
-  return `This project has a checker that enforces its architecture. It reports these errors:
-
-${JSON.stringify(findings, null, INDENT)}
+  return `This project has a checker that enforces its architecture. ${reported(findings, told)}
 
 The file tree is:
 
 ${tree}
 
-Make the checker pass. Do not change what the application does.`;
+${ASK}`;
 }
 
 function parse(out: string): Result {

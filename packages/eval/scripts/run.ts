@@ -13,7 +13,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { promptFor, takeTurn } from '../src/agent.ts';
+import { promptFor, takeTurn, Told } from '../src/agent.ts';
 import { CASES, type Case } from '../src/cases.ts';
 import { detect } from '../src/detect.ts';
 import { HOSTS, PACKAGE, prepare } from '../src/sandbox.ts';
@@ -25,23 +25,27 @@ const SEEDS = 5;
 const MODEL = 'claude-sonnet-5';
 const GATE = 0.8;
 const PERCENT = 100;
+const MONEY = 2;
 const NAME_WIDTH = 22;
 
 interface Options {
   readonly seeds: number;
   readonly only: string | undefined;
   readonly model: string;
+  readonly told: Told;
 }
 
 function options(argv: readonly string[]): Options {
   const seeds = argv.indexOf('--seeds');
   const only = argv.indexOf('--case');
   const model = argv.indexOf('--model');
+  const told = argv.indexOf('--told');
 
   return {
     seeds: seeds === -1 ? SEEDS : Number(argv[seeds + 1]),
     only: only === -1 ? undefined : argv[only + 1],
     model: model === -1 ? MODEL : (argv[model + 1] ?? MODEL),
+    told: told === -1 ? Told.Full : ((argv[told + 1] ?? Told.Full) as Told),
   };
 }
 
@@ -52,6 +56,7 @@ interface Run {
   readonly code: string;
   readonly seed: number;
   readonly model: string;
+  readonly told: Told;
   readonly pass: boolean;
   readonly repaired: boolean;
   readonly behaviourKept: boolean;
@@ -83,7 +88,7 @@ async function once(violation: Case, seed: number, into: string, opts: Options):
   const injected = inject(tree, violation);
   const findings = detect(injected);
   const root = join(tmpdir(), `sheratan-eval-${violation.id}-${String(seed)}`);
-  const prompt = promptFor(injected, findings);
+  const prompt = promptFor(injected, findings, opts.told);
 
   await prepare(root, injected);
 
@@ -106,6 +111,7 @@ async function once(violation: Case, seed: number, into: string, opts: Options):
     code: violation.code,
     seed,
     model: opts.model,
+    told: opts.told,
     pass: verdict.pass && turn.ok,
     repaired: verdict.repaired,
     behaviourKept: verdict.behaviourKept,
@@ -124,14 +130,17 @@ const chosen = opts.only === undefined ? CASES : CASES.filter((one) => one.id ==
 if (chosen.length === 0) throw new Error(`no case named ${String(opts.only)}`);
 
 const stamp = new Date().toISOString().replaceAll(':', '-').slice(0, 19);
-const into = join(PACKAGE, 'results', stamp);
+const into = join(PACKAGE, 'results', opts.told === Told.Full ? stamp : `${stamp}-${opts.told}`);
 
 await mkdir(into, { recursive: true });
 
 const total = chosen.length * opts.seeds;
 
 console.log(`Week 0 self-repair: ${String(chosen.length)} cases x ${String(opts.seeds)} seeds`);
-console.log(`model ${opts.model}, one turn each, gate ${String(GATE * PERCENT)}%\n`);
+
+console.log(
+  `model ${opts.model}, told "${opts.told}", one turn each, gate ${String(GATE * PERCENT)}%\n`,
+);
 
 const runs: Run[] = [];
 
@@ -163,6 +172,7 @@ await record(
     {
       when: stamp,
       model: opts.model,
+      told: opts.told,
       cases: chosen.length,
       seeds: opts.seeds,
       total,
@@ -182,4 +192,4 @@ await record(
 
 console.log(`\n${String(passed)}/${String(total)} (${(rate * PERCENT).toFixed(1)}%)`);
 console.log(`gate ${String(GATE * PERCENT)}%: ${rate >= GATE ? 'MET' : 'NOT MET'}`);
-console.log(`cost $${cost.toFixed(2)} · logs in results/${stamp}`);
+console.log(`cost $${cost.toFixed(MONEY)} · logs in ${into}`);

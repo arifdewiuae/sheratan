@@ -27,6 +27,7 @@ interface Run {
 interface Summary {
   readonly when: string;
   readonly model: string;
+  readonly told: string;
   readonly total: number;
   readonly passed: number;
   readonly rate: number;
@@ -35,14 +36,27 @@ interface Summary {
   readonly costUSD: number;
 }
 
+async function finished(results: string, name: string): Promise<boolean> {
+  try {
+    await readFile(join(results, name, 'summary.json'), 'utf8');
+
+    return true;
+  } catch {
+    // A run still in progress has no summary yet, and is not a result.
+    return false;
+  }
+}
+
 async function newest(): Promise<string> {
   const results = join(PACKAGE, 'results');
   const entries = await readdir(results, { withFileTypes: true });
-  const directories = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  const names = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  const done = await Promise.all(names.map(async (name) => finished(results, name)));
 
-  directories.sort();
-
-  const last = directories.at(-1);
+  const last = names
+    .filter((_unused, index) => done[index] === true)
+    .toSorted()
+    .at(-1);
 
   if (last === undefined) throw new Error('no results to report');
 
@@ -63,7 +77,8 @@ function rule(runs: readonly Run[], code: string): string {
   return `| \`${code}\` | ${String(passed)}/${String(mine.length)} | ${rate}% |`;
 }
 
-const where = process.argv[2] ?? (await newest());
+const named = process.argv.slice(2).find((argument) => argument !== '--');
+const where = named ?? (await newest());
 const summary = JSON.parse(await readFile(join(where, 'summary.json'), 'utf8')) as Summary;
 const lines = (await readFile(join(where, 'runs.jsonl'), 'utf8')).trim().split('\n');
 const runs = lines.map((line) => JSON.parse(line) as Run);
@@ -71,7 +86,11 @@ const runs = lines.map((line) => JSON.parse(line) as Run);
 const seconds = runs.reduce((sum, run) => sum + run.durationMs, 0) / runs.length / 1000;
 
 console.log(`# Week 0 self-repair — ${summary.when}\n`);
-console.log(`Model \`${summary.model}\`, one turn per case, ${String(runs.length)} runs.\n`);
+
+console.log(
+  `Model \`${summary.model}\`, told \`${summary.told}\`, one turn per case, ` +
+    `${String(runs.length)} runs.\n`,
+);
 
 console.log(
   `**${String(summary.passed)}/${String(summary.total)} ` +
