@@ -1,4 +1,4 @@
-# Sheratan — Eval Suite (draft v0.1)
+# SHERATAN — Eval Suite (draft v0.1)
 
 Two claims, two evals. Both must be reproducible by a stranger in one command,
 or they convince no one:

@@ -1,4 +1,4 @@
-# Sheratan — Task Tracker
+# SHERATAN — Task Tracker
 
 Source of truth for *what* and *why*: [SPEC.md](SPEC.md), [PLAN.md](PLAN.md), [EVAL.md](EVAL.md).
 This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins or gets amended.

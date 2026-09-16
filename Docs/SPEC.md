@@ -1,4 +1,4 @@
-# Sheratan — Technical Specification (draft v0.1)
+# SHERATAN — Technical Specification (draft v0.1)
 
 > Name: β Arietis — Arabic aš-šaraṭān, "the two signs"; with Mesarthim it
 > marked the vernal equinox, the reference point of the year. Free on npm as of

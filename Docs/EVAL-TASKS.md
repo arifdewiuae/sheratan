@@ -1,4 +1,4 @@
-# Sheratan — Eval Task Set v1
+# SHERATAN — Eval Task Set v1
 
 > **Status: FROZEN — v1, 2026-09-14.** Approved by the owner and tagged
 > `eval-tasks-v1`; the SHA-256 of this file is recorded in `Docs/TASKS.md`.
