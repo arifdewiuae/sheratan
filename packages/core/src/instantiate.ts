@@ -2,6 +2,8 @@
 // that receives a signal gets one frame watcher; anything else renders once.
 
 import { ErrorCode } from './codes.ts';
+import { DEV } from './env.ts';
+import { tracePatch } from './trace.ts';
 import { NodeType, removeAll } from './dom.ts';
 import { fail } from './errors.ts';
 import { isMountable, MOUNT } from './mountable.ts';
@@ -86,6 +88,8 @@ function bindValue(element: Element, part: Part, value: unknown): void {
 
   watchFrame(() => {
     write(read());
+
+    if (DEV) tracePatch(element);
   });
 }
 
@@ -237,6 +241,8 @@ function bindChild(marker: Comment, value: unknown): void {
 
   watchFrame(() => {
     nodes = commit(marker, nodes, read());
+
+    if (DEV) tracePatch(marker);
   });
 }
 

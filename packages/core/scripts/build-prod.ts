@@ -31,13 +31,22 @@ async function rewriteDeclarationExtensions(): Promise<void> {
 
 await rewriteDeclarationExtensions();
 
-// Swapping the environment module drops the message table from the bundle.
-const productionEnv: Plugin = {
-  name: 'sheratan-production-env',
+// Swapping a module is how development-only code leaves the bundle: `env.ts`
+// takes the message table with it, `trace.ts` the causal trace (SPEC §7).
+// Guarding the call sites with `DEV` is not enough on its own — esbuild folds
+// the branch but keeps the module, so the code would ship unreachable.
+const SWAPPED = new Set(['env', 'trace']);
+
+const productionModules: Plugin = {
+  name: 'sheratan-production-modules',
   setup(current) {
-    current.onResolve({ filter: /env\.ts$/ }, (args) => ({
-      path: resolve(dirname(args.importer), 'env.prod.ts'),
-    }));
+    current.onResolve({ filter: /\/(env|trace)\.ts$/ }, (args) => {
+      const name = args.path.slice(args.path.lastIndexOf('/') + 1, -'.ts'.length);
+
+      if (!SWAPPED.has(name)) return null;
+
+      return { path: resolve(dirname(args.importer), `${name}.prod.ts`) };
+    });
   },
 };
 
@@ -51,7 +60,7 @@ await build({
   minify: true,
   sourcemap: true,
   legalComments: 'none',
-  plugins: [productionEnv],
+  plugins: [productionModules],
 });
 
 const bundle = await readFile(outfile, 'utf8');
@@ -63,6 +72,15 @@ if (bundle.includes(leaked)) {
 
 if (!bundle.includes('sheratan.dev/errors/')) {
   throw new Error('Production bundle lost the docs link errors point at.');
+}
+
+// SPEC §7: the trace is absent from production, not merely switched off in it.
+// Asserted rather than assumed, because a `DEV` branch that fails to fold is
+// invisible — the bundle still works, it just carries what it promised not to.
+for (const absent of ['__sheratan', 'recomputed', 'causal']) {
+  if (bundle.includes(absent)) {
+    throw new Error(`Production bundle still carries the causal trace: ${absent}`);
+  }
 }
 
 // The package entry is ESM-only; state it next to the output so a consumer

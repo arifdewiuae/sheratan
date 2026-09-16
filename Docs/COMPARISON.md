@@ -76,7 +76,7 @@ Publishing the first table without this one would be dishonest.
 |---|---|---|
 | Router | **Not built.** Specified in SPEC §9b — `location` as a signal, delegated `<a>` interception, `navigate()`, flat `match()` over `URLPattern`. Basic routing belongs in core; anything nested is a separate package | All five ship or bless one, in wide use |
 | Server rendering / hydration | **No, by decision** (SPEC §13), and post-MVP at the earliest. The target niche is authenticated app UIs (SPEC §1), where it matters least — but it does rule out public, SEO-facing pages | All five |
-| Component library ecosystem | None | MUI, Vuetify, shadcn, Angular Material, and the rest |
+| Component library ecosystem | None of its own — the answer is [a web component library](guides/web-components.md), which works with no adapter | MUI, Vuetify, shadcn, Angular Material, and the rest |
 | Forms, animation, i18n | Separate packages, as they should be | Also separate packages — **except Angular**, which ships `@angular/forms`, `@angular/animations` and `@angular/localize` first-party |
 | Production use | Pre-release; nothing on npm | Millions of applications |
 | Browser devtools extension | Not built, and planned as a *second* surface: the causal trace is JSON first, because an extension is readable by a human and opaque to an agent (TASKS "Devtools surface") | React, Vue, Svelte, Angular |

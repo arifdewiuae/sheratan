@@ -1,8 +1,10 @@
 // Writable state (SPEC §5).
 
+import { DEV } from './env.ts';
 import { freeze } from './freeze.ts';
 import { Flags, type Dependency, type Link, propagate, track } from './graph.ts';
 import { enterBatch, exitBatch } from './scheduler.ts';
+import { traceWrite } from './trace.ts';
 import type { DeepReadonly, Signal } from './types.ts';
 
 class SignalNode<T> implements Dependency {
@@ -41,6 +43,9 @@ export function signal<T>(initial: T): Signal<T> {
     const next = freeze(value) as T;
 
     if (Object.is(next, node.value)) return;
+
+    // Before the assignment, so the old value is still there to record.
+    if (DEV) traceWrite(node.value, next);
 
     node.value = next;
     enterBatch();
