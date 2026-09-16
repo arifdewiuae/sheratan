@@ -159,17 +159,17 @@ function guide(): Template {
 
     <h3 class="label">The four files</h3>
     <ul class="entries">
-      ${entry('dashboard.state.ts', 'Signals and pure transitions. No I/O, no DOM.')}
-      ${entry('dashboard.effects.ts', 'The only impure file: it calls the feed and invokes one transition.')}
-      ${entry('dashboard.view.ts', 'Markup as a function of state. It never imports effects.')}
-      ${entry('feed.contract.ts', 'The interface the module depends on. Swap the adapter and nothing above it changes.')}
+      ${entry('dashboard.state.ts', 'Everything the feature knows, and the only functions allowed to change it. No network, no DOM — so the whole feature can be tested without a browser.')}
+      ${entry('dashboard.effects.ts', 'The only file that touches the outside world. It calls the feed and hands the result to one transition, which puts everything that can fail in one place.')}
+      ${entry('dashboard.view.ts', 'The markup, as a function of that state. It cannot fetch, write state or reach the DOM, so a wrong number on screen is always a wrong number in state.')}
+      ${entry('feed.contract.ts', 'What the module asks for, never how it arrives. Swap the live socket for a fake one in a test and nothing above this line notices.')}
     </ul>
 
     <h3 class="label">Three ideas, and you can read the rest</h3>
     <ul class="entries">
-      ${entry('signal', 'A value that remembers who read it.')}
-      ${entry('computed', 'A value derived from others. Never stored, never stale.')}
-      ${entry('each', 'A keyed list. The row function runs once per key, not once per change.')}
+      ${entry('signal', 'A value you can change. It keeps track of which parts of the page read it, so writing a new value updates exactly those parts and nothing else — no diffing, no re-render.')}
+      ${entry('computed', 'A value worked out from other values. It recalculates itself when its sources change, so it can never be stale and you never write the code that keeps it in sync.')}
+      ${entry('each', 'A list matched up by id. A row is built once when it appears and then only its changed cells are rewritten — which is why 500 rows cost 500 rows once, not once per update.')}
     </ul>
 
     <p class="hint">

@@ -439,6 +439,13 @@
       border-color: var(--ink);
     }
 
+    /* A heading that follows anything needs the break; the grid gap alone reads
+       as though the heading belongs to the block above it rather than below. */
+    .sub + .label,
+    .entries + .label {
+      margin-top: calc(var(--space) * 1.5);
+    }
+
     .entries {
       list-style: none;
       margin: 0;
