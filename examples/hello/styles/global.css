@@ -66,31 +66,39 @@
     .lockup {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: clamp(16px, 2vw, 26px);
       color: var(--ink);
       text-decoration: none;
-      margin-bottom: calc(var(--space) * 1.5);
+      margin-bottom: calc(var(--space) * 2);
+    }
+
+    .lockup svg {
+      width: clamp(34px, 4vw, 48px);
+      height: auto;
     }
 
     .lockup .rule {
       width: 1px;
-      height: 20px;
+      height: clamp(30px, 4vw, 46px);
       background: var(--hair);
     }
 
     .lockup .wordmark {
-      font-size: 13px;
-      font-weight: 400;
-      letter-spacing: 0.36em;
-      text-indent: 0.36em;
-      text-transform: lowercase;
+      font-size: clamp(28px, 4.4vw, 46px);
+      font-weight: 300;
+      letter-spacing: 0.3em;
+      text-indent: 0.3em;
+      text-transform: uppercase;
+      line-height: 1;
     }
 
+    /* The wordmark carries the page; the title is a quiet label under it. */
     .head h1 {
       margin: 0;
-      font-size: 1.1rem;
+      color: var(--t45);
+      font-size: 0.65rem;
       font-weight: 400;
-      letter-spacing: 0.34em;
+      letter-spacing: 0.24em;
       text-transform: uppercase;
     }
 

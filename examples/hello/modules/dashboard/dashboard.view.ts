@@ -83,7 +83,7 @@ function lockup(): Template {
     href="https://github.com/arifdewiuae/sheratan"
     aria-label="sheratan"
   >
-    <svg viewBox="-8 -8 80 80" width="28" height="28" fill="none" aria-hidden="true">
+    <svg viewBox="-8 -8 80 80" width="44" height="44" fill="none" aria-hidden="true">
       <path
         d="M8 48 Q33 38 56 16"
         stroke="currentColor"
