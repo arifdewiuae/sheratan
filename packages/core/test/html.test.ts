@@ -215,14 +215,70 @@ test('events: handler gets a payload, never the raw Event', () => {
 
   $('form').dispatchEvent(submit as unknown as Event);
 
+  // A button has a `value`, so it reports one: the payload is read from the
+  // element, not chosen from a list of event names (SPEC §9 Intents).
   assert.deepEqual(calls, [
-    ['click', undefined],
+    ['click', ''],
     ['input', '12'],
     ['change', true],
     ['submit', { qty: '12', gift: 'on' }],
   ]);
 
   assert.equal(submit.defaultPrevented, true);
+});
+
+test('events: a button names itself with its value, without a data attribute', () => {
+  const picked: unknown[] = [];
+
+  const sort = (payload: unknown): void => {
+    picked.push(payload);
+  };
+
+  render(
+    () => html` <div>
+      <button type="button" value="ascending" @click=${sort}>up</button>
+      <button type="button" value="descending" @click=${sort}>down</button>
+    </div>`,
+    host,
+  );
+
+  for (const button of host.querySelectorAll('button')) (button as HTMLElement).click();
+
+  assert.deepEqual(picked, ['ascending', 'descending']);
+});
+
+test('events: a namespaced event reads the control, so a component library works', () => {
+  const picked: unknown[] = [];
+
+  const pick = (payload: unknown): void => {
+    picked.push(payload);
+  };
+
+  // What a component library looks like from here: an element that owns a
+  // `value` property and announces changes under its own event name. Whether
+  // the element is registered makes no difference to either half.
+  render(() => html`<x-select @x-change=${pick}></x-select>`, host);
+
+  const select = $('x-select') as HTMLElement & { value?: string };
+
+  select.value = 'ascending';
+  select.dispatchEvent(new dom.CustomEvent('x-change', { bubbles: true }) as unknown as Event);
+
+  assert.deepEqual(picked, ['ascending']);
+});
+
+test('events: an element with no value to report delivers undefined', () => {
+  const seen: unknown[] = [];
+
+  const noted = (payload: unknown): void => {
+    seen.push(payload);
+  };
+
+  render(() => html`<div @x-ready=${noted}></div>`, host);
+
+  $('div').dispatchEvent(new dom.CustomEvent('x-ready', { bubbles: true }) as unknown as Event);
+
+  assert.deepEqual(seen, [undefined]);
 });
 
 test('events: disposal removes listeners, so a retained node no longer calls the handler', () => {
@@ -567,7 +623,9 @@ test('each: a handler inside a row receives the row item, current at event time'
   );
 
   ($$('button')[1] as HTMLElement).click();
-  assert.deepEqual(calls, [[undefined, { id: 2, status: 'new' }]]);
+  // The button reports its own (empty) value; the row item is the second
+  // argument, which is what this is about.
+  assert.deepEqual(calls, [['', { id: 2, status: 'new' }]]);
 
   items.set([{ id: 1, status: 'new', note: 'x' }, items()[1] as Item]);
   flush();
@@ -575,7 +633,7 @@ test('each: a handler inside a row receives the row item, current at event time'
 
   assert.deepEqual(
     calls[1],
-    [undefined, { id: 1, status: 'new', note: 'x' }],
+    ['', { id: 1, status: 'new', note: 'x' }],
     'latest item, from a nested template',
   );
 });
@@ -614,7 +672,7 @@ test('events outside any row get no second argument', () => {
 
   render(() => html`<button @click=${go}></button>`, host);
   ($('button') as HTMLElement).click();
-  assert.deepEqual(calls, [[undefined]]);
+  assert.deepEqual(calls, [['']]);
 });
 
 // render (SPEC §10d): owns only its subtree

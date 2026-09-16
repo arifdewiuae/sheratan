@@ -88,8 +88,12 @@ never an inline arrow (SHR-V001). The handler receives a payload, not the Event:
 | Event | Payload |
 |---|---|
 | `submit` | form fields as an object; default is prevented |
-| `input`, `change` | the control's `value` (a string), or `checked` for a checkbox |
-| anything else | `undefined` |
+| anything else | the element's `value`, or `checked` for a checkbox; `undefined` if it has neither |
+
+The payload is read from the **element**, not chosen by the event's name, so a
+component library's own event works like a native one: `@sl-change=${intent.sort}`
+on an `<sl-select>` delivers its `value`. A `<button value="ascending">` names
+itself the same way, which is why a `data-` attribute is never the answer.
 
 Inside an `each` row a handler also gets a **second argument: the row's
 current item** (innermost row). Every handler runs inside `batch()`.

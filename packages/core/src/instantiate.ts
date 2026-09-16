@@ -89,29 +89,44 @@ function bindValue(element: Element, part: Part, value: unknown): void {
   });
 }
 
-function readControl(element: Element): unknown {
-  const control = element as HTMLInputElement;
+/** The one event whose payload is the form rather than the element. */
+const SUBMIT_EVENT = 'submit';
 
-  return control.type === 'checkbox' ? control.checked : control.value;
+const CHECKBOX_TYPE = 'checkbox';
+
+/** What a payload is read from: a native control, or a library's element. */
+interface Control {
+  readonly type?: string;
+  readonly value?: unknown;
+  readonly checked?: boolean;
 }
 
-// Intents receive a payload, never the raw Event (SPEC §9 Intents).
-const PAYLOADS: Record<string, (element: Element, event: Event) => unknown> = {
-  submit: (element, event) => {
-    event.preventDefault();
+function readControl(element: Element): unknown {
+  const control = element as Control;
 
-    return Object.fromEntries(new FormData(element as HTMLFormElement));
-  },
-  input: readControl,
-  change: readControl,
-};
+  return control.type === CHECKBOX_TYPE ? control.checked : control.value;
+}
 
+function submitted(element: Element, event: Event): unknown {
+  event.preventDefault();
+
+  return Object.fromEntries(new FormData(element as HTMLFormElement));
+}
+
+/**
+ * Intents receive a payload, never the raw Event (SPEC §9 Intents), and the
+ * payload is read from the element the handler is on rather than chosen from a
+ * list of event names. A component library announces changes under its own
+ * name — `sl-change`, `md-input` — and no table of event types can hold them
+ * all, so an intent would silently receive nothing from every one of them.
+ * An element with no value to report still reports none.
+ */
 function payloadOf(event: Event): unknown {
-  const reader = PAYLOADS[event.type];
+  const element = event.currentTarget as Element;
 
-  if (reader === undefined) return undefined;
+  if (event.type === SUBMIT_EVENT) return submitted(element, event);
 
-  return reader(event.currentTarget as Element, event);
+  return readControl(element);
 }
 
 function bindEvent(element: Element, name: string, value: unknown): void {
