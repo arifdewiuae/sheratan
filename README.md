@@ -16,6 +16,7 @@
 <p align="center">
   <a href="https://arifdewiuae.github.io/sheratan/">Website</a> ·
   <a href="Docs/SPEC.md">Spec</a> ·
+  <a href="Docs/COMPARISON.md">Comparison</a> ·
   <a href="Docs/EVAL.md">Eval</a> ·
   <a href="Docs/TASKS.md">Progress</a>
 </p>
@@ -45,6 +46,27 @@ removes the choice:
 
 The honest version of the claim, including prior art (Elm, Solid, Lit, boundary
 linters) and what Sheratan won't do, is in [the spec](Docs/SPEC.md).
+
+## What it takes to match one import
+
+Signals, derived values, rendering without a virtual DOM, keyed lists, windowed
+lists, and the async request lifecycle — cancel on key change, deduplicate,
+discard out-of-order responses, retry with backoff, revalidate — plus push data
+folded once per frame. That is one import. Reaching the same place elsewhere,
+bundled and gzipped the same way ([method](Docs/comparison/README.md)):
+
+| Stack | Packages | gzip |
+|---|---|---|
+| **Sheratan** | **1** | **6.9 kB** |
+| Solid 1.9 | 3 | 25.6 kB |
+| Svelte 5 | 3 | 37.0 kB |
+| Vue 3 | 3 | 41.8 kB |
+| React 19 | 4 | 84.1 kB |
+| Angular 19 | 5 | 145.5 kB |
+
+The whole of Sheratan is smaller than the smallest single piece of any of them.
+[What is being matched, what Sheratan does not have, and the caveats](Docs/COMPARISON.md)
+— including that there is no router and no server rendering yet.
 
 ## Repository
 
