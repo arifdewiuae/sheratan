@@ -18,16 +18,19 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 
 | Week | Focus | Status | Gate result |
 |---|---|---|---|
-| Pre-flight | Names, repo | ⬜ Not started | — |
-| 0 | Falsification | 🟡 In progress | — |
-| 1 | Core | ⬜ Not started | — |
-| 2 | Async, ownership, trace | ⬜ Not started | — |
+| Pre-flight | Names, repo | 🟡 In progress | — |
+| 0 | Falsification | 🟡 In progress | Not reached |
+| 1 | Core | 🟡 In progress | No-build ✅ · reordering vs Solid not measured |
+| 2 | Async, ownership, trace | 🟡 In progress | — |
 | 3 | Checker, CLI, template | ⬜ Not started | — |
 | 4 | Agent surface, reference app | ⬜ Not started | — |
 | 5 | Re-measure, package, launch | ⬜ Not started | — |
 | +8 wks | Outside production use | ⬜ Not started | — |
 
 Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · ⛔ Stopped
+
+Last audited against the code on **2026-09-16**. A tick names where the work
+landed, so the claim can be checked without reading the diff.
 
 ---
 
@@ -36,8 +39,8 @@ Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · 
 - [ ] Verify GitHub org handle `sheratan` is available and claim it
 - [ ] Verify and register `sheratan.dev` — it goes into checker `docs` links and can't change later (SPEC header, §8)
 - [ ] Reserve `sheratan` on npm (free as of 2026-09-14)
-- [ ] `git init`; monorepo skeleton: `packages/{core,check,cli}`, `examples/dashboard`, `docs/` (SPEC §11)
-- [ ] Commit SPEC / PLAN / EVAL / TASKS as the baseline
+- [ ] `git init`; monorepo skeleton: `packages/{core,check,cli}`, `examples/dashboard`, `docs/` (SPEC §11) — `packages/core`, `examples/hello` and `Docs/` exist; `check` and `cli` are Week 3, and the reference app is Week 4
+- [x] Commit SPEC / PLAN / EVAL / TASKS as the baseline — `0d7e8e1`
 
 ---
 
@@ -47,7 +50,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 
 **Setup**
 - [x] `llms.txt` v0: API, import matrix, reactivity trap as the first item, canonical module (SPEC §10) — [llms.txt](../llms.txt), ~4.0–4.7k tokens estimated (recount with the evaluated model's counter before the first run); canonical module executed end to end
-- [x] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro) — `packages/core`: signals, scheduler, `html`, keyed `each`, `render`; TypeScript, 1561 non-blank lines, 69 tests, 4.8 KB brotli
+- [x] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro) — `packages/core`: signals, scheduler, `html`, keyed `each`, `render`; TypeScript; 1,708 non-blank lines, 81 unit tests and 5.3 KB brotli as of 2026-09-16
 - [x] Freeze and version 12 eval tasks (EVAL §2.1) — [EVAL-TASKS.md](EVAL-TASKS.md), tag `eval-tasks-v1`, SHA-256 `7a19d6474fbcb1a417d60fb3c2be815c908d8cb68bd50a7a60a3a5a9a317f1ce`
 - [x] Split: 6 headline tasks + 6 held-out (EVAL-TASKS §2)
 - [x] Fix the documentation token budget for both arms **and write it down** before the first run — 8,000 tokens (EVAL-TASKS §1.5)
@@ -83,7 +86,8 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [x] `[must]` `html` tagged templates: parse once into `<template>`, holes as precomputed paths (no per-mount scan)
 - [x] `[must]` View update model: view runs once; one micro-watcher per hole
 - [x] `[must]` Attribute (`.prop`) and event (`@event`) bindings
-- [ ] Holes escaped as text by default; `unsafeHTML()` directive
+- [x] Holes escaped as text by default — a hole becomes a text node, never markup (`html.test.ts` "static values render once and are escaped as text")
+- [ ] `unsafeHTML()` directive
 - [x] `[must]` Keyed `each` (no virtualization); per-row watchers, rows not rebuilt on cell change; minimum DOM moves via LIS
 - [ ] Style scoping (SPEC §9a): runtime sets `data-module` / `data-ui` on roots at mount; CSS module scripts attached via `adoptedStyleSheets`
 - [ ] Verify `@scope` + `@layer` browser support matrix before templates depend on it (SPEC §9a)
@@ -120,11 +124,11 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [ ] `[stretch]` Anything beyond the basic variant
 
 **Ownership & lifecycle** (SPEC §5b)
-- [ ] `[must]` Owner tree; children from `mount()` disposed recursively
-- [ ] `[must]` `onDispose()`
-- [ ] `[must]` Disposal order: watchers → subscriptions → nodes
-- [ ] `[must]` Post-disposal async is a no-op (owner flag on transitions)
-- [ ] `[must]` Leak test: 1000 mount/unmount cycles → live subscription count returns to 0
+- [x] `[must]` Owner tree; children from `mount()` disposed recursively — `OwnerNode` in `packages/core/src/owner.ts`, an intrusive linked list with O(1) add and remove
+- [x] `[must]` `onDispose()` — `packages/core/src/owner.ts`; `SHR-R001` when there is no owner
+- [x] `[must]` Disposal order: watchers → subscriptions → nodes — `OwnerNode.dispose()` runs `teardown()` (a watcher drops its sources) before `reset()` (children, then owned subscribers, then cleanups last-registered-first)
+- [ ] `[must]` Post-disposal async is a no-op (owner flag on transitions) — **blocked:** nothing marks a transition at run time (see the spec gap below). `examples/hello` checks `signal.aborted` by hand instead, which is the pattern but not the enforcement
+- [x] `[must]` Leak test: 1000 mount/unmount cycles → live subscription count returns to 0 — `reactive.test.ts:465` and `html.test.ts:622`; the windowed list has its own at `window.test.ts:268`
 
 **Streams & windowing**
 - [ ] `[stretch]` `stream()`: subscribe/teardown on key change and disposal, per-frame folding, `reduceMany`, `status()` reconnect (SPEC §6)
@@ -133,7 +137,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 
 **Debuggability**
 - [ ] `[stretch]` Causal trace: write → computed → patch, ring buffer (500), sampling, `__sheratan.trace()` JSON, absent in prod (SPEC §7)
-- [ ] Structured runtime errors: `code`, `fix`, `docs`
+- [x] Structured runtime errors — `SheratanError` carries a stable `code`, every message in `messages.ts` states what to write instead, and the production build swaps the table for `sheratan.dev/errors/<code>` (`src/errors.ts`, `src/env.prod.ts`). `fix` as a separate field is the checker's JSON shape (SPEC §8), not the runtime's
 - [ ] `declare()` legal-transition dev assertion (SPEC §5)
 
 - [ ] `[gate]` Correct and leak-free **first**: race tests pass, 1000 cycles leave zero live subscriptions → otherwise fix ownership before measuring anything
@@ -326,4 +330,5 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-16 | Internal field name mangling deliberately not done | It would cost the readability the code rules ask for; revisit only if the size budget comes under pressure, and with a measurement |
 | 2026-09-16 | `llms.txt`'s API table is generated from TSDoc and checked in CI | The agent-facing docs cannot drift from the declarations the package ships |
 | 2026-09-16 | Platform APIs instead of code where they exist: `Element.moveBefore` for row moves (falls back to `insertBefore`), `Symbol.dispose` on every disposer (`using stop = watch(…)`) | A moved row keeps focus, selection and media state; `using` removes a class of forgotten teardown |
+| 2026-09-16 | Tracker audited against the code: Week 1's `[must]` items and Week 2's ownership block were built but never ticked, and the status table still read "Not started" for both | A tracker that understates the work is as useless as one that overstates it — the next decision is which week to work on, and it was being made from wrong numbers |
 | 2026-09-15 | Immutability enforced, not requested: `DeepReadonly` reads in types, incremental deep freeze of plain objects/arrays on `set()`, checker rule for visible mutation (SPEC §5) | A rule an agent must remember is a rule an agent breaks; freezing only new nodes keeps the cost at what the caller already allocated |
