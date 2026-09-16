@@ -51,6 +51,7 @@ linters) and what Sheratan won't do, is in [the spec](Docs/SPEC.md).
 | Path | What |
 |---|---|
 | `packages/core/` | The runtime: signals, templates, `each`, `render`. Zero runtime dependencies |
+| `examples/hello/` | A live dashboard in the canonical module shape: 500 rows, 2000 values a second, sorted on every batch |
 | `tooling/eslint-config/` | Shared lint config |
 | `llms.txt` | The API as an agent should learn it |
 | `Docs/SPEC.md` | Technical specification. The source of truth for implementation |
@@ -71,6 +72,19 @@ pnpm check   # format, lint, typecheck, build, tests + coverage gate, package ch
 
 The runtime is 4.8 KB brotli with zero dependencies, and every commit is
 measured against `packages/core/size-budget.json`.
+
+Run the example — 500 rows under a synthetic 2000 values/second feed, re-sorted
+on every batch:
+
+```sh
+pnpm build                         # the example imports the built runtime
+pnpm --filter example-hello dev    # http://localhost:5173
+pnpm --filter example-hello e2e    # the same flows in a real browser
+```
+
+No bundler is involved: the dev server strips TypeScript and serves ESM. For
+the version with no build step at all, serve the repository with any static
+file server and open `examples/hello/public/no-build.html`.
 
 All changes go through pull requests into `develop`; `main` is for releases.
 Read [AGENTS.md](AGENTS.md) before opening one.
