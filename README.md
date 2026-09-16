@@ -18,6 +18,7 @@
   <a href="Docs/SPEC.md">Spec</a> ·
   <a href="Docs/COMPARISON.md">Comparison</a> ·
   <a href="Docs/EVAL.md">Eval</a> ·
+  <a href="Docs/EVAL-RESULTS.md">Results</a> ·
   <a href="Docs/TASKS.md">Progress</a>
 </p>
 
@@ -85,6 +86,7 @@ any of it makes an agent measurably better.
 | `llms.txt` | The API as an agent should learn it |
 | `Docs/SPEC.md` | Technical specification. The source of truth for implementation |
 | `Docs/EVAL.md` | Performance and agent-authoring evaluation plan, with go/no-go gates |
+| `Docs/EVAL-RESULTS.md` | What the Week 0 falsification gate actually measured, and what it did not |
 | `Docs/TASKS.md` | Progress tracker for the MVP |
 | `Docs/sheratan-identity.html` | Brand identity |
 | `site/` | Website: plain HTML, no build. Serve `site/` with any static file server |

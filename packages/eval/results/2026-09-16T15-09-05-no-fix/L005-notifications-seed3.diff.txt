@@ -1,0 +1,78 @@
+===== modules/notifications/notifications.effects.ts
+// Effects: sequencing only. It owns the clock and calls one transition (SPEC §4).
+
+import { onDispose } from 'sheratan';
+
+import type { NotificationsState } from './notifications.state.ts';
+
+/** How long a toast stays up before it takes itself away. */
+const LINGER_MS = 4000;
+
+/** What this module can do. The view declares the same shape for itself. */
+export interface NotificationsEffects {
+  raise(this: void, message: string): void;
+  dismiss(this: void): void;
+}
+
+/** Wires the state to the host's timer, and gives the mount its teardown. */
+export function createNotificationsEffects(state: NotificationsState): NotificationsEffects {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const clear = (): void => {
+    if (timer !== undefined) clearTimeout(timer);
+
+    timer = undefined;
+  };
+
+  onDispose(clear);
+
+  return {
+    raise(message: string): void {
+      clear();
+      state.raised(message);
+
+      timer = setTimeout(() => {
+        state.dismissed();
+      }, LINGER_MS);
+    },
+
+    dismiss(): void {
+      clear();
+      state.dismissed();
+    },
+  };
+}
+
+===== modules/notifications/notifications.state.ts
+// State: signals and pure transitions. No I/O, no DOM (SPEC §4).
+
+import { computed, signal, type Accessor } from 'sheratan';
+
+/** The toast T04 asks for: one message at a time, or none. */
+export interface NotificationsState {
+  readonly message: Accessor<string>;
+  readonly showing: Accessor<boolean>;
+
+  raised(message: string): void;
+  dismissed(): void;
+}
+
+const NOTHING = '';
+
+/** Builds the module's state. Called once per mount, inside the mount's scope. */
+export function createNotificationsState(): NotificationsState {
+  const message = signal(NOTHING);
+
+  return {
+    message,
+    showing: computed(() => message() !== NOTHING),
+
+    raised(next: string): void {
+      message.set(next);
+    },
+
+    dismissed(): void {
+      message.set(NOTHING);
+    },
+  };
+}

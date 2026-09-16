@@ -31,6 +31,8 @@ const NAME_WIDTH = 22;
 interface Options {
   readonly seeds: number;
   readonly only: string | undefined;
+  /** Narrows to one rule, for looking harder at a cell that moved. */
+  readonly code: string | undefined;
   readonly model: string;
   readonly told: Told;
 }
@@ -40,10 +42,12 @@ function options(argv: readonly string[]): Options {
   const only = argv.indexOf('--case');
   const model = argv.indexOf('--model');
   const told = argv.indexOf('--told');
+  const code = argv.indexOf('--code');
 
   return {
     seeds: seeds === -1 ? SEEDS : Number(argv[seeds + 1]),
     only: only === -1 ? undefined : argv[only + 1],
+    code: code === -1 ? undefined : argv[code + 1],
     model: model === -1 ? MODEL : (argv[model + 1] ?? MODEL),
     told: told === -1 ? Told.Full : ((argv[told + 1] ?? Told.Full) as Told),
   };
@@ -125,12 +129,22 @@ async function once(violation: Case, seed: number, into: string, opts: Options):
 }
 
 const opts = options(process.argv.slice(2));
-const chosen = opts.only === undefined ? CASES : CASES.filter((one) => one.id === opts.only);
 
-if (chosen.length === 0) throw new Error(`no case named ${String(opts.only)}`);
+const chosen = CASES.filter(
+  (one) =>
+    (opts.only === undefined || one.id === opts.only) &&
+    (opts.code === undefined || one.code === opts.code),
+);
+
+if (chosen.length === 0) throw new Error(`no case matches ${String(opts.only ?? opts.code)}`);
 
 const stamp = new Date().toISOString().replaceAll(':', '-').slice(0, 19);
-const into = join(PACKAGE, 'results', opts.told === Told.Full ? stamp : `${stamp}-${opts.told}`);
+
+const label = [opts.told === Told.Full ? '' : opts.told, opts.code?.toLowerCase() ?? '']
+  .filter((part) => part !== '')
+  .join('-');
+
+const into = join(PACKAGE, 'results', label === '' ? stamp : `${stamp}-${label}`);
 
 await mkdir(into, { recursive: true });
 

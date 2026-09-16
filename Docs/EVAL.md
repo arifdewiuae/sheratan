@@ -155,9 +155,13 @@ it is worth more than the numbers.
 
 ## Gates
 
+Results as they land: [EVAL-RESULTS.md](EVAL-RESULTS.md). Week 0's self-repair
+half ran on 2026-09-16 and is met at 60/60; the comparison half is unmeasured.
+
 | When | Gate | If failed |
 |---|---|---|
 | Week 0 | One-turn self-repair ≥ 80%, and median iterations on ≥3 tasks no worse than React — measured against a small **real** signal runtime, not an empty mock | Stop. Cost: 3 days. |
+| | ↳ self-repair: **met**, 60/60, `claude-sonnet-5`, 2026-09-16 · median iterations vs React: **not run** | |
 | Week 1 | 500-row reordering within 2× of Solid | Fix reconciliation before anything else |
 | Week 2 | Correct and leak-free first: 1000 mount/unmount cycles leave zero live subscriptions | Fix ownership before measuring anything |
 | Week 2–3 | 60fps under 1000 msg/sec, once keyed reconciliation is real | Scheduler or renderer is wrong; the headline claim dies |

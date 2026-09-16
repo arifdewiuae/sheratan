@@ -1,0 +1,48 @@
+This project has a checker that enforces its architecture. It reports these errors:
+
+[
+  {
+    "code": "SHR-L002",
+    "severity": "error",
+    "file": "modules/orders/orders.view.ts",
+    "range": {
+      "line": 31,
+      "column": 3
+    },
+    "message": "a view may not use `setTimeout`: timers belong in *.effects.ts, with teardown in onDispose()."
+  },
+  {
+    "code": "SHR-L002",
+    "severity": "error",
+    "file": "modules/orders/orders.view.ts",
+    "range": {
+      "line": 32,
+      "column": 5
+    },
+    "message": "a view may not use `document`: a view describes markup with html``; DOM access belongs in *.effects.ts."
+  }
+]
+
+The file tree is:
+
+hosts/app.ts
+hosts/modules/customers/customers.effects.ts
+hosts/modules/customers/customers.state.ts
+hosts/modules/customers/customers.view.ts
+hosts/modules/customers/index.ts
+hosts/modules/new-order/index.ts
+hosts/modules/new-order/new-order.effects.ts
+hosts/modules/new-order/new-order.state.ts
+hosts/modules/new-order/new-order.view.ts
+hosts/modules/notifications/index.ts
+hosts/modules/notifications/notifications.effects.ts
+hosts/modules/notifications/notifications.state.ts
+hosts/modules/notifications/notifications.view.ts
+hosts/modules/orders/index.ts
+hosts/modules/orders/orders.effects.ts
+hosts/modules/orders/orders.state.ts
+hosts/modules/orders/orders.view.ts
+hosts/services/api.contract.ts
+hosts/services/api.fixture.ts
+
+Make the checker pass. Do not change what the application does.
