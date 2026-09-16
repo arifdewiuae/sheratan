@@ -26,8 +26,11 @@ const metric = (id: number, name: string, value: number): Metric => ({ id, name,
 const text = (selector: string): string =>
   (host.querySelector(selector)?.textContent ?? '').replace(/\s+/g, ' ').trim();
 
+/** The heading row is markup, not data. */
+const ROW = '.metric:not(.heading)';
+
 const names = (): string[] =>
-  [...host.querySelectorAll('.metric-name')].map((node) => node.textContent.trim());
+  [...host.querySelectorAll(`${ROW} .metric-name`)].map((node) => node.textContent.trim());
 
 function mounted(): { state: DashboardState; calls: [string, unknown][] } {
   const state = createDashboardState();
@@ -71,13 +74,13 @@ test('the stat tiles read from state', () => {
 
   state.seeded([metric(0, 'a', 10), metric(1, 'b', 20)]);
   state.applyBatch([{ id: 0, value: 12 }]);
-  state.sampled(12_400);
+  state.sampled(12_400, 960);
   flush();
 
-  assert.equal(text('.tile.headline .tile-value'), '12.4k');
-  assert.equal(text('.tiles .tile:nth-child(2) .tile-value'), '1');
-  assert.equal(text('.tiles .tile:nth-child(3) .tile-value'), '2');
-  assert.equal(text('.tiles .tile:nth-child(4) .tile-value'), '1 rising');
+  assert.equal(text('.tile.headline .tile-value'), '12.4k', 'values in');
+  assert.equal(text('.tiles .tile:nth-child(2) .tile-value'), '960', 'rows rewritten');
+  assert.equal(text('.tiles .tile:nth-child(3) .tile-value'), '2', 'rows live');
+  assert.equal(text('.tiles .tile:nth-child(4) .tile-value'), '1', 'values received');
 });
 
 test('a new value writes one cell and keeps the row', () => {
@@ -86,14 +89,14 @@ test('a new value writes one cell and keeps the row', () => {
   state.seeded([metric(0, 'a', 10), metric(1, 'b', 5)]);
   flush();
 
-  const row = host.querySelectorAll('.metric')[0] as Element;
+  const row = host.querySelectorAll(ROW)[0] as Element;
   const valueCell = row.querySelector('.metric-value') as Element;
   const textNode = valueCell.firstChild;
 
   state.applyBatch([{ id: 0, value: 14 }]);
   flush();
 
-  assert.equal(host.querySelectorAll('.metric')[0], row, 'same row element');
+  assert.equal(host.querySelectorAll(ROW)[0], row, 'same row element');
   assert.equal(valueCell.firstChild, textNode, 'same text node, rewritten in place');
   assert.equal(valueCell.textContent.trim(), '14');
   assert.equal(row.getAttribute('class'), 'metric up');

@@ -76,15 +76,48 @@ function controls(state: DashboardState, intents: DashboardIntents): Template {
   </div>`;
 }
 
+/** The brand lockup: the mark, a hairline, the wordmark. */
+function lockup(): Template {
+  return html` <a
+    class="lockup"
+    href="https://github.com/arifdewiuae/sheratan"
+    aria-label="sheratan"
+  >
+    <svg viewBox="-8 -8 80 80" width="28" height="28" fill="none" aria-hidden="true">
+      <path
+        d="M8 48 Q33 38 56 16"
+        stroke="currentColor"
+        stroke-opacity="0.3"
+        stroke-width="1"
+        vector-effect="non-scaling-stroke"
+      />
+      <circle cx="8" cy="48" r="1.4" fill="currentColor" />
+      <circle cx="30.5" cy="37.2" r="3.2" fill="currentColor" />
+      <circle cx="56" cy="16" r="2" fill="currentColor" />
+    </svg>
+    <span class="rule"></span>
+    <span class="wordmark">sheratan</span>
+  </a>`;
+}
+
+function columns(): Template {
+  return html` <li class="metric heading" aria-hidden="true">
+    <span>metric</span>
+    <span>level</span>
+    <span class="metric-value">value</span>
+    <span class="metric-delta">change</span>
+  </li>`;
+}
+
 function stats(state: DashboardState): Template {
   const rate = computed(() => compact(state.rate()));
-  const applied = computed(() => compact(state.applied()));
+  const writeRate = computed(() => compact(state.writeRate()));
   const rows = computed(() => String(state.rows().length));
-  const rising = computed(() => `${String(state.rising())} rising`);
+  const applied = computed(() => compact(state.applied()));
 
   return html` <div class="tiles">
-    ${tile('values / second', rate, 'headline')} ${tile('values applied', applied)}
-    ${tile('rows', rows)} ${tile('direction', rising)}
+    ${tile('values in / sec', rate, 'headline')} ${tile('rows rewritten / sec', writeRate)}
+    ${tile('rows live', rows)} ${tile('values received', applied)}
   </div>`;
 }
 
@@ -100,14 +133,19 @@ export function dashboardView(state: DashboardState, intents: DashboardIntents):
     }
 
     return html`<ul class="metrics">
-      ${each(state.visible, row)}
+      ${columns()} ${each(state.visible, row)}
     </ul>`;
   });
 
   return html` <section class="app" data-module="dashboard">
     <header class="head">
+      ${lockup()}
       <h1>Live metrics</h1>
-      <p class="sub">500 rows, 2000 values a second. Sort by value to watch the order churn.</p>
+      <p class="sub">
+        The feed sends 20 000 values a second across 500 rows. Several land on the same row inside
+        one frame, so only the rows that really changed are rewritten: the gap between the first two
+        numbers is the work the framework did not do.
+      </p>
     </header>
 
     ${stats(state)} ${controls(state, intents)} ${body}

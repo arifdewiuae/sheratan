@@ -34,7 +34,7 @@ test('the zero-build page renders and keeps updating', async ({ page }) => {
 
   // Ordered by name, so the rows hold still while the numbers move — all of
   // it without a build step in sight.
-  const names = await page.locator('.metric-name').allInnerTexts();
+  const names = await page.locator('.metric .metric-name').allInnerTexts();
 
   expect(names).toEqual(names.toSorted((left, right) => left.localeCompare(right)));
 

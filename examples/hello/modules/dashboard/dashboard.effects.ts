@@ -25,13 +25,20 @@ function messageOf(error: unknown): string {
 /** Samples "values per second" from a counter that only ever grows. */
 function sampler(state: DashboardState): () => void {
   const windowsPerSecond = MS_PER_SECOND / SAMPLE_MS;
-  let previous = 0;
+  let lastApplied = 0;
+  let lastWritten = 0;
 
   const timer = setInterval(() => {
-    const total = state.applied();
+    const applied = state.applied();
+    const written = state.written();
 
-    state.sampled((total - previous) * windowsPerSecond);
-    previous = total;
+    state.sampled(
+      (applied - lastApplied) * windowsPerSecond,
+      (written - lastWritten) * windowsPerSecond,
+    );
+
+    lastApplied = applied;
+    lastWritten = written;
   }, SAMPLE_MS);
 
   return () => {

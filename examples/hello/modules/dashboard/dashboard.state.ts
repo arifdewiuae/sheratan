@@ -30,23 +30,25 @@ export interface DashboardState {
   readonly error: Accessor<string>;
   readonly sortedBy: Accessor<SortKey>;
   readonly live: Accessor<boolean>;
-  /** Values applied since the mount. */
+  /** Values received since the mount. */
   readonly applied: Accessor<number>;
+  /** Rows whose value actually changed, which is what reaches the DOM. */
+  readonly written: Accessor<number>;
   /** Batches applied since the mount. */
   readonly batches: Accessor<number>;
-  /** Values per second, sampled once a second by effects. */
+  /** Values a second, sampled by effects. */
   readonly rate: Accessor<number>;
+  /** Rows rewritten a second: what the first number costs the DOM. */
+  readonly writeRate: Accessor<number>;
 
   /** The table's order: derived, never stored. */
   readonly visible: Accessor<readonly Metric[]>;
-  /** How many rows moved up on the last batch. */
-  readonly rising: Accessor<number>;
 
   seeded(metrics: readonly Metric[]): void;
   failed(message: string): void;
   /** One commit for a whole batch: rows and counters move together. */
   applyBatch(ticks: readonly Tick[]): void;
-  sampled(rate: number): void;
+  sampled(rate: number, writeRate: number): void;
   toggledLive(): void;
   sorted(key: SortKey): void;
 }
@@ -75,6 +77,8 @@ function order(rows: readonly Metric[], key: SortKey): readonly Metric[] {
 
 interface Signals {
   rows: Signal<readonly Metric[]>;
+  written: Signal<number>;
+  writeRate: Signal<number>;
   status: Signal<Status>;
   error: Signal<string>;
   sortKey: Signal<SortKey>;
@@ -105,15 +109,25 @@ function transitions(
     },
 
     applyBatch: (ticks) => {
+      const before = state.rows();
+      const next = apply(before, ticks);
+      // Several values can land on one row in one batch, and a value can
+      // repeat. Only a row that really changed costs a DOM write.
+      const changed = next.filter((row, index) => row !== before[index]).length;
+
       batch(() => {
-        state.rows.set(apply(state.rows(), ticks));
+        state.rows.set(next);
         state.applied.set(state.applied() + ticks.length);
+        state.written.set(state.written() + changed);
         state.batches.set(state.batches() + 1);
       });
     },
 
-    sampled: (next) => {
-      state.rate.set(next);
+    sampled: (values, writes) => {
+      batch(() => {
+        state.rate.set(values);
+        state.writeRate.set(writes);
+      });
     },
 
     toggledLive: () => {
@@ -135,14 +149,15 @@ export function createDashboardState(): DashboardState {
     sortKey: signal<SortKey>(SortKey.Name),
     live: signal(true),
     applied: signal(0),
+    written: signal(0),
     batches: signal(0),
     rate: signal(0),
+    writeRate: signal(0),
   };
 
   // Sorting on every batch is the point: values churn, so the order churns,
   // and the reconciler moves the minimum number of rows (SPEC §9).
   const visible = computed(() => order(signals.rows(), signals.sortKey()));
-  const rising = computed(() => signals.rows().filter((row) => row.delta > 0).length);
 
   return {
     rows: signals.rows,
@@ -151,10 +166,11 @@ export function createDashboardState(): DashboardState {
     sortedBy: signals.sortKey,
     live: signals.live,
     applied: signals.applied,
+    written: signals.written,
     batches: signals.batches,
     rate: signals.rate,
+    writeRate: signals.writeRate,
     visible,
-    rising,
     ...transitions(signals),
   };
 }

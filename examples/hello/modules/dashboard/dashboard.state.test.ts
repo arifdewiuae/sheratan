@@ -116,17 +116,20 @@ test('the order is derived, and starts stable: by name, then by value', () => {
   );
 });
 
-test('rising counts the rows that went up on the last batch', () => {
+test('a batch counts the rows it actually rewrote, not the values it received', () => {
   const state = createDashboardState();
 
   state.seeded([metric(0, 'a', 10), metric(1, 'b', 20)]);
 
+  // Three values, two rows, and one of them repeats the value it already has.
   state.applyBatch([
-    { id: 0, value: 14 },
-    { id: 1, value: 15 },
+    { id: 0, value: 11 },
+    { id: 0, value: 12 },
+    { id: 1, value: 20 },
   ]);
 
-  assert.equal(state.rising(), 1);
+  assert.equal(state.applied(), 3, 'three values arrived');
+  assert.equal(state.written(), 1, 'one row changed, so one row is rewritten');
 });
 
 test('live toggles, and sampling records the rate', () => {
@@ -137,6 +140,7 @@ test('live toggles, and sampling records the rate', () => {
   state.toggledLive();
   assert.equal(state.live(), false);
 
-  state.sampled(1234);
+  state.sampled(1234, 96);
   assert.equal(state.rate(), 1234);
+  assert.equal(state.writeRate(), 96);
 });

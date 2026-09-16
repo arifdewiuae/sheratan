@@ -63,6 +63,29 @@
       gap: calc(var(--space) * 2);
     }
 
+    .lockup {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: var(--ink);
+      text-decoration: none;
+      margin-bottom: calc(var(--space) * 1.5);
+    }
+
+    .lockup .rule {
+      width: 1px;
+      height: 20px;
+      background: var(--hair);
+    }
+
+    .lockup .wordmark {
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.36em;
+      text-indent: 0.36em;
+      text-transform: lowercase;
+    }
+
     .head h1 {
       margin: 0;
       font-size: 1.1rem;
@@ -153,11 +176,29 @@
       font-size: 0.85rem;
     }
 
+    /* A short table: a fixed window on the rows, until `each` grows a window
+       of its own (SPEC §9 windowed each). */
     .metrics {
       list-style: none;
       margin: 0;
       padding: 0;
+      max-height: 24rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
       border-top: 1px solid var(--hair);
+      border-bottom: 1px solid var(--hair);
+    }
+
+    .metric.heading {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--ground);
+      color: var(--t45);
+      font-family: var(--sans);
+      font-size: 0.6rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
     }
 
     .metric {
