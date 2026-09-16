@@ -110,14 +110,17 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 ## Week 2 — Async, ownership, trace
 
 **`resource()`** (SPEC §6)
-- [ ] `[must]` Reactive `key`; abort in-flight request on key change and on owner disposal (unmount)
-- [ ] `[must]` De-duplication of identical keys
-- [ ] `[must]` Out-of-order responses discarded
-- [ ] `[must]` Stale-while-revalidate (`staleAfter`, `refreshing` status, previous data retained)
-- [ ] `[must]` Retry with exponential backoff
-- [ ] `[must]` Errors are values; `AbortError` never becomes `error()`
-- [ ] `[must]` `invalidate()`, `abort()`
-- [ ] `[must]` `is(status)` type guard: `is("ready")` narrows `data()` to `T`; reads `status()` only (SPEC §6)
+All of the below in `packages/core/src/resource.ts`, specified by
+`packages/core/test/resource.test.ts` (25 tests, 100% lines/branches/functions).
+
+- [x] `[must]` Reactive `key`; abort in-flight request on key change and on owner disposal (unmount) — one `watch` over the key accessor; every new request cancels the one it replaced, and `onDispose` cancels the last
+- [x] `[must]` De-duplication of identical keys — a key compares by contents, so a rebuilt array with the same parts is the same key; `invalidate()` during a request in flight is absorbed by it
+- [x] `[must]` Out-of-order responses discarded — a generation counter per request; a response from a superseded one is dropped even when the fetcher ignored its signal
+- [x] `[must]` Stale-while-revalidate (`staleAfter`, `refreshing` status, previous data retained) — a timer owned by the mount, per ADR 0004; SPEC §6 amended, since it named the option without saying what triggers it
+- [x] `[must]` Retry with exponential backoff — `attempts` counts the first try; 100 ms base, doubled by `'exponential'` and flat under `'fixed'`; a cancelled request is never retried
+- [x] `[must]` Errors are values; `AbortError` never becomes `error()` — a thrown non-Error is wrapped; `data()` survives a failure, so an error shows beside the value it could not replace
+- [x] `[must]` `invalidate()`, `abort()` — `abort()` leaves a resource with a value `ready` and one without `idle`, which is the only way `idle` is reached
+- [x] `[must]` `is(status)` type guard: `is("ready")` narrows `data()` to `T`; reads `status()` only (SPEC §6) — overloads returning `this is LoadedResource<T>` / `FailedResource<T>`; `scripts/verify-types.ts` proves it narrows for a consumer too
 
 **`mutation()`** (SPEC §6)
 - [ ] Basic: `run`, `status`, `error`, `optimistic`/`rollback` as transitions, `onSuccess`, serialized by default
@@ -287,7 +290,17 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [ ] **Devtools surface.** Dev-build-only additions that belong with the causal trace (SPEC §7), not before it: a Chrome custom formatter so a signal prints as its value rather than `ƒ read()`, a Performance-panel track for drains and frame flushes, and debug names from the trace's write provenance. Decide the shape when §7 is built.
 - [ ] **Public repository before v1.0.0.** Dependency review in CI switches itself on when the repository stops being private; the release checklist has to include making it public (or buying Advanced Security).
 - [ ] **Checker on TypeScript 7.** SPEC §8 builds `packages/check` on the TypeScript compiler API. TS 7 (native) exposes only an unstable IPC API (`typescript/unstable/*`), not the TS 5/6 JS API. Decide before Week 3: pin the checker to TS 6's API, target TS 7's API, or parse with a standalone parser.
-- [ ] **The size budget's scenarios all measure the same thing.** `scripts/size.ts` bundles from `dist/prod/index.js`, which is already one flattened file, so esbuild can only shake whole modules and every scenario comes out within about 100 B of the whole runtime — bundling the same imports from `dist/dev` drops `signal` alone to 1774 B against 14364 B from prod. The budget is therefore accurate for what a consumer ships and fiction as a per-import breakdown. Decide: emit the prod build with modules preserved, measure `dist/dev` for the breakdown and `dist/prod` for the total, or drop the scenarios and keep one number. Found while re-recording the budget for windowed `each`.
+- [ ] **One prod build cannot be right for both a small import and a whole app.** Measured (gzip, esbuild + minify, 2026-09-16), bundling the same scenario from the flattened `dist/prod/index.js` against the module-preserved `dist/dev`:
+
+  | scenario | from `dist/prod` (flat) | from `dist/dev` (modules) |
+  |---|---|---|
+  | `signal` alone | 5492 B | **877 B** |
+  | state only | 5642 B | **1419 B** |
+  | widget | 5703 B | **5000 B** |
+  | widget with lists | 5727 B | **6358 B** ✗ |
+  | everything | 6600 B | **7241 B** ✗ |
+
+  The flat bundle minifies across module boundaries, so it wins for a real app by about 10%; it cannot be shaken finely, so it loses by 6× for a small import. The crossover sits between "widget" and "widget with lists" — roughly, anything that renders pays the whole runtime either way. So the earlier reading ("something in the template modules is not shakeable") was wrong: nothing is broken, the two builds simply trade off, and today's `exports` map offers only the one that suits whole apps. Decide: ship a third module-preserved prod condition for consumers who import a subset, or accept it and keep one number for the whole runtime instead of five scenarios that mostly restate it.
 - [ ] **Immutability rule code.** The checker rule for statically visible mutation of a signal's value (TASKS decision 2026-09-15) needs a code and a row in SPEC §4's table.
 - [x] **CSS scoping.** SPEC said `adoptedStyleSheets` on the component root, which is global on `document`. Resolved in SPEC §9a: native `@scope` + `@layer`, enforced by `SHR-L009`.
 
@@ -330,5 +343,9 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-16 | Internal field name mangling deliberately not done | It would cost the readability the code rules ask for; revisit only if the size budget comes under pressure, and with a measurement |
 | 2026-09-16 | `llms.txt`'s API table is generated from TSDoc and checked in CI | The agent-facing docs cannot drift from the declarations the package ships |
 | 2026-09-16 | Platform APIs instead of code where they exist: `Element.moveBefore` for row moves (falls back to `insertBefore`), `Symbol.dispose` on every disposer (`using stop = watch(…)`) | A moved row keeps focus, selection and media state; `using` removes a class of forgotten teardown |
+| 2026-09-16 | `resource()` holds its own value: no cache shared between resources, and data shared between modules goes through a state module (ADR 0004) | A cache is a second place state lives, which A1 does not allow, and it is the part of a query library an app can least often use unchanged |
+| 2026-09-16 | `staleAfter` revalidates on a timer owned by the mount (ADR 0004); SPEC §6 amended, which named the option without saying what triggers it | Core has no remount or window-focus trigger to hang freshness on, and a read that starts a request would fire inside `flush()` |
+| 2026-09-16 | `Error` added to `DeepReadonly`'s opaque list | It matches what `freeze()` already declines to freeze: an `Error` mapped member by member stops being an `Error`, which broke `resource.error()` |
+| 2026-09-16 | `resource()` costs 766 B brotli (5306 → 6072 for the `everything` scenario, +14%) and the budget was re-recorded | SPEC §6 calls it the single most important differentiator, and the whole runtime is still 6.1 KB |
 | 2026-09-16 | Tracker audited against the code: Week 1's `[must]` items and Week 2's ownership block were built but never ticked, and the status table still read "Not started" for both | A tracker that understates the work is as useless as one that overstates it — the next decision is which week to work on, and it was being made from wrong numbers |
 | 2026-09-15 | Immutability enforced, not requested: `DeepReadonly` reads in types, incremental deep freeze of plain objects/arrays on `set()`, checker rule for visible mutation (SPEC §5) | A rule an agent must remember is a rule an agent breaks; freezing only new nodes keeps the cost at what the caller already allocated |
