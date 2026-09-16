@@ -416,6 +416,20 @@ code-generating agent cannot accidentally mutate a nested object, which it does
 routinely. Cost is verbosity on deep updates; addressed with a structural
 update helper in `core`, not with an Immer-style dependency.
 
+Immutability is enforced, not requested, in three layers:
+
+1. **Types.** Reading a signal or computed yields `DeepReadonly<T>`, so
+   `items().push(x)` or `order().status = 'shipped'` fails type-checking.
+2. **Run time.** `signal.set(value)` deep-freezes plain objects and arrays.
+   Subtrees that are already frozen are skipped, so with structural sharing
+   only the newly allocated nodes are frozen — the cost is bounded by what the
+   caller already allocated, and it stays on in production. A mutation then
+   throws a `TypeError` (ES modules are strict). DOM nodes, `Date`, `Map`,
+   `Set` and class instances are left alone: freezing them breaks them.
+3. **Check time.** Mutation visible on the AST (a mutating method or an
+   assignment through a signal read) is a checker error with a `fix` (code to
+   be assigned, see TASKS "Spec gaps").
+
 ### Declared transitions (no `machine()` primitive)
 
 Where state is a finite automaton, the legal moves are declared next to the
@@ -1016,6 +1030,11 @@ The honest formulation, and the only one to use in the README:
   disappears.
 - Production is ESM served as-is. Bundling is optional and the user's choice.
 
+"No build" is a promise to users, not a constraint on how Sheratan itself is
+written. The core's source is strict TypeScript, compiled once before publish
+to plain ESM plus generated `.d.ts`; the package users install contains only
+the compiled output, so nothing above changes for them.
+
 Never write "no build step" unqualified. Write "no bundler, no config, no
 plugin pipeline — type stripping only".
 
@@ -1044,6 +1063,7 @@ widget mode, since the host app owns routing).
 ```
 packages/
   core/        signals, resource, html, render, trace   (zero runtime deps)
+               src/ TypeScript → dist/ ESM + .d.ts, published
   check/       TS-API based rule checker                (dev only)
   cli/         create / generate / check / dev
   router/      post-MVP, optional — path matching, layouts, guards

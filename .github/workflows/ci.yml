@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+  schedule:
+    # Daily, so a newly published advisory fails the build without a push.
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+# Deny everything by default; each job asks for what it needs.
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Format, lint, typecheck, build, test, coverage, package, audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Before setup-node, so `cache: pnpm` can find the store. The pnpm
+      # version comes from `packageManager` in package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test with coverage gate
+        run: pnpm coverage
+
+      - name: Package checks (consumer types, publint, attw, size budget, llms.txt)
+        run: pnpm verify
+
+      - name: Audit advisories and registry signatures
+        run: pnpm security
+
+
+  dependency-review:
+    name: Dependency review
+    # Needs GitHub Advanced Security on private repositories, so it switches
+    # on by itself once the repository is public (planned for v1.0.0).
+    if: github.event_name == 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+          fail-on-scopes: runtime, development, unknown
+          deny-licenses: AGPL-3.0-only, AGPL-3.0-or-later, GPL-3.0-only, GPL-3.0-or-later
