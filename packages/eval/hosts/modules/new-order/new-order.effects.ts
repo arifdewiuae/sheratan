@@ -1,0 +1,99 @@
+// Effects: the only impure file (SPEC §4). It calls the contract and then
+// invokes one transition; it never decides what the data means.
+
+import { onDispose } from 'sheratan';
+
+import type { Api, Rejected } from '../../services/api.contract.ts';
+import type { NotificationsEffects } from '../notifications/index.ts';
+import type { FieldErrors, NewOrderState } from './new-order.state.ts';
+
+/** What this module can do. The view declares the same shape for itself. */
+export interface NewOrderEffects {
+  submit(this: void): void;
+  chooseCustomer(this: void, value: string): void;
+  typeQuantity(this: void, value: string): void;
+  typeNote(this: void, value: string): void;
+}
+
+function rejectionOf(error: unknown): FieldErrors | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+
+  const body = error as Partial<Rejected>;
+
+  return typeof body.errors === 'object' ? body.errors : undefined;
+}
+
+function failureOf(error: unknown): FieldErrors {
+  const rejected = rejectionOf(error);
+
+  if (rejected !== undefined) return rejected;
+
+  return { form: error instanceof Error ? error.message : 'unknown error' };
+}
+
+/** Wires the state to the API, and gives the mount its teardown. */
+export function createNewOrderEffects(
+  api: Api,
+  state: NewOrderState,
+  notifications: NotificationsEffects,
+): NewOrderEffects {
+  const controller = new AbortController();
+
+  onDispose(() => {
+    controller.abort();
+  });
+
+  const options = async (): Promise<void> => {
+    try {
+      const rows = await api.customers(controller.signal);
+
+      if (!controller.signal.aborted) state.customersLoaded(rows);
+    } catch {
+      // The select simply stays empty; T03 asserts on validation, not on this.
+    }
+  };
+
+  const send = async (): Promise<void> => {
+    const draft = state.draft();
+
+    state.sending();
+
+    try {
+      const id = await api.createOrder(draft, controller.signal);
+
+      if (!controller.signal.aborted) state.created(id);
+    } catch (error: unknown) {
+      if (controller.signal.aborted) return;
+
+      const found = failureOf(error);
+
+      state.rejected(found);
+
+      if (found['form'] !== undefined) notifications.raise(found['form']);
+    }
+  };
+
+  void options();
+
+  return {
+    submit(): void {
+      // A second click while the first is in flight is not a second order.
+      if (state.pending()) return;
+      if (!state.checked()) return;
+
+      void send();
+    },
+
+    chooseCustomer(value: string): void {
+      state.customerChosen(Number(value));
+    },
+
+    typeQuantity(value: string): void {
+      state.quantityTyped(value);
+    },
+
+    typeNote(value: string): void {
+      state.noteTyped(value);
+    },
+  };
+}
