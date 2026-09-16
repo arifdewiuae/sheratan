@@ -661,13 +661,43 @@ written. Cells read the item through computeds in the row, the same rule as any
 other derived value (§9 "Holes take signals by reference"). `${item().title}`
 reads once and is the trap.
 
-`each` takes an optional `window` parameter: instead of creating and destroying
-nodes on scroll, it keeps a fixed set of rows and rewrites values in place.
-Virtualization is cheap here precisely because the framework owns both the
-scheduler and the renderer — a userland library has to measure through
-`getBoundingClientRect` and fight the renderer for write timing. Mechanism in
-core, policy outside: row-height strategy and buffer size are supplied by the
-caller, not decided by the framework. An optional compiler (post-MVP) can pre-compile templates and add
+**`each(list, row, window)`.** A third argument turns the list positional:
+instead of creating and destroying nodes on scroll, `each` keeps a fixed pool
+of rows and rewrites their items in place, with a spacer above and below
+standing in for the rows that are not in the DOM. Virtualization is cheap here
+precisely because the framework owns both the scheduler and the renderer — a
+userland library has to measure through `getBoundingClientRect` and fight the
+renderer for write timing.
+
+```ts
+interface EachWindow {
+  readonly start: number;     // index of the first row rendered
+  readonly count: number;     // how many rows exist — the size of the pool
+  readonly rowHeight: number; // CSS pixels, for the spacers
+}
+
+each(s.rows, row, window: Accessor<EachWindow>)
+```
+
+Mechanism in core, policy outside: the window is supplied by the caller, not
+decided by the framework. A scroll listener in `*.effects.ts` owns the
+container's height and the overscan and hands over one value — which is also
+the only place a measurement can come from, because the list's first reconcile
+happens while its rows are still in a detached fragment. An out-of-range window
+is clamped rather than rejected: a rubber-banding scroll reports a negative
+offset, and that is not an error.
+
+The scroll container needs `overflow-anchor: none`. This is not a nicety: the
+spacer above the rows changes height on every scroll step, the browser moves
+`scrollTop` to hold its anchor element still, and that move fires another
+scroll event. Six wheel ticks carry the list to the end of its own accord.
+
+A windowed list is **positional, not keyed**. A slot is recycled, so a row's
+DOM node no longer follows its item when the list reorders, and `SHR-R006` /
+`SHR-R007` key validation does not run. That is what makes scrolling
+allocation-free; see ADR 0003.
+
+An optional compiler (post-MVP) can pre-compile templates and add
 typed template checking; it must remain optional.
 
 ### How a view updates (the most important runtime decision)

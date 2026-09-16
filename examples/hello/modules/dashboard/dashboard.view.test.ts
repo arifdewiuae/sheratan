@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { flush, render } from 'sheratan';
 
+import { ROW_HEIGHT_PX, WINDOW_ROWS } from '../../lib/layout.ts';
 import type { Metric } from '../../services/feed.contract.ts';
 import { createDashboardState, SortKey, type DashboardState } from './dashboard.state.ts';
 import { dashboardView, type DashboardIntents } from './dashboard.view.ts';
@@ -39,6 +40,9 @@ function mounted(): { state: DashboardState; calls: [string, unknown][] } {
   const intents: DashboardIntents = {
     toggleLive: () => {
       calls.push(['toggleLive', undefined]);
+    },
+    toggleWindowing: () => {
+      calls.push(['toggleWindowing', undefined]);
     },
     sortBy: (value) => {
       calls.push(['sortBy', value]);
@@ -88,6 +92,47 @@ test('the stat tiles read from state', () => {
   assert.equal(text('.tiles .tile:nth-child(2) .tile-value'), '12.4k', 'values in');
   assert.equal(text('.tiles .tile:nth-child(3) .tile-value'), '50%', 'updates skipped');
   assert.equal(text('.tiles .tile:nth-child(4) .tile-value'), '2', 'rows live');
+  assert.equal(text('.tiles .tile:nth-child(5) .tile-value'), '2', 'rows in the page');
+});
+
+test('virtualising renders a window of rows, and turning it off renders them all', () => {
+  const { state } = mounted();
+  const total = WINDOW_ROWS * 2;
+
+  state.seeded(Array.from({ length: total }, (_, id) => metric(id, `m${String(id)}`, id)));
+  flush();
+
+  assert.equal(host.querySelectorAll(ROW).length, WINDOW_ROWS, 'only the window is in the DOM');
+  assert.equal(text('.tiles .tile:nth-child(4) .tile-value'), String(total), 'rows live');
+  assert.equal(text('.tiles .tile:nth-child(5) .tile-value'), String(WINDOW_ROWS));
+
+  state.toggledWindowing();
+  flush();
+
+  // The same five hundred rows, now all of them present: the table looks
+  // identical and the last tile says what it cost.
+  assert.equal(host.querySelectorAll(ROW).length, total);
+  assert.equal(text('.tiles .tile:nth-child(5) .tile-value'), String(total));
+});
+
+test('scrolling moves the window without building rows', () => {
+  const { state } = mounted();
+  const total = WINDOW_ROWS * 4;
+
+  state.seeded(Array.from({ length: total }, (_, id) => metric(id, `m${String(id)}`, id)));
+  flush();
+
+  const before = host.querySelectorAll(ROW)[0] as Element;
+
+  assert.equal(names()[0], 'm0');
+
+  // Far enough that the whole window has moved past where it started.
+  state.scrolled(WINDOW_ROWS * ROW_HEIGHT_PX * 2);
+  flush();
+
+  assert.equal(host.querySelectorAll(ROW)[0], before, 'the same element, refilled');
+  assert.notEqual(names()[0], 'm0');
+  assert.equal(host.querySelectorAll(ROW).length, WINDOW_ROWS);
 });
 
 test('a new value writes one cell and keeps the row', () => {
@@ -119,6 +164,9 @@ test('the controls ask for the intents, and the button follows state', () => {
   (host.querySelector('.toggle') as HTMLElement).click();
   assert.deepEqual(calls, [['toggleLive', undefined]]);
 
+  (host.querySelectorAll('.toggle')[1] as HTMLElement).click();
+  assert.deepEqual(calls[1], ['toggleWindowing', undefined]);
+
   state.toggledLive();
   flush();
   assert.equal(text('.toggle'), 'Resume');
@@ -127,5 +175,5 @@ test('the controls ask for the intents, and the button follows state', () => {
 
   select.value = SortKey.Name;
   select.dispatchEvent(new window.Event('change', { bubbles: true }) as unknown as Event);
-  assert.deepEqual(calls[1], ['sortBy', SortKey.Name]);
+  assert.deepEqual(calls[2], ['sortBy', SortKey.Name]);
 });

@@ -1,7 +1,8 @@
 // State: signals and pure transitions. No I/O, no DOM (SPEC §4).
 
-import { batch, computed, signal, type Accessor, type Signal } from 'sheratan';
+import { batch, computed, signal, type Accessor, type EachWindow, type Signal } from 'sheratan';
 
+import { OVERSCAN_ROWS, ROW_HEIGHT_PX, WINDOW_ROWS } from '../../lib/layout.ts';
 import type { Metric, Tick } from '../../services/feed.contract.ts';
 
 /** Which column the table is ordered by. */
@@ -42,9 +43,15 @@ export interface DashboardState {
   readonly fps: Accessor<number>;
   /** Share of arriving values that changed nothing, and so cost nothing. 0…1. */
   readonly skipped: Accessor<number>;
+  /** Whether the table renders a window of rows or all of them. */
+  readonly windowed: Accessor<boolean>;
+  /** Rows that exist in the DOM, which is the number virtualising changes. */
+  readonly inPage: Accessor<number>;
 
   /** The table's order: derived, never stored. */
   readonly visible: Accessor<readonly Metric[]>;
+  /** Which rows `each` renders, worked out from the scroll offset (SPEC §9). */
+  readonly rowWindow: Accessor<EachWindow>;
 
   seeded(metrics: readonly Metric[]): void;
   failed(message: string): void;
@@ -53,6 +60,9 @@ export interface DashboardState {
   sampled(rate: number, fps: number): void;
   toggledLive(): void;
   sorted(key: SortKey): void;
+  toggledWindowing(): void;
+  /** The table's scroll offset in CSS pixels, read by effects. */
+  scrolled(top: number): void;
 }
 
 function apply(rows: readonly Metric[], ticks: readonly Tick[]): readonly Metric[] {
@@ -88,12 +98,14 @@ interface Signals {
   applied: Signal<number>;
   batches: Signal<number>;
   rate: Signal<number>;
+  windowed: Signal<boolean>;
+  scrollTop: Signal<number>;
 }
 
-/** The transitions, kept apart from the signals they commit to. */
-function transitions(
+/** What the feed drives, kept apart from the signals it commits to. */
+function feedTransitions(
   state: Signals,
-): Pick<DashboardState, 'seeded' | 'failed' | 'applyBatch' | 'sampled' | 'toggledLive' | 'sorted'> {
+): Pick<DashboardState, 'seeded' | 'failed' | 'applyBatch' | 'sampled'> {
   return {
     seeded: (metrics) => {
       batch(() => {
@@ -131,7 +143,14 @@ function transitions(
         state.fps.set(frames);
       });
     },
+  };
+}
 
+/** What a person drives: two controls and the scrollbar under their thumb. */
+function controlTransitions(
+  state: Signals,
+): Pick<DashboardState, 'toggledLive' | 'sorted' | 'toggledWindowing' | 'scrolled'> {
+  return {
     toggledLive: () => {
       state.live.set(!state.live());
     },
@@ -139,7 +158,39 @@ function transitions(
     sorted: (key) => {
       state.sortKey.set(key);
     },
+
+    toggledWindowing: () => {
+      state.windowed.set(!state.windowed());
+    },
+
+    scrolled: (top) => {
+      state.scrollTop.set(top);
+    },
   };
+}
+
+/**
+ * The caller's half of a windowed `each` (ADR 0003): a scroll offset in, three
+ * numbers out. `start` can come out negative at the top of a rubber-banding
+ * scroll, and `each` clamps it rather than treating it as a mistake.
+ */
+function windowOver(state: Signals): Accessor<EachWindow> {
+  return computed(() => ({
+    start: Math.floor(state.scrollTop() / ROW_HEIGHT_PX) - OVERSCAN_ROWS,
+    count: WINDOW_ROWS,
+    rowHeight: ROW_HEIGHT_PX,
+  }));
+}
+
+/** What virtualising actually changes. "Rows live" stays five hundred either way. */
+function rowsInPage(state: Signals): Accessor<number> {
+  return computed(() => {
+    const total = state.rows().length;
+
+    if (!state.windowed()) return total;
+
+    return Math.min(WINDOW_ROWS, total);
+  });
 }
 
 /** A factory, so every mount and every test starts clean (SPEC §4). */
@@ -155,6 +206,8 @@ export function createDashboardState(): DashboardState {
     batches: signal(0),
     rate: signal(0),
     fps: signal(0),
+    windowed: signal(true),
+    scrollTop: signal(0),
   };
 
   // Sorting on every batch is the point: values churn, so the order churns,
@@ -184,7 +237,11 @@ export function createDashboardState(): DashboardState {
     rate: signals.rate,
     fps: signals.fps,
     skipped,
+    windowed: signals.windowed,
+    inPage: rowsInPage(signals),
     visible,
-    ...transitions(signals),
+    rowWindow: windowOver(signals),
+    ...feedTransitions(signals),
+    ...controlTransitions(signals),
   };
 }

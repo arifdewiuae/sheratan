@@ -309,17 +309,33 @@
       font-size: 0.85rem;
     }
 
-    /* A short table: a fixed window on the rows, until `each` grows a window
-       of its own (SPEC §9 windowed each). */
+    /* The scroll viewport a windowed `each` is sized against. Its height comes
+       from `--list-h`, published by the view from the same constant the window
+       arithmetic divides by, so the two cannot drift (SPEC §9). */
     .metrics {
       list-style: none;
       margin: 0;
       padding: 0;
-      max-height: 24rem;
+      max-height: var(--list-h);
       overflow-y: auto;
       overscroll-behavior: contain;
+      /* Scroll anchoring has to be off in a windowed list, and this is not a
+         nicety. The spacer above the rows changes height on every scroll step,
+         Chrome compensates by moving scrollTop to keep the anchored element
+         still, that move fires another scroll event, and the list runs to the
+         end of its own accord. */
+      overflow-anchor: none;
       border-top: 1px solid var(--hair);
       border-bottom: 1px solid var(--hair);
+    }
+
+    /* `each`'s spacers stand in for the rows that are not in the DOM. They are
+       <li> so the list stays a list, and carry their height inline. Never an
+       anchor: a box whose whole job is to change height is the worst possible
+       thing for the browser to hold still against. */
+    .metrics > [role='presentation'] {
+      border: 0;
+      overflow-anchor: none;
     }
 
     .metric.heading {
@@ -335,7 +351,9 @@
     }
 
     /* Height comes from `--row-h`, which the view publishes from one TypeScript
-       constant: a windowed list needs a row height it can trust. */
+       constant: a windowed list needs a row height it can trust. `border-box`
+       in the base layer is what makes the border free — without it every row
+       would be a pixel taller than the window arithmetic believes. */
     .metric {
       display: grid;
       grid-template-columns: 11rem 1fr 5rem 3.5rem;
@@ -452,6 +470,12 @@
       padding: 0;
       display: grid;
       gap: 0.35rem;
+    }
+
+    /* And the matching break under it: a heading sitting flush on its first row
+       reads as part of the row rather than as its title. */
+    .label + .entries {
+      margin-top: calc(var(--space) * 0.75);
     }
 
     .entries li {

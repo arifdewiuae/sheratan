@@ -11,11 +11,21 @@ const MS_PER_SECOND = 1000;
 /** Sampled four times a second, so the rate tile is meaningful immediately. */
 const SAMPLE_MS = 250;
 
+/** The one element on the page that scrolls its own content. */
+const LIST_CLASS = 'metrics';
+
 /** What this module can do. The view declares the same shape for itself. */
 export interface DashboardEffects {
   start(this: void): void;
   toggleLive(this: void): void;
+  toggleWindowing(this: void): void;
   sortBy(this: void, value: string): void;
+}
+
+/** What the listener needs from whatever was scrolled; `document` has neither. */
+interface Scrolled {
+  readonly classList?: DOMTokenList;
+  readonly scrollTop?: number;
 }
 
 function messageOf(error: unknown): string {
@@ -81,12 +91,36 @@ function sampler(state: DashboardState, frames: Frames): () => void {
   };
 }
 
+/**
+ * Where the window comes from. `each` is handed numbers and never a container
+ * (ADR 0003), and a scroll offset is DOM state, so it is read here and nowhere
+ * else. On capture, because `scroll` does not bubble and the table is a new
+ * element every time virtualising is toggled — there is nothing stable to bind
+ * to, and a listener that outlives the element it watches is the point.
+ */
+function watchScrolling(state: DashboardState): () => void {
+  const onScroll = (event: Event): void => {
+    const target = event.target as Scrolled | null;
+
+    if (target?.classList?.contains(LIST_CLASS) !== true) return;
+
+    state.scrolled(target.scrollTop ?? 0);
+  };
+
+  document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+
+  return () => {
+    document.removeEventListener('scroll', onScroll, { capture: true });
+  };
+}
+
 /** Dependencies arrive as parameters (SPEC §4b): tests pass a fake feed. */
 export function createDashboardEffects(feed: FeedApi, state: DashboardState): DashboardEffects {
   const controller = new AbortController();
   const { signal } = controller;
   const frames = frameCounter();
   const stopSampling = sampler(state, frames);
+  const stopScrolling = watchScrolling(state);
 
   // The runtime cannot see an interval or a socket, so teardown is by hand.
   // After this, the feed is unsubscribed and no late batch reaches a discarded
@@ -94,6 +128,7 @@ export function createDashboardEffects(feed: FeedApi, state: DashboardState): Da
   onDispose(() => {
     frames.stop();
     stopSampling();
+    stopScrolling();
     controller.abort();
   });
 
@@ -125,6 +160,10 @@ export function createDashboardEffects(feed: FeedApi, state: DashboardState): Da
 
     toggleLive: () => {
       state.toggledLive();
+    },
+
+    toggleWindowing: () => {
+      state.toggledWindowing();
     },
 
     sortBy: (value) => {

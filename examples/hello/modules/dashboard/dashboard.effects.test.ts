@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { html, render } from 'sheratan';
 
+import { OVERSCAN_ROWS, ROW_HEIGHT_PX } from '../../lib/layout.ts';
 import type { FeedApi, Metric, Tick } from '../../services/feed.contract.ts';
 import { createDashboardEffects, type DashboardEffects } from './dashboard.effects.ts';
 import { createDashboardState, SortKey, Status, type DashboardState } from './dashboard.state.ts';
@@ -183,4 +184,33 @@ test('the rate is sampled from the applied counter and scaled to a second', asyn
 
   t.mock.timers.tick(250);
   assert.equal(state.rate(), 0, 'a quiet window reads zero, not the last value');
+});
+
+test('a scroll on the table becomes the window, and stops at disposal', async (t) => {
+  const feed = fakeFeed(async () => [metric(0, 'a', 10)]);
+  const { state, dispose } = mount(feed.api, t);
+
+  const list = document.createElement('ul');
+
+  list.className = 'metrics';
+  host.append(list);
+
+  const scroll = (top: number): void => {
+    Object.defineProperty(list, 'scrollTop', { value: top, configurable: true });
+    list.dispatchEvent(new window.Event('scroll') as unknown as Event);
+  };
+
+  scroll(600);
+  assert.equal(state.rowWindow().start, 600 / ROW_HEIGHT_PX - OVERSCAN_ROWS);
+
+  // `scroll` does not bubble, so anything else scrolling is not the table.
+  const other = document.createElement('div');
+
+  host.append(other);
+  other.dispatchEvent(new window.Event('scroll') as unknown as Event);
+  assert.equal(state.rowWindow().start, 600 / ROW_HEIGHT_PX - OVERSCAN_ROWS, 'unchanged');
+
+  dispose();
+  scroll(0);
+  assert.equal(state.rowWindow().start, 600 / ROW_HEIGHT_PX - OVERSCAN_ROWS, 'listener is gone');
 });
