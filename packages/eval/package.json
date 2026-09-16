@@ -2,13 +2,14 @@
   "name": "@sheratan/eval",
   "version": "0.0.0",
   "private": true,
-  "description": "The Week 0 falsification harness (EVAL §2.3). Runs agents; not part of pnpm check.",
+  "description": "The Week 0 falsification harness (EVAL \u00a72.3). Runs agents; not part of pnpm check.",
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test \"test/**/*.test.ts\"",
     "selfrepair": "node src/run.ts",
-    "report": "node src/report.ts"
+    "report": "node src/report.ts",
+    "check:cases": "node src/check-cases.ts"
   },
   "devDependencies": {
     "@types/node": "24.13.4",
