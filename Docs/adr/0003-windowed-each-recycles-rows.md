@@ -57,6 +57,13 @@ Without a `window` argument the keyed path is unchanged, byte for byte.
 - **Key validation does not run on the windowed path.** An item without `id`
   (`SHR-R006`) or a duplicate key (`SHR-R007`) is an error in a keyed list and
   silent in a windowed one, because a positional list never reads a key.
+- **The scroll container needs `overflow-anchor: none`.** The spacer above the
+  rows changes height on every scroll step; the browser moves `scrollTop` to
+  hold its anchor element still, and that move fires another scroll event. Six
+  wheel ticks carried the example's list to the very bottom on their own, and
+  `e2e/dashboard.e2e.ts` pins it with real wheel events — a programmatic
+  `scrollTop = n` settles in one step and never sees it. Core cannot set this
+  for the caller: it does not know which ancestor scrolls.
 - **The caller owns a measurement it can get wrong.** A `rowHeight` that does
   not match the stylesheet makes the scrollbar lie. `examples/hello` keeps the
   number in one place and pushes it to CSS as a custom property; a

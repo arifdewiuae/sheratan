@@ -687,6 +687,11 @@ happens while its rows are still in a detached fragment. An out-of-range window
 is clamped rather than rejected: a rubber-banding scroll reports a negative
 offset, and that is not an error.
 
+The scroll container needs `overflow-anchor: none`. This is not a nicety: the
+spacer above the rows changes height on every scroll step, the browser moves
+`scrollTop` to hold its anchor element still, and that move fires another
+scroll event. Six wheel ticks carry the list to the end of its own accord.
+
 A windowed list is **positional, not keyed**. A slot is recycled, so a row's
 DOM node no longer follows its item when the list reorders, and `SHR-R006` /
 `SHR-R007` key validation does not run. That is what makes scrolling

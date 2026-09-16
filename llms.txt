@@ -136,6 +136,10 @@ const window = computed(() => ({
 each(s.rows, row, s.window)
 ```
 
+The scroll container needs `overflow-anchor: none`, or the list runs away:
+the spacer above the rows changes height on every step, the browser moves
+`scrollTop` to hold its anchor still, and that move fires another scroll.
+
 A windowed list is **positional, not keyed**: a slot is recycled, so a row's
 node stays with the screen position rather than with its item, and `id` is not
 required or checked. An out-of-range window is clamped, not an error. Use the

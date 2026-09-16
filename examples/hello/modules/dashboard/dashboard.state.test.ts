@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 import { watch } from 'sheratan';
 
+import { OVERSCAN_ROWS, ROW_HEIGHT_PX, WINDOW_ROWS } from '../../lib/layout.ts';
 import type { Metric } from '../../services/feed.contract.ts';
 import { createDashboardState, SortKey, Status } from './dashboard.state.ts';
 
@@ -150,4 +151,44 @@ test('live toggles, and sampling records the rate', () => {
   state.sampled(1234, 60);
   assert.equal(state.rate(), 1234);
   assert.equal(state.fps(), 60);
+});
+
+test('the window is a scroll offset turned into three numbers', () => {
+  const state = createDashboardState();
+
+  assert.deepEqual(state.rowWindow(), {
+    start: -OVERSCAN_ROWS,
+    count: WINDOW_ROWS,
+    rowHeight: ROW_HEIGHT_PX,
+  });
+
+  state.scrolled(ROW_HEIGHT_PX * 40);
+  assert.equal(state.rowWindow().start, 40 - OVERSCAN_ROWS);
+
+  // A start above the list is what overscan costs at the top, and `each`
+  // clamps it rather than treating a rubber-banding scroll as a mistake.
+  state.scrolled(0);
+  assert.equal(state.rowWindow().start, -OVERSCAN_ROWS);
+});
+
+test('virtualising changes rows in the page, never rows live', () => {
+  const state = createDashboardState();
+  const total = WINDOW_ROWS * 3;
+
+  state.seeded(Array.from({ length: total }, (_, id) => metric(id, `m${String(id)}`, id)));
+
+  assert.equal(state.windowed(), true);
+  assert.equal(state.rows().length, total);
+  assert.equal(state.inPage(), WINDOW_ROWS);
+
+  state.toggledWindowing();
+  assert.equal(state.rows().length, total);
+  assert.equal(state.inPage(), total);
+});
+
+test('a list shorter than the window puts every row in the page', () => {
+  const state = createDashboardState();
+
+  state.seeded([metric(0, 'a', 1), metric(1, 'b', 2)]);
+  assert.equal(state.inPage(), 2);
 });

@@ -3,15 +3,15 @@
 import { computed, each, html, type Accessor, type Template } from 'sheratan';
 
 import { compact, percent, signed } from '../../lib/format.ts';
-import { ROW_HEIGHT_PX } from '../../lib/layout.ts';
+import { LIST_HEIGHT_PX, ROW_HEIGHT_PX } from '../../lib/layout.ts';
 import type { Metric } from '../../services/feed.contract.ts';
 import { SortKey, Status, type DashboardState } from './dashboard.state.ts';
 
 /** Bar width as a share of the feed's ceiling, so the table reads at a glance. */
 const BAR_CEILING = 2000;
 
-/** Published to CSS, so the stylesheet and the row height share one number. */
-const ROW_HEIGHT_STYLE = `--row-h:${String(ROW_HEIGHT_PX)}px`;
+/** Published to CSS, so the stylesheet and the window arithmetic share one number. */
+const TABLE_STYLE = `--row-h:${String(ROW_HEIGHT_PX)}px;--list-h:${String(LIST_HEIGHT_PX)}px`;
 
 /**
  * What this view asks the module to do. Intents are plain functions, never
@@ -20,6 +20,7 @@ const ROW_HEIGHT_STYLE = `--row-h:${String(ROW_HEIGHT_PX)}px`;
  */
 export interface DashboardIntents {
   toggleLive(this: void): void;
+  toggleWindowing(this: void): void;
   sortBy(this: void, value: string): void;
 }
 
@@ -66,11 +67,13 @@ function row(metric: Accessor<Metric>): Template {
 
 function controls(state: DashboardState, intents: DashboardIntents): Template {
   const label = computed(() => (state.live() ? 'Pause' : 'Resume'));
+  const windowing = computed(() => (state.windowed() ? 'Virtualise: on' : 'Virtualise: off'));
   const byValue = computed(() => state.sortedBy() === SortKey.Value);
   const byName = computed(() => state.sortedBy() === SortKey.Name);
 
   return html` <div class="controls">
     <button type="button" class="toggle" @click=${intents.toggleLive}>${label}</button>
+    <button type="button" class="toggle" @click=${intents.toggleWindowing}>${windowing}</button>
     <label class="sort">
       Sort by
       <select @change=${intents.sortBy}>
@@ -135,10 +138,12 @@ function stats(state: DashboardState): Template {
   const rate = computed(() => compact(state.rate()));
   const skipped = computed(() => percent(state.skipped()));
   const rows = computed(() => String(state.rows().length));
+  const inPage = computed(() => String(state.inPage()));
 
   return html` <div class="tiles">
     ${tile('frames / sec', fps, 'headline')} ${tile('values in / sec', rate)}
     ${tile('updates skipped', skipped)} ${tile('rows live', rows)}
+    ${tile('rows in the page', inPage)}
   </div>`;
 }
 
@@ -165,11 +170,12 @@ function guide(): Template {
       ${entry('feed.contract.ts', 'What the module asks for, never how it arrives. Swap the live socket for a fake one in a test and nothing above this line notices.')}
     </ul>
 
-    <h3 class="label">Three ideas, and you can read the rest</h3>
+    <h3 class="label">Four ideas, and you can read the rest</h3>
     <ul class="entries">
       ${entry('signal', 'A value you can change. It keeps track of which parts of the page read it, so writing a new value updates exactly those parts and nothing else — no diffing, no re-render.')}
       ${entry('computed', 'A value worked out from other values. It recalculates itself when its sources change, so it can never be stale and you never write the code that keeps it in sync.')}
       ${entry('each', 'A list matched up by id. A row is built once when it appears and then only its changed cells are rewritten — which is why 500 rows cost 500 rows once, not once per update.')}
+      ${entry('each + window', 'The same list, but only the part you can see exists. Scroll and the thirty-odd rows in the page are refilled rather than rebuilt, so a list of five hundred costs the same as a list of fifty thousand.')}
     </ul>
 
     <p class="hint">
@@ -190,8 +196,16 @@ export function dashboardView(state: DashboardState, intents: DashboardIntents):
       return html`<p class="note error" role="alert">Feed stopped: ${message}</p>`;
     }
 
-    return html`<ul class="metrics" style=${ROW_HEIGHT_STYLE}>
-      ${columns()} ${each(state.visible, row)}
+    // Two call shapes, not a flag: a windowed list recycles its rows and a
+    // keyed one does not, so switching between them rebuilds the table
+    // (SPEC §9, ADR 0003). Off is the 500-rows-in-the-DOM case, kept because
+    // it is the shape the framework comparison measures.
+    const rows = state.windowed()
+      ? each(state.visible, row, state.rowWindow)
+      : each(state.visible, row);
+
+    return html`<ul class="metrics" style=${TABLE_STYLE}>
+      ${columns()} ${rows}
     </ul>`;
   });
 
@@ -203,7 +217,8 @@ export function dashboardView(state: DashboardState, intents: DashboardIntents):
       <p class="sub">
         Five hundred rows, twenty thousand new values every second, and the page holds sixty frames
         a second while you read it. Many of those values land on a row that already shows that
-        number, so Sheratan skips them: skipped work is why the frame rate holds.
+        number, so Sheratan skips them: skipped work is why the frame rate holds. Only the rows you
+        can see exist — turn virtualising off to put all five hundred back and watch what it costs.
       </p>
 
       ${stats(state)} ${controls(state, intents)} ${body}
