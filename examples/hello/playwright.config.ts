@@ -22,7 +22,7 @@ export default defineConfig({
   webServer: {
     command: 'node serve.ts',
     url: `http://localhost:${String(PORT)}/`,
-    env: { PORT: String(PORT) },
+    env: { PORT: String(PORT), SHERATAN_RELOAD: 'off' },
     reuseExistingServer: !isCI,
     timeout: SERVER_TIMEOUT_MS,
   },

@@ -25,18 +25,16 @@ function watchConsole(page: Page): string[] {
   return errors;
 }
 
-const SCALES: Record<string, number> = { k: 1e3, M: 1e6 };
+/**
+ * What the table is showing, right now. The tiles are all rates or ratios, so
+ * progress is asserted against the thing a user actually looks at: no counter
+ * to trust, and a stalled feed cannot hide behind one that keeps ticking.
+ */
+const snapshot = async (page: Page): Promise<string> =>
+  (await page.locator(`${ROW} .metric-value`).allInnerTexts()).join(',');
 
-/** Reads a compact tile value like "12.4k" back into a number. */
-/** The fourth tile is the running total of values received. */
-const appliedCount = async (page: Page): Promise<number> => {
-  const text = await page.locator('.tiles .tile').nth(3).locator('.tile-value').innerText();
-  const scale = SCALES[text.slice(-1)];
-
-  if (scale === undefined) return Number(text);
-
-  return Number(text.slice(0, -1)) * scale;
-};
+/** Long enough for several frames, short enough to keep the suite quick. */
+const SETTLE_MS = 400;
 
 test.beforeEach(async ({ page }, testInfo) => {
   await page.goto(appUrl(testInfo.project.name));
@@ -48,10 +46,17 @@ test('renders the whole table and keeps applying values', async ({ page }) => {
 
   await expect(page.locator('.tile')).toHaveCount(4);
 
-  const first = await appliedCount(page);
+  const first = await snapshot(page);
 
-  await expect.poll(async () => appliedCount(page), { timeout: 5000 }).toBeGreaterThan(first);
-  await expect(page.locator('.tile.headline .tile-value')).not.toHaveText('0');
+  await expect.poll(async () => snapshot(page), { timeout: 5000 }).not.toBe(first);
+
+  // The headline tile is the frame rate, which reads an em dash until the
+  // first sample lands. That it becomes a number is the whole claim.
+  await expect
+    .poll(async () => page.locator('.tile.headline .tile-value').innerText(), {
+      timeout: 5000,
+    })
+    .toMatch(/^[1-9]/u);
 
   expect(errors).toEqual([]);
 });
@@ -59,13 +64,17 @@ test('renders the whole table and keeps applying values', async ({ page }) => {
 test('pausing stops applying values, and resuming carries on', async ({ page }) => {
   await page.getByRole('button', { name: 'Pause' }).click();
 
-  const paused = await appliedCount(page);
+  // A batch can already be in flight when the click lands; let it finish
+  // before the table is read, so this asserts about pausing and not a race.
+  await page.waitForTimeout(SETTLE_MS);
 
-  await page.waitForTimeout(400);
-  expect(await appliedCount(page)).toBe(paused);
+  const paused = await snapshot(page);
+
+  await page.waitForTimeout(SETTLE_MS);
+  expect(await snapshot(page)).toBe(paused);
 
   await page.getByRole('button', { name: 'Resume' }).click();
-  await expect.poll(async () => appliedCount(page), { timeout: 5000 }).toBeGreaterThan(paused);
+  await expect.poll(async () => snapshot(page), { timeout: 5000 }).not.toBe(paused);
 });
 
 test('rows move as values change, and a moved row keeps its node', async ({ page }) => {

@@ -40,6 +40,15 @@ const RELOAD_RETRY_MS = 300;
 /** Only sources the page actually loads; everything else is noise. */
 const WATCHED = new Set(['.css', '.html', '.js', '.ts']);
 
+/** Generated trees. A test report landing here is not an edit to react to. */
+const IGNORED = ['node_modules', 'test-results', 'playwright-report', 'dist'];
+
+/**
+ * Reloading a page out from under an assertion is how a dev convenience
+ * becomes a flaky suite, so the e2e run turns the whole thing off.
+ */
+const RELOADS = process.env['SHERATAN_RELOAD'] !== 'off';
+
 const TYPES: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -181,6 +190,8 @@ async function body(file: string, wantsProd: boolean): Promise<string | Buffer> 
       ? source.toString('utf8').replaceAll('/sheratan/dev/', '/sheratan/prod/')
       : source.toString('utf8');
 
+    if (!RELOADS) return markup;
+
     return markup.replace('</body>', `${RELOAD_CLIENT}</body>`);
   }
 
@@ -270,7 +281,7 @@ function watchSources(): void {
   const changed = (_event: string, name: string | Buffer | null): void => {
     const file = typeof name === 'string' ? name : '';
 
-    if (file.includes('node_modules') || !WATCHED.has(extname(file))) return;
+    if (IGNORED.some((tree) => file.includes(tree)) || !WATCHED.has(extname(file))) return;
 
     clearTimeout(pending);
 
@@ -302,8 +313,10 @@ function start(port: number, attemptsLeft: number): void {
   });
 
   server.listen(port, () => {
-    watchSources();
-    process.stdout.write(`examples/hello on http://localhost:${String(port)}/ (reloads on save)\n`);
+    if (RELOADS) watchSources();
+    const how = RELOADS ? ' (reloads on save)' : '';
+
+    process.stdout.write(`examples/hello on http://localhost:${String(port)}/${how}\n`);
   });
 }
 
