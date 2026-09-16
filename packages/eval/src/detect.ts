@@ -143,7 +143,7 @@ function boundary(file: SourceFile): Finding[] {
       finding(RuleCode.Boundary, file, {
         offset: match.index + match[0].indexOf(specifier),
         message: `\`${owner}\` reached into \`${other}\`'s internals: \`${specifier}\` is not that module's public surface.`,
-        fix: `Import from '../${other}/${INDEX}' instead. If what you need is not exported there, export it from ${other}'s index.ts rather than deepening the import.`,
+        fix: `Import from '../${other}/${INDEX}' instead. If what you need is not exported there, export it from that module's index.ts rather than deepening the import.`,
       }),
     );
   }

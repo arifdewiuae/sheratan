@@ -7,9 +7,9 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test \"test/**/*.test.ts\"",
-    "selfrepair": "node src/run.ts",
-    "report": "node src/report.ts",
-    "check:cases": "node src/check-cases.ts"
+    "selfrepair": "node scripts/run.ts",
+    "report": "node scripts/report.ts",
+    "check:cases": "node scripts/check-cases.ts"
   },
   "devDependencies": {
     "@types/node": "24.13.4",

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { CASES } from '../src/cases.ts';
+import { runtimeCycles } from '../src/cycles.ts';
 import { detect } from '../src/detect.ts';
 import { RuleCode } from '../src/rules.ts';
 import { inject, readTree } from '../src/tree.ts';
@@ -145,4 +146,40 @@ test('L001 sees an export … from as well as an import', () => {
 
   assert.ok(first);
   assert.equal(first.code, RuleCode.Boundary);
+});
+
+// ------------------------------------------------- runtime cycles
+
+test('a type-only mutual reference is not a runtime cycle', () => {
+  const found = runtimeCycles([
+    { path: 'modules/a/a.effects.ts', text: "import type { X } from '../b/index.ts';\n" },
+    { path: 'modules/b/b.effects.ts', text: "import type { Y } from '../a/index.ts';\n" },
+  ]);
+
+  assert.deepEqual(found, []);
+});
+
+test('two modules importing each other’s values is', () => {
+  const found = runtimeCycles([
+    { path: 'modules/a/a.effects.ts', text: "import { x } from '../b/index.ts';\n" },
+    { path: 'modules/b/b.effects.ts', text: "import { y } from '../a/index.ts';\n" },
+  ]);
+
+  assert.deepEqual(found, ['a <-> b']);
+});
+
+test('and so is a cycle that goes the long way round', () => {
+  const found = runtimeCycles([
+    { path: 'modules/a/a.effects.ts', text: "import { x } from '../b/index.ts';\n" },
+    { path: 'modules/b/b.effects.ts', text: "import { y } from '../c/index.ts';\n" },
+    { path: 'modules/c/c.effects.ts', text: "import { z } from '../a/index.ts';\n" },
+  ]);
+
+  // Every edge that sits on a cycle, named by the pair it joins. c → a is the
+  // same edge as a ← c, so the ring of three reports two, not three.
+  assert.deepEqual(found, ['a <-> b', 'b <-> c']);
+});
+
+test('the host app has no runtime cycle', () => {
+  assert.deepEqual(runtimeCycles(tree), []);
 });

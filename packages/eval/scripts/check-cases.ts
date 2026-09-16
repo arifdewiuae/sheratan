@@ -8,12 +8,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { rm } from 'node:fs/promises';
 
-import { CASES } from './cases.ts';
-import { detect } from './detect.ts';
-import { addSuite, HOSTS, prepare, runTests } from './sandbox.ts';
-import { inject, readTree } from './tree.ts';
+import { CASES } from '../src/cases.ts';
+import { detect } from '../src/detect.ts';
+import { addSuite, HOSTS, prepare, runTests } from '../src/sandbox.ts';
+import { inject, readTree } from '../src/tree.ts';
 
 const FAILED = 1;
+
+const NAME_WIDTH = 20;
 
 async function check(id: string, files: ReturnType<typeof inject>): Promise<boolean> {
   const root = join(tmpdir(), `sheratan-eval-check-${id}`);
@@ -45,7 +47,7 @@ for (const violation of CASES) {
   const reported = findings.length > 0 && findings.every((one) => one.code === violation.code);
 
   console.log(
-    `${passes && reported ? 'ok  ' : 'FAIL'} ${violation.id.padEnd(20)} ` +
+    `${passes && reported ? 'ok  ' : 'FAIL'} ${violation.id.padEnd(NAME_WIDTH)} ` +
       `${String(findings.length)} finding(s), behaviour ${passes ? 'preserved' : 'BROKEN'}`,
   );
 
