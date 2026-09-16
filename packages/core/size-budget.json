@@ -1,6 +1,8 @@
 {
-  "everything": 5314,
-  "state only": 5196,
-  "widget": 5250,
-  "widget with lists": 5272
+  "everything": 6518,
+  "state only": 5200,
+  "widget": 5251,
+  "widget with lists": 5275,
+  "widget with async": 6019,
+  "widget with live data": 5881
 }

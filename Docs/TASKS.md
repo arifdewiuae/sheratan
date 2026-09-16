@@ -18,16 +18,19 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 
 | Week | Focus | Status | Gate result |
 |---|---|---|---|
-| Pre-flight | Names, repo | ⬜ Not started | — |
-| 0 | Falsification | 🟡 In progress | — |
-| 1 | Core | ⬜ Not started | — |
-| 2 | Async, ownership, trace | ⬜ Not started | — |
+| Pre-flight | Names, repo | 🟡 In progress | — |
+| 0 | Falsification | 🟡 In progress | Not reached |
+| 1 | Core | 🟡 In progress | No-build ✅ · reordering vs Solid not measured |
+| 2 | Async, ownership, trace | 🟡 In progress | — |
 | 3 | Checker, CLI, template | ⬜ Not started | — |
 | 4 | Agent surface, reference app | ⬜ Not started | — |
 | 5 | Re-measure, package, launch | ⬜ Not started | — |
 | +8 wks | Outside production use | ⬜ Not started | — |
 
 Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · ⛔ Stopped
+
+Last audited against the code on **2026-09-16**. A tick names where the work
+landed, so the claim can be checked without reading the diff.
 
 ---
 
@@ -36,8 +39,8 @@ Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · 
 - [ ] Verify GitHub org handle `sheratan` is available and claim it
 - [ ] Verify and register `sheratan.dev` — it goes into checker `docs` links and can't change later (SPEC header, §8)
 - [ ] Reserve `sheratan` on npm (free as of 2026-09-14)
-- [ ] `git init`; monorepo skeleton: `packages/{core,check,cli}`, `examples/dashboard`, `docs/` (SPEC §11)
-- [ ] Commit SPEC / PLAN / EVAL / TASKS as the baseline
+- [ ] `git init`; monorepo skeleton: `packages/{core,check,cli}`, `examples/dashboard`, `docs/` (SPEC §11) — `packages/core`, `examples/hello` and `Docs/` exist; `check` and `cli` are Week 3, and the reference app is Week 4
+- [x] Commit SPEC / PLAN / EVAL / TASKS as the baseline — `0d7e8e1`
 
 ---
 
@@ -47,7 +50,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 
 **Setup**
 - [x] `llms.txt` v0: API, import matrix, reactivity trap as the first item, canonical module (SPEC §10) — [llms.txt](../llms.txt), ~4.0–4.7k tokens estimated (recount with the evaluated model's counter before the first run); canonical module executed end to end
-- [x] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro) — `packages/core`: signals, scheduler, `html`, keyed `each`, `render`; TypeScript, 1561 non-blank lines, 69 tests, 4.8 KB brotli
+- [x] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro) — `packages/core`: signals, scheduler, `html`, keyed `each`, `render`; TypeScript; 1,708 non-blank lines, 81 unit tests and 5.3 KB brotli as of 2026-09-16
 - [x] Freeze and version 12 eval tasks (EVAL §2.1) — [EVAL-TASKS.md](EVAL-TASKS.md), tag `eval-tasks-v1`, SHA-256 `7a19d6474fbcb1a417d60fb3c2be815c908d8cb68bd50a7a60a3a5a9a317f1ce`
 - [x] Split: 6 headline tasks + 6 held-out (EVAL-TASKS §2)
 - [x] Fix the documentation token budget for both arms **and write it down** before the first run — 8,000 tokens (EVAL-TASKS §1.5)
@@ -83,7 +86,8 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [x] `[must]` `html` tagged templates: parse once into `<template>`, holes as precomputed paths (no per-mount scan)
 - [x] `[must]` View update model: view runs once; one micro-watcher per hole
 - [x] `[must]` Attribute (`.prop`) and event (`@event`) bindings
-- [ ] Holes escaped as text by default; `unsafeHTML()` directive
+- [x] Holes escaped as text by default — a hole becomes a text node, never markup (`html.test.ts` "static values render once and are escaped as text")
+- [ ] `unsafeHTML()` directive
 - [x] `[must]` Keyed `each` (no virtualization); per-row watchers, rows not rebuilt on cell change; minimum DOM moves via LIS
 - [ ] Style scoping (SPEC §9a): runtime sets `data-module` / `data-ui` on roots at mount; CSS module scripts attached via `adoptedStyleSheets`
 - [ ] Verify `@scope` + `@layer` browser support matrix before templates depend on it (SPEC §9a)
@@ -106,34 +110,37 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 ## Week 2 — Async, ownership, trace
 
 **`resource()`** (SPEC §6)
-- [ ] `[must]` Reactive `key`; abort in-flight request on key change and on owner disposal (unmount)
-- [ ] `[must]` De-duplication of identical keys
-- [ ] `[must]` Out-of-order responses discarded
-- [ ] `[must]` Stale-while-revalidate (`staleAfter`, `refreshing` status, previous data retained)
-- [ ] `[must]` Retry with exponential backoff
-- [ ] `[must]` Errors are values; `AbortError` never becomes `error()`
-- [ ] `[must]` `invalidate()`, `abort()`
-- [ ] `[must]` `is(status)` type guard: `is("ready")` narrows `data()` to `T`; reads `status()` only (SPEC §6)
+All of the below in `packages/core/src/resource.ts`, specified by
+`packages/core/test/resource.test.ts` (25 tests, 100% lines/branches/functions).
+
+- [x] `[must]` Reactive `key`; abort in-flight request on key change and on owner disposal (unmount) — one `watch` over the key accessor; every new request cancels the one it replaced, and `onDispose` cancels the last
+- [x] `[must]` De-duplication of identical keys — a key compares by contents, so a rebuilt array with the same parts is the same key; `invalidate()` during a request in flight is absorbed by it
+- [x] `[must]` Out-of-order responses discarded — a generation counter per request; a response from a superseded one is dropped even when the fetcher ignored its signal
+- [x] `[must]` Stale-while-revalidate (`staleAfter`, `refreshing` status, previous data retained) — a timer owned by the mount, per ADR 0004; SPEC §6 amended, since it named the option without saying what triggers it
+- [x] `[must]` Retry with exponential backoff — `attempts` counts the first try; 100 ms base, doubled by `'exponential'` and flat under `'fixed'`; a cancelled request is never retried
+- [x] `[must]` Errors are values; `AbortError` never becomes `error()` — a thrown non-Error is wrapped; `data()` survives a failure, so an error shows beside the value it could not replace
+- [x] `[must]` `invalidate()`, `abort()` — `abort()` leaves a resource with a value `ready` and one without `idle`, which is the only way `idle` is reached
+- [x] `[must]` `is(status)` type guard: `is("ready")` narrows `data()` to `T`; reads `status()` only (SPEC §6) — overloads returning `this is LoadedResource<T>` / `FailedResource<T>`; `scripts/verify-types.ts` proves it narrows for a consumer too
 
 **`mutation()`** (SPEC §6)
 - [ ] Basic: `run`, `status`, `error`, `optimistic`/`rollback` as transitions, `onSuccess`, serialized by default
 - [ ] `[stretch]` Anything beyond the basic variant
 
 **Ownership & lifecycle** (SPEC §5b)
-- [ ] `[must]` Owner tree; children from `mount()` disposed recursively
-- [ ] `[must]` `onDispose()`
-- [ ] `[must]` Disposal order: watchers → subscriptions → nodes
-- [ ] `[must]` Post-disposal async is a no-op (owner flag on transitions)
-- [ ] `[must]` Leak test: 1000 mount/unmount cycles → live subscription count returns to 0
+- [x] `[must]` Owner tree; children from `mount()` disposed recursively — `OwnerNode` in `packages/core/src/owner.ts`, an intrusive linked list with O(1) add and remove
+- [x] `[must]` `onDispose()` — `packages/core/src/owner.ts`; `SHR-R001` when there is no owner
+- [x] `[must]` Disposal order: watchers → subscriptions → nodes — `OwnerNode.dispose()` runs `teardown()` (a watcher drops its sources) before `reset()` (children, then owned subscribers, then cleanups last-registered-first)
+- [ ] `[must]` Post-disposal async is a no-op (owner flag on transitions) — **blocked:** nothing marks a transition at run time (see the spec gap below). `examples/hello` checks `signal.aborted` by hand instead, which is the pattern but not the enforcement
+- [x] `[must]` Leak test: 1000 mount/unmount cycles → live subscription count returns to 0 — `reactive.test.ts:465` and `html.test.ts:622`; the windowed list has its own at `window.test.ts:268`
 
 **Streams & windowing**
-- [ ] `[stretch]` `stream()`: subscribe/teardown on key change and disposal, per-frame folding, `reduceMany`, `status()` reconnect (SPEC §6)
+- [x] `[stretch]` `stream()`: subscribe/teardown on key change and disposal, per-frame folding, `reduceMany`, `status()` reconnect (SPEC §6) — `packages/core/src/stream.ts`, 17 tests; the fold is committed by a scheduler job on the frame queue, so a thousand messages are a thousand O(1) folds and one write; SPEC §6 amended with the shipped status values and `close(reason?)`
 - [x] `[stretch]` Windowed `each`: fixed row set rewritten in place; row-height policy supplied by caller (SPEC §9) — `each(list, row, window)`, positional pool + spacers, `packages/core/test/window.test.ts`, ADR 0003
 - [ ] `windowBy(element, rowHeight, overscan)`: the scroll listener every windowed list otherwise writes by hand. Needs element refs; until then the window is assembled in `*.effects.ts`, as `examples/hello` shows
 
 **Debuggability**
 - [ ] `[stretch]` Causal trace: write → computed → patch, ring buffer (500), sampling, `__sheratan.trace()` JSON, absent in prod (SPEC §7)
-- [ ] Structured runtime errors: `code`, `fix`, `docs`
+- [x] Structured runtime errors — `SheratanError` carries a stable `code`, every message in `messages.ts` states what to write instead, and the production build swaps the table for `sheratan.dev/errors/<code>` (`src/errors.ts`, `src/env.prod.ts`). `fix` as a separate field is the checker's JSON shape (SPEC §8), not the runtime's
 - [ ] `declare()` legal-transition dev assertion (SPEC §5)
 
 - [ ] `[gate]` Correct and leak-free **first**: race tests pass, 1000 cycles leave zero live subscriptions → otherwise fix ownership before measuring anything
@@ -262,7 +269,7 @@ Custom dev server · Krausest PR · nested layouts / `@sheratan/router` · ten p
 Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, then log below.
 
 - [x] **Rule numbering.** PLAN Week 3 says "L001–L006, all six violations"; SPEC defines the import matrix + L002/L005/L006/L008 + T001. L001/L003/L004/L007 are undefined (L001 appears only in the §8 JSON example). Resolved in SPEC §4: L001 = every import-matrix cell, holes filled with L003/L004/L007, template rules as `V001`–`V004`.
-- [ ] **`stream()` priority.** Cut list marks it "if time", but SPEC §12 DoD, the canonical module (§10b) and the dashboard all require it.
+- [x] **`stream()` priority.** Cut list marks it "if time", but SPEC §12 DoD, the canonical module (§10b) and the dashboard all require it. Resolved: built in Week 2 rather than deferred — `packages/core/src/stream.ts`, 446 B brotli.
 - [x] **Windowed `each` priority.** Marked stretch, but DoD requires a 500-row *virtualized* table and the canonical module needs `each` with a window. Resolved: built in Week 2 rather than deferred — `each(list, row, window)` in `packages/core/src/each.ts`, SPEC §9 amended to the shipped signature, ADR 0003 for the recycling trade-off.
 - [ ] **Causal trace priority.** Marked stretch, but DoD says "causal trace renders for the reference app" and Week 2 gate says "trace readable".
 - [ ] **Unscheduled must-items.** Widget mode and routing have no week in PLAN — tentatively placed in Week 1 and Week 4 here.
@@ -283,7 +290,19 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [ ] **Devtools surface.** Dev-build-only additions that belong with the causal trace (SPEC §7), not before it: a Chrome custom formatter so a signal prints as its value rather than `ƒ read()`, a Performance-panel track for drains and frame flushes, and debug names from the trace's write provenance. Decide the shape when §7 is built.
 - [ ] **Public repository before v1.0.0.** Dependency review in CI switches itself on when the repository stops being private; the release checklist has to include making it public (or buying Advanced Security).
 - [ ] **Checker on TypeScript 7.** SPEC §8 builds `packages/check` on the TypeScript compiler API. TS 7 (native) exposes only an unstable IPC API (`typescript/unstable/*`), not the TS 5/6 JS API. Decide before Week 3: pin the checker to TS 6's API, target TS 7's API, or parse with a standalone parser.
-- [ ] **The size budget's scenarios all measure the same thing.** `scripts/size.ts` bundles from `dist/prod/index.js`, which is already one flattened file, so esbuild can only shake whole modules and every scenario comes out within about 100 B of the whole runtime — bundling the same imports from `dist/dev` drops `signal` alone to 1774 B against 14364 B from prod. The budget is therefore accurate for what a consumer ships and fiction as a per-import breakdown. Decide: emit the prod build with modules preserved, measure `dist/dev` for the breakdown and `dist/prod` for the total, or drop the scenarios and keep one number. Found while re-recording the budget for windowed `each`.
+- [ ] **One prod build cannot be right for both a small import and a whole app.** Measured (gzip, esbuild + minify, 2026-09-16), bundling the same scenario from the flattened `dist/prod/index.js` against the module-preserved `dist/dev`:
+
+  | scenario | from `dist/prod` (flat) | from `dist/dev` (modules) |
+  |---|---|---|
+  | `signal` alone | 5492 B | **877 B** |
+  | state only | 5642 B | **1419 B** |
+  | widget | 5703 B | **5000 B** |
+  | widget with lists | 5727 B | **6358 B** ✗ |
+  | everything | 6600 B | **7241 B** ✗ |
+
+  The flat bundle minifies across module boundaries, so it wins for a real app by about 10%; it cannot be shaken finely, so it loses by 6× for a small import. The crossover sits between "widget" and "widget with lists" — roughly, anything that renders pays the whole runtime either way. So the earlier reading ("something in the template modules is not shakeable") was wrong: nothing is broken, the two builds simply trade off, and today's `exports` map offers only the one that suits whole apps. Decide: ship a third module-preserved prod condition for consumers who import a subset, or accept it and keep one number for the whole runtime instead of five scenarios that mostly restate it.
+- [ ] **How a module stylesheet is loaded is unspecified.** SPEC §9a says `global.css` is "linked from `index.html`" and that `ui` and `modules` "are filled by the scoped component and module sheets", but never says how those sheets arrive. `examples/hello` now links each one by hand (`<link href="/modules/dashboard/dashboard.css">`), which works with no build step and is honest, but it names every module twice — once where it is wired and once in the HTML — and a module added without its link fails silently. Options: CSS module scripts attached with `adoptedStyleSheets` (already an open Week 1 item), `sheratan build` collecting module sheets into one file, or `@import` from `global.css` and accepting the extra round trip. Decide before `sheratan create` writes the wrapper.
+- [ ] **The example's page furniture is not the dashboard.** `dashboard.view.ts` also holds the lockup, the pitch and the "where to go next" guide, which are not functions of dashboard state. They pass the letter of SPEC §4 — stateless and used once, so they belong inside the module rather than in `ui/` — but they are a second feature sharing one view file. The fix is a second module composed with `mount()` (SPEC §9 "Composing modules"), which is not built. Do it when `mount()` lands; the example is also the only place `ui/` would get demonstrated.
 - [ ] **Immutability rule code.** The checker rule for statically visible mutation of a signal's value (TASKS decision 2026-09-15) needs a code and a row in SPEC §4's table.
 - [x] **CSS scoping.** SPEC said `adoptedStyleSheets` on the component root, which is global on `document`. Resolved in SPEC §9a: native `@scope` + `@layer`, enforced by `SHR-L009`.
 
@@ -325,6 +344,12 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-16 | Size budget in CI (`size-budget.json`, brotli, per scenario; 4.8 KB for the whole runtime today) | "Small" has to be measured on every commit or it stops being true |
 | 2026-09-16 | Internal field name mangling deliberately not done | It would cost the readability the code rules ask for; revisit only if the size budget comes under pressure, and with a measurement |
 | 2026-09-16 | `llms.txt`'s API table is generated from TSDoc and checked in CI | The agent-facing docs cannot drift from the declarations the package ships |
+| 2026-09-16 | `examples/hello`'s module styles move out of `global.css` into `modules/dashboard/dashboard.css`, with the `to ([data-module], [data-ui])` boundary SPEC §9a requires | `global.css` may hold only `tokens` and `base` (`SHR-L009`); the reference app was breaking the rule it exists to demonstrate, and the checker would have rejected it in Week 3 |
 | 2026-09-16 | An intent's payload is read from the element the handler is on, not chosen by the event's name (SPEC §9 Intents) | A component library announces changes under its own name (`sl-change`, `md-input`), and a table of event types silently handed every one of them `undefined`. One rule instead of a list that is always incomplete; the cost is that a plain `<button>` now reports `""` rather than `undefined` |
 | 2026-09-16 | Platform APIs instead of code where they exist: `Element.moveBefore` for row moves (falls back to `insertBefore`), `Symbol.dispose` on every disposer (`using stop = watch(…)`) | A moved row keeps focus, selection and media state; `using` removes a class of forgotten teardown |
+| 2026-09-16 | `resource()` holds its own value: no cache shared between resources, and data shared between modules goes through a state module (ADR 0004) | A cache is a second place state lives, which A1 does not allow, and it is the part of a query library an app can least often use unchanged |
+| 2026-09-16 | `staleAfter` revalidates on a timer owned by the mount (ADR 0004); SPEC §6 amended, which named the option without saying what triggers it | Core has no remount or window-focus trigger to hang freshness on, and a read that starts a request would fire inside `flush()` |
+| 2026-09-16 | `Error` added to `DeepReadonly`'s opaque list | It matches what `freeze()` already declines to freeze: an `Error` mapped member by member stops being an `Error`, which broke `resource.error()` |
+| 2026-09-16 | `resource()` costs 766 B brotli (5306 → 6072 for the `everything` scenario, +14%) and the budget was re-recorded | SPEC §6 calls it the single most important differentiator, and the whole runtime is still 6.1 KB |
+| 2026-09-16 | Tracker audited against the code: Week 1's `[must]` items and Week 2's ownership block were built but never ticked, and the status table still read "Not started" for both | A tracker that understates the work is as useless as one that overstates it — the next decision is which week to work on, and it was being made from wrong numbers |
 | 2026-09-15 | Immutability enforced, not requested: `DeepReadonly` reads in types, incremental deep freeze of plain objects/arrays on `set()`, checker rule for visible mutation (SPEC §5) | A rule an agent must remember is a rule an agent breaks; freezing only new nodes keeps the cost at what the caller already allocated |

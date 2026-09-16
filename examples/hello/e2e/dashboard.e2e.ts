@@ -13,6 +13,9 @@ const ROW = '.metric:not(.heading)';
 /** Virtualising is on by default; the keyed specs are about the other shape. */
 const KEYED = { name: 'Virtualise: on' };
 
+/** `:scope { max-width: 54rem }` in the module sheet, at the 16px root. */
+const APP_MAX_WIDTH = '864px';
+
 /** The project name decides which build the import map points at. */
 function appUrl(project: string): string {
   return project.startsWith('prod') ? '/?build=prod' : '/';
@@ -202,6 +205,20 @@ async function wheelDown(page: Page, ticks: number): Promise<void> {
   await page.waitForTimeout(FRAME_MS);
   await wheelDown(page, ticks - 1);
 }
+
+test('the module stylesheet reaches the module and stops at its boundary', async ({ page }) => {
+  // A scoped sheet that fails to load, or a `to (…)` boundary that excludes the
+  // scope root itself, leaves every one of these unset and the page still
+  // renders — so the behavioural specs above would all pass regardless.
+  const app = page.locator('[data-module="dashboard"]');
+
+  await expect(app).toHaveCSS('max-width', APP_MAX_WIDTH);
+
+  await expect(page.locator('.metrics')).toHaveCSS('overflow-y', 'auto');
+
+  // Deepest rule in the sheet: proves the whole block parsed, not just the top.
+  await expect(page.locator(`${ROW} .metric-bar i`).first()).toHaveCSS('transform-origin', /^0px/);
+});
 
 test('a windowed list stays where the wheel left it', async ({ page }) => {
   await page.getByRole('button', { name: 'Pause' }).click();

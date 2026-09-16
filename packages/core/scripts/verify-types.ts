@@ -13,7 +13,7 @@ const entry = resolve(root, 'dist/dev/index.js');
 const directory = await mkdtemp(resolve(tmpdir(), 'sheratan-types-'));
 
 const consumer = `
-import { signal, computed, html, each, render, type Accessor, type EachWindow, type Signal } from ${JSON.stringify(entry)};
+import { signal, computed, html, each, render, resource, type Accessor, type EachWindow, type Signal } from ${JSON.stringify(entry)};
 
 const count: Signal<number> = signal(0);
 const items = signal([{ id: 1, title: 'a' }]);
@@ -28,6 +28,21 @@ const viewport = computed((): EachWindow => ({ start: 0, count: 32, rowHeight: 2
 const row = (item: Accessor<{ readonly title: string }>) => html\`<li>\${computed(() => item().title)}</li>\`;
 
 const view = () => html\`<p>\${doubled}</p><ul>\${each(items, row)}\${each(items, row, viewport)}</ul>\`;
+
+// Async has to type-check from outside too: the key is inferred into \`fetch\`,
+// and \`is()\` has to narrow \`data()\` for a consumer, not only for us.
+const user = resource({
+  key: () => ['user', count()] as const,
+  fetch: async ({ key, signal }) => {
+    signal.throwIfAborted();
+
+    return { name: \`user \${String(key[1])}\` };
+  },
+  staleAfter: 30_000,
+  retry: { attempts: 3, backoff: 'exponential' },
+});
+
+export const name: string | undefined = user.is('ready') ? user.data().name : undefined;
 
 export const stop = render(view, document.body);
 `;
