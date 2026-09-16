@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - examples/*
 
 # Supply chain. The runtime has zero dependencies (SPEC A4); these settings
 # guard the dev toolchain and CI, which is where an attack would land.

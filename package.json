@@ -15,8 +15,9 @@
     "test": "pnpm -r --if-present test",
     "coverage": "pnpm -r --if-present coverage",
     "verify": "pnpm -r --if-present verify",
-    "security": "pnpm audit --audit-level low && pnpm audit signatures",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm coverage && pnpm verify && pnpm security"
+    "security": "pnpm audit --audit-level low",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm coverage && pnpm verify && pnpm security",
+    "security:signatures": "pnpm audit signatures"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",

@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "isolatedDeclarations": false
+  },
+  "include": ["app.ts", "lib", "modules", "services", "e2e", "serve.ts", "playwright.config.ts"]
+}

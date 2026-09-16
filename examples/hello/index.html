@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>sheratan — live metrics</title>
+    <link rel="stylesheet" href="/styles/global.css" />
+    <!-- One import map, no bundler. `?build=prod` swaps in the production build. -->
+    <script type="importmap">
+      { "imports": { "sheratan": "/sheratan/dev/index.js" } }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/app.ts"></script>
+  </body>
+</html>

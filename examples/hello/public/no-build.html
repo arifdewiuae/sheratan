@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>sheratan — no build step</title>
+    <link rel="stylesheet" href="../styles/global.css" />
+  </head>
+  <body>
+    <!--
+  The zero-build demo (SPEC §10c): plain JavaScript, the published ESM build,
+  and any static file server. Serve the repository root and open this file:
+
+    python3 -m http.server
+    open http://localhost:8000/examples/hello/public/no-build.html
+-->
+    <div id="app"></div>
+    <script type="module">
+      import {
+        signal,
+        computed,
+        html,
+        each,
+        render,
+      } from '../../../packages/core/dist/prod/index.js';
+
+      const ROWS = 50;
+      const seed = Array.from({ length: ROWS }, (_, id) => ({
+        id,
+        name: `metric-${String(id).padStart(2, '0')}`,
+        value: 200 + Math.round(Math.random() * 1400),
+        delta: 0,
+      }));
+
+      const rows = signal(seed);
+      const applied = signal(0);
+      const rate = signal(0);
+
+      const visible = computed(() => rows().toSorted((left, right) => right.value - left.value));
+      const headline = computed(() => String(rate()));
+      const total = computed(() => String(applied()));
+
+      // One batch of values per frame, applied as one commit.
+      const tick = () => {
+        const updates = new Map();
+
+        for (let i = 0; i < 12; i++) {
+          const id = Math.floor(Math.random() * ROWS);
+
+          updates.set(
+            id,
+            Math.max(0, Math.round((rows()[id]?.value ?? 800) + (Math.random() - 0.5) * 140)),
+          );
+        }
+
+        rows.set(
+          rows().map((row) => {
+            const value = updates.get(row.id);
+
+            return value === undefined ? row : { ...row, value, delta: value - row.value };
+          }),
+        );
+        applied.set(applied() + updates.size);
+        requestAnimationFrame(tick);
+      };
+
+      let previous = 0;
+
+      setInterval(() => {
+        rate.set(applied() - previous);
+        previous = applied();
+      }, 1000);
+
+      const view = () =>
+        html` <section class="app" data-module="dashboard">
+          <header class="head">
+            <h1>No build step</h1>
+            <p class="sub">Plain JavaScript, published ESM, any static file server.</p>
+          </header>
+
+          <div class="tiles">
+            <div class="tile headline">
+              <span class="tile-label">values / second</span>
+              <strong class="tile-value">${headline}</strong>
+            </div>
+            <div class="tile">
+              <span class="tile-label">values applied</span>
+              <strong class="tile-value">${total}</strong>
+            </div>
+          </div>
+
+          <ul class="metrics">
+            ${each(visible, (metric) => {
+              const name = computed(() => metric().name);
+              const value = computed(() => String(metric().value));
+              const direction = computed(() => (metric().delta > 0 ? 'metric up' : 'metric down'));
+              const width = computed(
+                () => `width:${Math.min(100, (metric().value / 1600) * 100)}%`,
+              );
+
+              return html`<li class=${direction}>
+                <span class="metric-name">${name}</span>
+                <span class="metric-bar"><i style=${width}></i></span>
+                <span class="metric-value">${value}</span>
+                <span class="metric-delta"
+                  >${computed(() => (metric().delta > 0 ? '▲' : '▼'))}</span
+                >
+              </li>`;
+            })}
+          </ul>
+        </section>`;
+
+      render(view, document.querySelector('#app'));
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>
