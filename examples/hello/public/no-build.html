@@ -4,6 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>sheratan — no build step</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500&family=IBM+Plex+Mono:wght@400&display=swap"
+    />
     <link rel="stylesheet" href="../styles/global.css" />
   </head>
   <body>
@@ -36,7 +42,9 @@
       const applied = signal(0);
       const rate = signal(0);
 
-      const visible = computed(() => rows().toSorted((left, right) => right.value - left.value));
+      const visible = computed(() =>
+        rows().toSorted((left, right) => left.name.localeCompare(right.name)),
+      );
       const headline = computed(() => String(rate()));
       const total = computed(() => String(applied()));
 

@@ -948,6 +948,7 @@ sheratan check [--json]
 sheratan explain <error-code> [--json]
 sheratan trace [--json]        # pulls the causal trace from the dev server
 sheratan dev
+sheratan build                 # strips types into a deployable directory
 ```
 
 - **`llms.txt`** at the repo and docs root: full API surface, the import
@@ -1028,7 +1029,14 @@ The honest formulation, and the only one to use in the README:
   serves ESM — no bundling, no transform of the templates, no plugin
   configuration. Under Bun or Deno, which run TypeScript natively, even that
   disappears.
-- Production is ESM served as-is. Bundling is optional and the user's choice.
+- Production is ESM served as-is: `sheratan build` strips types from `src/`
+  into a directory of plain ESM and copies everything else, so what ships is
+  what a static host serves. No bundler is involved, and `dev` and `build`
+  differ only in where the stripped output goes. Bundling afterwards is
+  optional and the user's choice.
+- Both commands are served by Sheratan's own minimal server rather than a
+  third-party dev server: a framework that promises no plugin pipeline should
+  not require one to run (ADR pending; prototyped in `examples/hello/serve.ts`).
 
 "No build" is a promise to users, not a constraint on how Sheratan itself is
 written. The core's source is strict TypeScript, compiled once before publish

@@ -32,11 +32,11 @@ test('the zero-build page renders and keeps updating', async ({ page }) => {
 
   await expect.poll(async () => applied(page), { timeout: 5000 }).toBeGreaterThan(first);
 
-  // Sorted by value, descending, without a framework build step in sight.
-  const values = await page.locator('.metric-value').allInnerTexts();
-  const numbers = values.map(Number);
+  // Ordered by name, so the rows hold still while the numbers move — all of
+  // it without a build step in sight.
+  const names = await page.locator('.metric-name').allInnerTexts();
 
-  expect(numbers).toEqual(numbers.toSorted((left, right) => right - left));
+  expect(names).toEqual(names.toSorted((left, right) => left.localeCompare(right)));
 
   expect(errors).toEqual([]);
 });

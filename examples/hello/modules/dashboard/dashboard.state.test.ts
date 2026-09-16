@@ -79,17 +79,13 @@ test('a value that did not change leaves its row untouched', () => {
   assert.equal(state.applied(), 1, 'but the value still counts as delivered');
 });
 
-test('the order is derived: by value, or by name', () => {
+test('the order is derived, and starts stable: by name, then by value', () => {
   const state = createDashboardState();
 
   state.seeded([metric(0, 'b', 10), metric(1, 'a', 30), metric(2, 'c', 20)]);
 
-  assert.deepEqual(
-    state.visible().map((row) => row.name),
-    ['a', 'c', 'b'],
-  );
-
-  state.sorted(SortKey.Name);
+  // Rows hold still by default, so the numbers are what moves.
+  assert.equal(state.sortedBy(), SortKey.Name);
 
   assert.deepEqual(
     state.visible().map((row) => row.name),
@@ -109,6 +105,14 @@ test('the order is derived: by value, or by name', () => {
   assert.deepEqual(
     state.visible().map((row) => row.name),
     ['b', 'a', 'c'],
+  );
+
+  state.applyBatch([{ id: 2, value: 200 }]);
+
+  assert.deepEqual(
+    state.visible().map((row) => row.name),
+    ['c', 'b', 'a'],
+    'the order follows values',
   );
 });
 

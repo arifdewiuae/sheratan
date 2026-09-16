@@ -1,29 +1,33 @@
-/* Tokens and base layers only (SPEC §9a). Module styles are scoped with
-   @scope so a widget cannot leak into a host page. */
+/* Tokens and base layers only (SPEC §9a). The tokens are the brand's, from
+   Docs/sheratan-identity.html — the same ones the site uses, including the
+   rule that there is no accent colour. Module styles are scoped with @scope,
+   so a widget cannot leak into a host page. */
 
 @layer tokens, base, modules;
 
 @layer tokens {
   :root {
     --ground: #fafaf8;
-    --ink: #111;
-    --muted: #0009;
-    --line: #0002;
-    --accent: #1b4dff;
-    --danger: #b3261e;
+    --ink: #000000;
+    --t66: rgba(0, 0, 0, 0.66);
+    --t55: rgba(0, 0, 0, 0.55);
+    --t45: rgba(0, 0, 0, 0.45);
+    --hair: rgba(0, 0, 0, 0.12);
+    --construct: rgba(0, 0, 0, 0.3);
     --space: 0.75rem;
-    --radius: 8px;
-    --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --sans: Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   }
 
   @media (prefers-color-scheme: dark) {
     :root {
-      --ground: #101010;
-      --ink: #f4f4f2;
-      --muted: #ffffff99;
-      --line: #ffffff26;
-      --accent: #8aa4ff;
-      --danger: #ff8a80;
+      --ground: #000000;
+      --ink: #fafaf8;
+      --t66: rgba(250, 250, 248, 0.7);
+      --t55: rgba(250, 250, 248, 0.58);
+      --t45: rgba(250, 250, 248, 0.48);
+      --hair: rgba(250, 250, 248, 0.2);
+      --construct: rgba(250, 250, 248, 0.3);
     }
   }
 }
@@ -35,10 +39,11 @@
 
   body {
     margin: 0;
-    padding: calc(var(--space) * 3) var(--space);
+    padding: calc(var(--space) * 4) var(--space);
     background: var(--ground);
     color: var(--ink);
-    font: 16px/1.5 var(--sans);
+    font: 15px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
   }
 
   button,
@@ -52,56 +57,56 @@
 @layer modules {
   @scope ([data-module="dashboard"]) {
     :scope {
-      max-width: 52rem;
+      max-width: 54rem;
       margin: 0 auto;
       display: grid;
-      gap: calc(var(--space) * 1.5);
+      gap: calc(var(--space) * 2);
     }
 
     .head h1 {
       margin: 0;
-      font-size: 1.6rem;
-      letter-spacing: -0.02em;
+      font-size: 1.1rem;
+      font-weight: 400;
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
     }
 
     .head .sub {
-      margin: 0.25rem 0 0;
-      color: var(--muted);
+      margin: 0.5rem 0 0;
+      color: var(--t45);
+      font-size: 0.85rem;
     }
 
     .tiles {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-      gap: var(--space);
+      grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+      border-top: 1px solid var(--hair);
+      border-left: 1px solid var(--hair);
     }
 
     .tile {
       padding: var(--space);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
+      border-right: 1px solid var(--hair);
+      border-bottom: 1px solid var(--hair);
       display: grid;
-      gap: 0.25rem;
+      gap: 0.35rem;
     }
 
     .tile-label {
-      color: var(--muted);
-      font-size: 0.75rem;
+      color: var(--t45);
+      font-size: 0.65rem;
+      letter-spacing: 0.24em;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
     }
 
     .tile-value {
-      font-size: 1.6rem;
+      font: 400 1.5rem/1 var(--mono);
       font-variant-numeric: tabular-nums;
     }
 
-    .tile.headline {
-      border-color: var(--accent);
-    }
-
     .tile.headline .tile-value {
-      font-size: 2.4rem;
-      color: var(--accent);
+      font-size: 2.6rem;
+      letter-spacing: -0.02em;
     }
 
     .controls {
@@ -111,91 +116,93 @@
     }
 
     .toggle {
-      padding: 0.45rem 1rem;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
+      padding: 0.4rem 1.1rem;
+      border: 1px solid var(--hair);
+      border-radius: 0;
       background: transparent;
       cursor: pointer;
+      font-size: 0.8rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
     }
 
     .toggle:hover {
-      border-color: var(--accent);
-      color: var(--accent);
+      border-color: var(--ink);
     }
 
     .sort {
-      color: var(--muted);
+      color: var(--t45);
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      font-size: 0.8rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .sort select {
+      background: transparent;
+      border: 1px solid var(--hair);
+      padding: 0.3rem 0.4rem;
     }
 
     .note {
       margin: 0;
-      color: var(--muted);
-    }
-
-    .note.error {
-      color: var(--danger);
+      color: var(--t45);
+      font-family: var(--mono);
+      font-size: 0.85rem;
     }
 
     .metrics {
       list-style: none;
       margin: 0;
       padding: 0;
-      display: grid;
+      border-top: 1px solid var(--hair);
     }
 
     .metric {
       display: grid;
-      grid-template-columns: 10rem 1fr 5rem 4rem;
+      grid-template-columns: 11rem 1fr 5rem 3.5rem;
       align-items: center;
       gap: var(--space);
-      padding: 0.35rem 0.25rem;
-      border-bottom: 1px solid var(--line);
+      padding: 0.3rem 0;
+      border-bottom: 1px solid var(--hair);
+      font-family: var(--mono);
+      font-size: 0.8rem;
       font-variant-numeric: tabular-nums;
     }
 
     .metric-name {
-      color: var(--muted);
-      font-size: 0.85rem;
+      color: var(--t55);
     }
 
     .metric-bar {
-      height: 0.5rem;
-      background: var(--line);
-      border-radius: 999px;
-      overflow: hidden;
+      height: 2px;
+      background: var(--hair);
     }
 
     .metric-bar i {
       display: block;
       height: 100%;
-      background: var(--accent);
+      background: var(--construct);
     }
 
     .metric-value {
       text-align: right;
+      color: var(--ink);
     }
 
     .metric-delta {
       text-align: right;
-      font-size: 0.85rem;
-      color: var(--muted);
+      color: var(--t45);
+    }
+
+    .metric.up .metric-bar i {
+      background: var(--ink);
     }
 
     .metric.up .metric-delta {
-      color: #1a7f37;
-    }
-
-    .metric.down .metric-delta {
-      color: var(--danger);
-    }
-
-    @media (prefers-color-scheme: dark) {
-      .metric.up .metric-delta {
-        color: #57d178;
-      }
+      color: var(--t66);
     }
   }
 }

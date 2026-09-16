@@ -107,7 +107,7 @@ export function dashboardView(state: DashboardState, intents: DashboardIntents):
   return html` <section class="app" data-module="dashboard">
     <header class="head">
       <h1>Live metrics</h1>
-      <p class="sub">A synthetic feed, sorted by value, re-ordered on every batch.</p>
+      <p class="sub">500 rows, 2000 values a second. Sort by value to watch the order churn.</p>
     </header>
 
     ${stats(state)} ${controls(state, intents)} ${body}

@@ -76,7 +76,8 @@ test('rows move as values change, and a moved row keeps its node', async ({ page
 
   const name = await marked.locator('.metric-name').innerText();
 
-  await page.getByLabel('Sort by').selectOption('name');
+  // The list holds still by name; ordering by value is what moves rows.
+  await page.getByLabel('Sort by').selectOption('value');
   await expect(page.locator('.metric').first().locator('.metric-name')).not.toHaveText(name);
 
   // The row is somewhere else in the list, but it is the same element.
@@ -86,11 +87,16 @@ test('rows move as values change, and a moved row keeps its node', async ({ page
   await expect(moved.locator('.metric-name')).toHaveText(name);
 });
 
-test('sorting by name orders the table alphabetically', async ({ page }) => {
+test('the default order is by name, and by value it follows the numbers', async ({ page }) => {
   await page.getByRole('button', { name: 'Pause' }).click();
-  await page.getByLabel('Sort by').selectOption('name');
 
   const names = await page.locator('.metric-name').allInnerTexts();
 
   expect(names).toEqual(names.toSorted((left, right) => left.localeCompare(right)));
+
+  await page.getByLabel('Sort by').selectOption('value');
+
+  const values = (await page.locator('.metric-value').allInnerTexts()).map(Number);
+
+  expect(values).toEqual(values.toSorted((left, right) => right - left));
 });

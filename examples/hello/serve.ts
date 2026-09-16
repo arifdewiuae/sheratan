@@ -1,6 +1,10 @@
-// A static file server that strips TypeScript on the way out — the shape of
-// what `sheratan dev` will do (SPEC §10c): no bundler, no plugins, no config.
-// The runtime itself needs none of this; see public/no-build.html.
+// A static file server that strips TypeScript on the way out. This is the
+// prototype of `sheratan dev` (SPEC §10c) — no bundler, no plugins, no config
+// — and it moves into the CLI in Week 3, along with `sheratan build`, which is
+// the same stripping written to a directory instead of a response. Nobody is
+// expected to copy this file into their own app.
+//
+// The runtime itself needs none of it; see public/no-build.html.
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';

@@ -43,14 +43,16 @@ jobs:
       - name: Format
         run: pnpm format:check
 
+      # Before lint and typecheck: both are type-aware, and the example
+      # resolves `sheratan` through the built declarations.
+      - name: Build
+        run: pnpm build
+
       - name: Lint
         run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
-
-      - name: Build
-        run: pnpm build
 
       - name: Test
         run: pnpm test

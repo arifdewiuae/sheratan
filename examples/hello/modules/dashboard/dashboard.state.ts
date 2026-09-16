@@ -132,7 +132,7 @@ export function createDashboardState(): DashboardState {
     rows: signal<readonly Metric[]>([]),
     status: signal<Status>(Status.Loading),
     error: signal(''),
-    sortKey: signal<SortKey>(SortKey.Value),
+    sortKey: signal<SortKey>(SortKey.Name),
     live: signal(true),
     applied: signal(0),
     batches: signal(0),
