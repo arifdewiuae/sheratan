@@ -22,23 +22,58 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown error';
 }
 
-/** Samples "values per second" from a counter that only ever grows. */
-function sampler(state: DashboardState): () => void {
+/** A running count of the frames the host has painted. */
+interface Frames {
+  read(this: void): number;
+  stop(this: void): void;
+}
+
+/**
+ * Counts painted frames. Deliberately its own clock rather than the feed's
+ * batch counter: a paused dashboard still renders, and the tile should still
+ * read 60. A host without a frame clock reports zero and the tile says so.
+ */
+function frameCounter(): Frames {
+  const frame = globalThis.requestAnimationFrame as ((callback: () => void) => number) | undefined;
+  let painted = 0;
+  let live = true;
+
+  if (typeof frame === 'function') {
+    const step = (): void => {
+      if (!live) return;
+
+      painted += 1;
+      frame(step);
+    };
+
+    frame(step);
+  }
+
+  return {
+    read: () => painted,
+    stop: () => {
+      live = false;
+    },
+  };
+}
+
+/** Samples per-second rates from counters that only ever grow. */
+function sampler(state: DashboardState, frames: Frames): () => void {
   const windowsPerSecond = MS_PER_SECOND / SAMPLE_MS;
   let lastApplied = 0;
-  let lastWritten = 0;
+  let lastPainted = 0;
 
   const timer = setInterval(() => {
     const applied = state.applied();
-    const written = state.written();
+    const painted = frames.read();
 
     state.sampled(
       (applied - lastApplied) * windowsPerSecond,
-      (written - lastWritten) * windowsPerSecond,
+      (painted - lastPainted) * windowsPerSecond,
     );
 
     lastApplied = applied;
-    lastWritten = written;
+    lastPainted = painted;
   }, SAMPLE_MS);
 
   return () => {
@@ -50,12 +85,14 @@ function sampler(state: DashboardState): () => void {
 export function createDashboardEffects(feed: FeedApi, state: DashboardState): DashboardEffects {
   const controller = new AbortController();
   const { signal } = controller;
-  const stopSampling = sampler(state);
+  const frames = frameCounter();
+  const stopSampling = sampler(state, frames);
 
   // The runtime cannot see an interval or a socket, so teardown is by hand.
   // After this, the feed is unsubscribed and no late batch reaches a discarded
   // state (SPEC §5b).
   onDispose(() => {
+    frames.stop();
     stopSampling();
     controller.abort();
   });

@@ -130,6 +130,13 @@ test('a batch counts the rows it actually rewrote, not the values it received', 
 
   assert.equal(state.applied(), 3, 'three values arrived');
   assert.equal(state.written(), 1, 'one row changed, so one row is rewritten');
+  assert.equal(state.skipped(), 2 / 3, 'the other two changed nothing, so they cost nothing');
+});
+
+test('nothing has arrived yet, so nothing has been skipped', () => {
+  const state = createDashboardState();
+
+  assert.equal(state.skipped(), 0, 'no values in means no claim to make');
 });
 
 test('live toggles, and sampling records the rate', () => {
@@ -140,7 +147,7 @@ test('live toggles, and sampling records the rate', () => {
   state.toggledLive();
   assert.equal(state.live(), false);
 
-  state.sampled(1234, 96);
+  state.sampled(1234, 60);
   assert.equal(state.rate(), 1234);
-  assert.equal(state.writeRate(), 96);
+  assert.equal(state.fps(), 60);
 });

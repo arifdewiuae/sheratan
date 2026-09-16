@@ -38,8 +38,10 @@ export interface DashboardState {
   readonly batches: Accessor<number>;
   /** Values a second, sampled by effects. */
   readonly rate: Accessor<number>;
-  /** Rows rewritten a second: what the first number costs the DOM. */
-  readonly writeRate: Accessor<number>;
+  /** Frames a second, sampled by effects: the one number anyone can read. */
+  readonly fps: Accessor<number>;
+  /** Share of arriving values that changed nothing, and so cost nothing. 0…1. */
+  readonly skipped: Accessor<number>;
 
   /** The table's order: derived, never stored. */
   readonly visible: Accessor<readonly Metric[]>;
@@ -48,7 +50,7 @@ export interface DashboardState {
   failed(message: string): void;
   /** One commit for a whole batch: rows and counters move together. */
   applyBatch(ticks: readonly Tick[]): void;
-  sampled(rate: number, writeRate: number): void;
+  sampled(rate: number, fps: number): void;
   toggledLive(): void;
   sorted(key: SortKey): void;
 }
@@ -78,7 +80,7 @@ function order(rows: readonly Metric[], key: SortKey): readonly Metric[] {
 interface Signals {
   rows: Signal<readonly Metric[]>;
   written: Signal<number>;
-  writeRate: Signal<number>;
+  fps: Signal<number>;
   status: Signal<Status>;
   error: Signal<string>;
   sortKey: Signal<SortKey>;
@@ -123,10 +125,10 @@ function transitions(
       });
     },
 
-    sampled: (values, writes) => {
+    sampled: (values, frames) => {
       batch(() => {
         state.rate.set(values);
-        state.writeRate.set(writes);
+        state.fps.set(frames);
       });
     },
 
@@ -152,12 +154,23 @@ export function createDashboardState(): DashboardState {
     written: signal(0),
     batches: signal(0),
     rate: signal(0),
-    writeRate: signal(0),
+    fps: signal(0),
   };
 
   // Sorting on every batch is the point: values churn, so the order churns,
   // and the reconciler moves the minimum number of rows (SPEC §9).
   const visible = computed(() => order(signals.rows(), signals.sortKey()));
+
+  // A lifetime ratio, not a sampled one: it settles instead of jittering, and
+  // the claim it makes is about the whole run rather than the last quarter
+  // second.
+  const skipped = computed(() => {
+    const total = signals.applied();
+
+    if (total === 0) return 0;
+
+    return (total - signals.written()) / total;
+  });
 
   return {
     rows: signals.rows,
@@ -169,7 +182,8 @@ export function createDashboardState(): DashboardState {
     written: signals.written,
     batches: signals.batches,
     rate: signals.rate,
-    writeRate: signals.writeRate,
+    fps: signals.fps,
+    skipped,
     visible,
     ...transitions(signals),
   };
