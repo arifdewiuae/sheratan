@@ -1,7 +1,22 @@
 // Public value types (SPEC §5).
 
-/** A value that cannot hold nested state, so it is returned unchanged. */
-type Opaque = string | number | boolean | bigint | symbol | null | undefined | Node | Date | RegExp;
+/**
+ * A value that cannot hold nested state, so it is returned unchanged. The list
+ * matches what `freeze()` declines to freeze: a class instance breaks when its
+ * members are mapped, and an `Error` mapped member-by-member stops being one.
+ */
+type Opaque =
+  | string
+  | number
+  | boolean
+  | bigint
+  | symbol
+  | null
+  | undefined
+  | Node
+  | Date
+  | RegExp
+  | Error;
 
 /**
  * A value as a signal hands it out: readable everywhere, writable nowhere.

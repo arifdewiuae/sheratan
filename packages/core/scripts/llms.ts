@@ -21,6 +21,7 @@ const ORDER = [
   'computed',
   'watch',
   'batch',
+  'resource',
   'onDispose',
   'flush',
   'html',

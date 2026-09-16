@@ -513,7 +513,32 @@ user.status();   // 'idle' | 'loading' | 'ready' | 'error' | 'refreshing'
 user.data();     // T | undefined  — previous value retained while refreshing
 user.error();    // Error | undefined
 user.invalidate();
+user.abort();
 ```
+
+`'idle'` means nothing in flight and nothing to show, which only `abort()`
+produces: a resource fetches as soon as it is constructed, so it is never idle
+on the way in.
+
+**A key change is a different question.** `data()` and `error()` are cleared
+and the status goes to `'loading'`, because the value that is there answers the
+old key. A *failure* is the other way round: `data()` is kept, so a stale value
+beside an error beats an empty screen.
+
+`staleAfter` is milliseconds of freshness. When it elapses the resource
+revalidates itself — `'refreshing'` with `data()` still readable, then
+`'ready'` — and the timer is owned by the mount, so unmounting stops it.
+Omitted, a key is fetched once and never goes stale.
+
+`retry.attempts` counts the first try: `3` is one try and two retries. The
+first wait is 100 ms; `'exponential'` doubles it each attempt, `'fixed'` does
+not. A cancelled request is never retried.
+
+**No shared cache.** A resource owns its value and nothing else's: two modules
+asking for the same key make two requests, and `invalidate()` on one does not
+reach the other. A cache is a second place state lives, which A1 does not
+allow, and it is the part of a query library an app can least often use
+unchanged (ADR 0004).
 
 **Separate signals, not one union.** `status()`, `data()` and `error()` are
 independent signals, so a hole that renders a spinner reads only `status()`
@@ -525,13 +550,15 @@ Narrowing comes from one type-guard method, since TypeScript cannot narrow
 `data()` from a separate `status() === 'ready'` comparison:
 
 ```ts
-if (user.is('ready'))   user.data();    // T — `this is Ready<T>`
-if (user.is('error'))   user.error();   // Error
+if (user.is('ready'))   user.data();    // T — `this is LoadedResource<T>`
+if (user.is('error'))   user.error();   // Error — `this is FailedResource<T>`
 if (user.is('refreshing')) user.data(); // T — previous value retained
 ```
 
 `is()` reads `status()` only, so it has the same reactivity as the comparison.
 Comparing `status()` directly remains legal but leaves `data()` as `T | undefined`.
+A value arrives `DeepReadonly` like every other value a signal hands out
+(§5 Immutability), so `T` above means the read-only view of it.
 
 Guarantees: in-flight request is aborted when the key changes; identical keys
 are de-duplicated; out-of-order responses are discarded, never applied; errors
