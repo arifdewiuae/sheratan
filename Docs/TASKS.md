@@ -134,7 +134,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [x] `[must]` Leak test: 1000 mount/unmount cycles → live subscription count returns to 0 — `reactive.test.ts:465` and `html.test.ts:622`; the windowed list has its own at `window.test.ts:268`
 
 **Streams & windowing**
-- [ ] `[stretch]` `stream()`: subscribe/teardown on key change and disposal, per-frame folding, `reduceMany`, `status()` reconnect (SPEC §6)
+- [x] `[stretch]` `stream()`: subscribe/teardown on key change and disposal, per-frame folding, `reduceMany`, `status()` reconnect (SPEC §6) — `packages/core/src/stream.ts`, 17 tests; the fold is committed by a scheduler job on the frame queue, so a thousand messages are a thousand O(1) folds and one write; SPEC §6 amended with the shipped status values and `close(reason?)`
 - [x] `[stretch]` Windowed `each`: fixed row set rewritten in place; row-height policy supplied by caller (SPEC §9) — `each(list, row, window)`, positional pool + spacers, `packages/core/test/window.test.ts`, ADR 0003
 - [ ] `windowBy(element, rowHeight, overscan)`: the scroll listener every windowed list otherwise writes by hand. Needs element refs; until then the window is assembled in `*.effects.ts`, as `examples/hello` shows
 
@@ -269,7 +269,7 @@ Custom dev server · Krausest PR · nested layouts / `@sheratan/router` · ten p
 Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, then log below.
 
 - [x] **Rule numbering.** PLAN Week 3 says "L001–L006, all six violations"; SPEC defines the import matrix + L002/L005/L006/L008 + T001. L001/L003/L004/L007 are undefined (L001 appears only in the §8 JSON example). Resolved in SPEC §4: L001 = every import-matrix cell, holes filled with L003/L004/L007, template rules as `V001`–`V004`.
-- [ ] **`stream()` priority.** Cut list marks it "if time", but SPEC §12 DoD, the canonical module (§10b) and the dashboard all require it.
+- [x] **`stream()` priority.** Cut list marks it "if time", but SPEC §12 DoD, the canonical module (§10b) and the dashboard all require it. Resolved: built in Week 2 rather than deferred — `packages/core/src/stream.ts`, 446 B brotli.
 - [x] **Windowed `each` priority.** Marked stretch, but DoD requires a 500-row *virtualized* table and the canonical module needs `each` with a window. Resolved: built in Week 2 rather than deferred — `each(list, row, window)` in `packages/core/src/each.ts`, SPEC §9 amended to the shipped signature, ADR 0003 for the recycling trade-off.
 - [ ] **Causal trace priority.** Marked stretch, but DoD says "causal trace renders for the reference app" and Week 2 gate says "trace readable".
 - [ ] **Unscheduled must-items.** Widget mode and routing have no week in PLAN — tentatively placed in Week 1 and Week 4 here.

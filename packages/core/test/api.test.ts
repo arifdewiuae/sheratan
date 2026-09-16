@@ -10,6 +10,8 @@ import {
   SheratanError,
   type EachWindow,
   type ResourceOptions,
+  type StreamOptions,
+  StreamStatus,
 } from '../src/index.ts';
 
 test('the package exports exactly its documented names', () => {
@@ -17,6 +19,7 @@ test('the package exports exactly its documented names', () => {
     'ErrorCode',
     'ResourceStatus',
     'SheratanError',
+    'StreamStatus',
     'batch',
     'computed',
     'each',
@@ -26,6 +29,7 @@ test('the package exports exactly its documented names', () => {
     'render',
     'resource',
     'signal',
+    'stream',
     'watch',
   ]);
 });
@@ -62,6 +66,26 @@ test('the resource options type is exported in the shape callers write', () => {
     'ready',
     'refreshing',
   ]);
+});
+
+// And for push data: the shape an effects file writes, with the reducer the
+// type admits exactly one of.
+const feed: StreamOptions<number, { readonly by: number }, readonly [string, number]> = {
+  key: () => ['ticks', 1],
+  initial: 0,
+  reduce: (total, tick) => total + tick.by,
+  subscribe: ({ emit, signal }) => {
+    signal.throwIfAborted();
+    emit({ by: 1 });
+
+    return () => {};
+  },
+};
+
+test('the stream options type is exported in the shape callers write', () => {
+  assert.deepEqual(Object.keys(feed).toSorted(), ['initial', 'key', 'reduce', 'subscribe']);
+
+  assert.deepEqual(Object.values(StreamStatus).toSorted(), ['closed', 'connecting', 'open']);
 });
 
 test('every runtime error code is distinct and shaped SHR-Rnnn', () => {
