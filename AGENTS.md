@@ -43,6 +43,10 @@ pnpm verify                      # consumer types, publint, attw, size budget, l
 pnpm security                    # pnpm audit + registry signature verification
 ```
 
+Example app: `pnpm --filter example-hello dev` (http://localhost:5173), and
+`pnpm --filter example-hello e2e` for the browser specs. E2E is deliberately
+outside `pnpm check`, because it needs a browser; CI runs it as its own job.
+
 Single test file: `node --test packages/core/test/html.test.ts`.
 Fix lint and formatting: `pnpm exec oxlint --type-aware --fix && pnpm format`.
 Re-record the size budget after an intended change: `pnpm --filter sheratan exec node scripts/size.ts --update`.
@@ -55,8 +59,10 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `packages/core/src/` | Runtime. Graph (`graph`, `signal`, `computed`, `watch`, `scheduler`, `owner`), templates (`template`, `instantiate`, `each`, `lis`, `render`, `dom`), errors (`codes`, `messages`, `env`, `env.prod`, `errors`), entries (`index` public, `internal` test-only) |
 | `packages/core/test/` | `node:test` suites; DOM via happy-dom |
 | `packages/core/scripts/` | Build (`build-prod`), package checks (`verify-types`, `size`), docs (`llms`) |
+| `examples/hello/` | The reference app in the canonical module shape (SPEC §4): a live dashboard, its dev server, and the e2e specs |
 | `.oxlintrc.json`, `.oxfmtrc.json` | The one lint config and the one formatter config |
 | `Docs/` | SPEC, EVAL, EVAL-TASKS, TASKS, brand identity |
+| `Docs/adr/` | Decisions with a real trade-off, written up once instead of re-argued |
 | `llms.txt` | The API as an agent should learn it. Updated with every public API change |
 | `site/` | Static landing page (GitHub Pages, deployed from `main`) |
 | `.github/workflows/` | `ci.yml` (every push/PR, daily audit), `pages.yml` (site deploy) |
@@ -135,6 +141,32 @@ where it can't.
 - Immutable by default: `readonly` fields and `ReadonlyArray` in public types; `const` everywhere possible; no parameter reassignment.
 - Runtime code (`packages/core/src`) imports only relative modules. No `node:` imports, and no DOM access at module evaluation time (SPEC §13: SSR door stays open).
 
+## Layers, in application code
+
+`examples/hello` is the worked example of SPEC §4, and the rule is the same in
+any app built with Sheratan:
+
+| File | Owns | May not |
+|---|---|---|
+| `*.state.ts` | signals and pure transitions; everything derivable is a `computed` | do I/O, touch the DOM, import effects, a view, or a service adapter |
+| `*.effects.ts` | sequencing: calls a service contract, then invokes **one** transition | decide what data means, write a signal directly, import a view |
+| `*.view.ts` | markup as a pure function of state; declares the intents it needs | do I/O, import effects or an adapter |
+| `services/*.contract.ts` | the interface modules depend on; every promise-returning method takes an `AbortSignal` | know about a transport |
+| `index.ts` | the module's only public surface: `kind` plus a factory returning a view function | — |
+| `app.ts` | the one place a contract meets an adapter | contain feature logic |
+
+Until the checker exists (Week 3), `.oxlintrc.json` enforces this with
+`no-restricted-imports` and `no-restricted-globals`, keyed by filename. Each
+message names the allowed alternative rather than a rule number, the way the
+checker's will.
+
+**Two things a new lint rule needs:**
+- **Break the code once to prove the rule fires.** A rule that matches nothing
+  is worse than no rule: CI is green and nothing is enforced.
+- **No lookahead.** Oxlint matches with Rust's regex engine, which has no
+  `(?!…)`, and an unsupported pattern simply never matches. Use `group` globs,
+  where `!` negation works (`["**/services/**", "!**/services/*.contract.ts"]`).
+
 ## Performance and algorithms
 
 The runtime's value is its update cost, so algorithmic complexity is part of
@@ -179,6 +211,9 @@ A change to the public API updates, in the same PR:
 1. TSDoc — `llms.txt`'s API table is generated from it (`pnpm --filter sheratan llms`), and CI fails when it is stale
 2. the SPEC section it implements
 3. the export-surface test, which lists the exact public names (SPEC A5)
+
+A decision with a real trade-off gets an ADR in `Docs/adr/` (see its README for
+when); a one-line outcome goes in the TASKS decisions log instead.
 
 A behaviour change updates the relevant SPEC section. A resolved gap gets ticked in TASKS with where it was resolved.
 

@@ -7,6 +7,9 @@ yarn.lock
 # Build and test output
 dist/
 coverage/
+playwright-report/
+test-results/
+blob-report/
 *.tsbuildinfo
 *.lcov
 lcov.info

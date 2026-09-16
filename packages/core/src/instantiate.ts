@@ -185,6 +185,8 @@ function commit(marker: Comment, old: ChildNode[], value: unknown): ChildNode[] 
     return insertTemplate(marker, value);
   }
 
+  if (Array.isArray(value)) fail(ErrorCode.ArrayInHole, value.length);
+
   if (typeof value === 'object' && 'nodeType' in value) {
     removeAll(old);
 

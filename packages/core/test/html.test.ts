@@ -256,6 +256,12 @@ test('holes inside a tag must be whole attribute values (SHR-R003)', () => {
   );
 });
 
+test('an array in a hole fails with SHR-R008 instead of rendering [object Object]', () => {
+  const parts = [html`<b>a</b>`, html`<b>b</b>`];
+
+  assert.throws(() => render(() => html`<p>${parts}</p>`, host), hasCode(ErrorCode.ArrayInHole));
+});
+
 test('a hole the HTML parser cannot keep fails with SHR-R004', () => {
   const value = signal('x');
 

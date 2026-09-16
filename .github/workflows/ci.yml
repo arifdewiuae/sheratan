@@ -43,24 +43,87 @@ jobs:
       - name: Format
         run: pnpm format:check
 
+      # Before lint and typecheck: both are type-aware, and the example
+      # resolves `sheratan` through the built declarations.
+      - name: Build
+        run: pnpm build
+
       - name: Lint
         run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Build
-        run: pnpm build
+      - name: Test
+        run: pnpm test
 
-      - name: Test with coverage gate
+      - name: Coverage gate
         run: pnpm coverage
 
       - name: Package checks (consumer types, publint, attw, size budget, llms.txt)
         run: pnpm verify
 
-      - name: Audit advisories and registry signatures
+      - name: Audit advisories
         run: pnpm security
 
+      # Verifying every lockfile entry's signature needs a packument per
+      # package, including platforms we never install, and a few requests fail
+      # per run for reasons unrelated to the change under test. Daily instead,
+      # so a flaky registry never blocks a PR (Docs/adr/0001).
+      - name: Verify registry signatures
+        if: ${{ github.event_name == 'schedule' }}
+        run: pnpm security:signatures
+
+
+  e2e:
+    name: End-to-end (Chromium, dev and prod builds)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the runtime the example imports
+        run: pnpm build
+
+      - name: Resolve the Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter example-hello exec playwright --version | tr ' ' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore browsers
+        id: browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      # Browsers come from an explicit command, never a postinstall script:
+      # pnpm blocks dependency lifecycle scripts (pnpm-workspace.yaml).
+      - name: Install Chromium
+        run: pnpm --filter example-hello exec playwright install --with-deps chromium
+
+      - name: Run end-to-end tests
+        run: pnpm --filter example-hello e2e
+
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        if: ${{ failure() }}
+        with:
+          name: playwright-report
+          path: examples/hello/playwright-report/
+          retention-days: 7
 
   dependency-review:
     name: Dependency review
