@@ -73,14 +73,21 @@ test('the stat tiles read from state', () => {
   const { state } = mounted();
 
   state.seeded([metric(0, 'a', 10), metric(1, 'b', 20)]);
-  state.applyBatch([{ id: 0, value: 12 }]);
-  state.sampled(12_400, 960);
+
+  // Two values for one row, and the second repeats the first: one write, one
+  // skip, which is the claim the third tile makes.
+  state.applyBatch([
+    { id: 0, value: 12 },
+    { id: 0, value: 12 },
+  ]);
+
+  state.sampled(12_400, 60);
   flush();
 
-  assert.equal(text('.tile.headline .tile-value'), '12.4k', 'values in');
-  assert.equal(text('.tiles .tile:nth-child(2) .tile-value'), '960', 'rows rewritten');
-  assert.equal(text('.tiles .tile:nth-child(3) .tile-value'), '2', 'rows live');
-  assert.equal(text('.tiles .tile:nth-child(4) .tile-value'), '1', 'values received');
+  assert.equal(text('.tile.headline .tile-value'), '60', 'frames a second');
+  assert.equal(text('.tiles .tile:nth-child(2) .tile-value'), '12.4k', 'values in');
+  assert.equal(text('.tiles .tile:nth-child(3) .tile-value'), '50%', 'updates skipped');
+  assert.equal(text('.tiles .tile:nth-child(4) .tile-value'), '2', 'rows live');
 });
 
 test('a new value writes one cell and keeps the row', () => {

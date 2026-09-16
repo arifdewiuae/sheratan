@@ -2,13 +2,16 @@
 
 import { computed, each, html, type Accessor, type Template } from 'sheratan';
 
-import { compact, signed } from '../../lib/format.ts';
+import { compact, percent, signed } from '../../lib/format.ts';
+import { ROW_HEIGHT_PX } from '../../lib/layout.ts';
 import type { Metric } from '../../services/feed.contract.ts';
 import { SortKey, Status, type DashboardState } from './dashboard.state.ts';
 
-/** Bar width as a share of a sensible ceiling, so the table reads at a glance. */
-const BAR_CEILING = 1600;
-const FULL = 100;
+/** Bar width as a share of the feed's ceiling, so the table reads at a glance. */
+const BAR_CEILING = 2000;
+
+/** Published to CSS, so the stylesheet and the row height share one number. */
+const ROW_HEIGHT_STYLE = `--row-h:${String(ROW_HEIGHT_PX)}px`;
 
 /**
  * What this view asks the module to do. Intents are plain functions, never
@@ -47,13 +50,15 @@ function row(metric: Accessor<Metric>): Template {
     return 'metric';
   });
 
-  const width = computed(
-    () => `width:${String(Math.min(FULL, (metric().value / BAR_CEILING) * FULL))}%`,
+  // A transform, not a width: scaling costs no layout, so the bar can be
+  // tweened between frames instead of stepping once per value.
+  const level = computed(
+    () => `transform:scaleX(${String(Math.min(1, metric().value / BAR_CEILING))})`,
   );
 
   return html` <li class=${direction}>
     <span class="metric-name">${name}</span>
-    <span class="metric-bar"><i style=${width}></i></span>
+    <span class="metric-bar"><i style=${level}></i></span>
     <span class="metric-value">${value}</span>
     <span class="metric-delta">${delta}</span>
   </li>`;
@@ -100,25 +105,78 @@ function lockup(): Template {
   </a>`;
 }
 
+/** What the framework is, before any number is claimed for it. */
+function intro(): Template {
+  return html` <h1>A frontend framework with one legal way to structure an app.</h1>
+    <ul class="values">
+      <li>
+        <b>No virtual DOM.</b> A number changes and the text node showing it is rewritten. Nothing
+        else runs.
+      </li>
+      <li>
+        <b>One shape for every feature</b> — state, effects, view, contract — enforced by a checker,
+        not by review.
+      </li>
+      <li><b>Zero runtime dependencies</b>, about 4.8&nbsp;KB over the wire.</li>
+    </ul>`;
+}
+
 function columns(): Template {
   return html` <li class="metric heading" aria-hidden="true">
     <span>metric</span>
-    <span>level</span>
+    <span class="metric-bar-label">level</span>
     <span class="metric-value">value</span>
     <span class="metric-delta">change</span>
   </li>`;
 }
 
 function stats(state: DashboardState): Template {
+  const fps = computed(() => (state.fps() === 0 ? '—' : compact(state.fps())));
   const rate = computed(() => compact(state.rate()));
-  const writeRate = computed(() => compact(state.writeRate()));
+  const skipped = computed(() => percent(state.skipped()));
   const rows = computed(() => String(state.rows().length));
-  const applied = computed(() => compact(state.applied()));
 
   return html` <div class="tiles">
-    ${tile('values in / sec', rate, 'headline')} ${tile('rows rewritten / sec', writeRate)}
-    ${tile('rows live', rows)} ${tile('values received', applied)}
+    ${tile('frames / sec', fps, 'headline')} ${tile('values in / sec', rate)}
+    ${tile('updates skipped', skipped)} ${tile('rows live', rows)}
   </div>`;
+}
+
+/** One file of the module, and the rule that governs it. */
+function entry(term: string, line: string): Template {
+  return html` <li><code>${term}</code><span>${line}</span></li>`;
+}
+
+/** Where a developer goes after watching the numbers move. */
+function guide(): Template {
+  return html` <details class="guide" open>
+    <summary class="label">Where to go next</summary>
+
+    <p class="sub">
+      This page is one Sheratan module. Four files, each with a single job — the shape every feature
+      takes, and the shape the checker enforces.
+    </p>
+
+    <h3 class="label">The four files</h3>
+    <ul class="entries">
+      ${entry('dashboard.state.ts', 'Signals and pure transitions. No I/O, no DOM.')}
+      ${entry('dashboard.effects.ts', 'The only impure file: it calls the feed and invokes one transition.')}
+      ${entry('dashboard.view.ts', 'Markup as a function of state. It never imports effects.')}
+      ${entry('feed.contract.ts', 'The interface the module depends on. Swap the adapter and nothing above it changes.')}
+    </ul>
+
+    <h3 class="label">Three ideas, and you can read the rest</h3>
+    <ul class="entries">
+      ${entry('signal', 'A value that remembers who read it.')}
+      ${entry('computed', 'A value derived from others. Never stored, never stale.')}
+      ${entry('each', 'A keyed list. The row function runs once per key, not once per change.')}
+    </ul>
+
+    <p class="hint">
+      <code>pnpm --filter example-hello dev</code> runs this page · <code>llms.txt</code> is the
+      whole API on one screen · <code>Docs/SPEC.md §4</code> is the module shape
+    </p>
+  </details>`;
 }
 
 /** The module's markup: stat tiles over a live, self-sorting table. */
@@ -132,22 +190,25 @@ export function dashboardView(state: DashboardState, intents: DashboardIntents):
       return html`<p class="note error" role="alert">Feed stopped: ${message}</p>`;
     }
 
-    return html`<ul class="metrics">
+    return html`<ul class="metrics" style=${ROW_HEIGHT_STYLE}>
       ${columns()} ${each(state.visible, row)}
     </ul>`;
   });
 
   return html` <section class="app" data-module="dashboard">
-    <header class="head">
-      ${lockup()}
-      <h1>Live metrics</h1>
-      <p class="sub">
-        The feed sends 20 000 values a second across 500 rows. Several land on the same row inside
-        one frame, so only the rows that really changed are rewritten: the gap between the first two
-        numbers is the work the framework did not do.
-      </p>
-    </header>
+    <header class="head">${lockup()} ${intro()}</header>
 
-    ${stats(state)} ${controls(state, intents)} ${body}
+    <section class="demo">
+      <h2 class="label">Live metrics</h2>
+      <p class="sub">
+        Five hundred rows, twenty thousand new values every second, and the page holds sixty frames
+        a second while you read it. Many of those values land on a row that already shows that
+        number, so Sheratan skips them: skipped work is why the frame rate holds.
+      </p>
+
+      ${stats(state)} ${controls(state, intents)} ${body}
+    </section>
+
+    ${guide()}
   </section>`;
 }
