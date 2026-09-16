@@ -18,6 +18,8 @@ export const ErrorCode = {
   EachItemWithoutId: 'SHR-R006',
   /** Two `each()` items resolved to the same key. */
   EachDuplicateKey: 'SHR-R007',
+  /** An array reached a hole, which renders many and needs `each()`. */
+  ArrayInHole: 'SHR-R008',
 } as const;
 
 /** One of the runtime error codes. */

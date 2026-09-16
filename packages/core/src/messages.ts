@@ -13,6 +13,7 @@ export interface MessageArgs {
   [ErrorCode.EventHoleNotFunction]: [name: string, received: string];
   [ErrorCode.EachItemWithoutId]: [];
   [ErrorCode.EachDuplicateKey]: [key: string];
+  [ErrorCode.ArrayInHole]: [length: number];
 }
 
 type Messages = { [C in ErrorCode]: (...args: MessageArgs[C]) => string };
@@ -45,4 +46,8 @@ export const MESSAGES: Messages = {
 
   [ErrorCode.EachDuplicateKey]: (key) =>
     `each() got two items with the key ${key}. Keys identify rows, so they must be unique.`,
+
+  [ErrorCode.ArrayInHole]: (length) =>
+    `A hole received an array of ${String(length)} values. Rendering many is what each() is for: ` +
+    'each(items, (item) => html`…`), which keys rows and updates them in place.',
 };
