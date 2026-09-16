@@ -6,7 +6,7 @@ import { DOCS_BASE_URL } from './codes.ts';
 import type { MessageArgs } from './messages.ts';
 
 /** False in the production build, so dev-only branches fold away. */
-export const DEV = false;
+export const DEV: boolean = false;
 
 /** Docs link for an error code. */
 export function describe<C extends ErrorCode>(code: C, _args: MessageArgs[C]): string {

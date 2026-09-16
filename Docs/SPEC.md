@@ -644,10 +644,32 @@ write(count, 0 -> 1) @ todo.effects.ts:24
       └─ view(TodoList) patched 1 node: <span data-s="3">
 ```
 
-Retention is bounded: a fixed-size ring buffer (default 500 entries), opt-in
-per signal for previous-value capture, and sampling above a write-rate
-threshold. Holding a previous value for every write at 1000 writes/sec would
-exhaust memory and produce a log unreadable by human or agent alike.
+Retention is bounded: a fixed-size ring buffer of 500 entries, and sampling —
+past 1000 writes in a second only one in twenty is kept, and the rest are
+counted as `dropped`. Without the sampling the trace would spend the frame
+budget of the very flood it exists to explain.
+
+**Previous values need no opt-in.** The original concern was memory: holding a
+previous value for every write at 1000 writes/sec exhausts it. A ring buffer
+already bounds that to 500, and entries keep a *short rendering* of the value
+rather than the value, so nothing is retained at all — an object is `{id, name}`
+and a list is `Array(500)`. One less option to configure, and one less thing an
+agent must remember to switch on.
+
+Recording is off until `__sheratan.start()`. When off, a hook is one boolean
+test; the flag is the mechanism SPEC asks for, not a default.
+
+**A write inside a running chain continues it.** `each` rewriting a row's item
+*is* the list update, not a second one, so it is nested under the write that
+caused it rather than opening a chain of its own. A write with no application
+frame on the stack is attributed to `sheratan` rather than to whichever runtime
+frame happened to be innermost.
+
+An entry is `{ at, cause, kind, source, from?, to? }`, where `cause` is the
+write the step follows from — steps sharing one are one chain — and `source` is
+a write's call site, a derivation's id, or the element a patch wrote.
+`__sheratan.trace()` returns them; `__sheratan.format()` renders the same
+chains as the tree above, for eyes rather than for a program.
 
 Note the tension, acknowledged rather than hidden: `__sheratan` is a global
 registry, which this spec rejects for DI and for event buses. It is defensible
@@ -656,7 +678,16 @@ code, and it is absent from production builds entirely.
 
 Exposed as `__sheratan.trace()` returning structured JSON — timestamp, cause,
 propagation path, DOM patches. This is the artifact an agent reads to debug
-itself (section 10). Off in production; zero cost when disabled.
+itself (section 10). Installed by `render()`, not on import, because a module
+that reaches for `globalThis` when loaded is a side effect and the package
+promises it has none.
+
+**Absent in production, and the build proves it.** Guarding the call sites is
+not enough on its own: esbuild folds the branch but keeps the module, so the
+code would ship unreachable. `scripts/build-prod.ts` therefore swaps `trace.ts`
+for a no-op `trace.prod.ts`, the way it swaps `env.ts`, and then fails the build
+if the bundle still contains `__sheratan`. What remains in production is the
+boolean test at each hook: 11 bytes brotli across the whole runtime.
 
 ## 8. Checker
 
