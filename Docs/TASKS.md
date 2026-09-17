@@ -37,8 +37,9 @@ landed, so the claim can be checked without reading the diff.
 ## Pre-flight
 
 - [ ] Verify GitHub org handle `sheratan` is available and claim it
-- [ ] Verify and register `sheratan.dev` — it goes into checker `docs` links and can't change later (SPEC header, §8)
-- [ ] Reserve `sheratan` on npm (free as of 2026-09-14)
+- [x] Verify and register `sheratan.dev` — it goes into checker `docs` links and can't change later (SPEC header, §8) — **registered 2026-09-17**, GoDaddy, expires 2027-09-17, all four client locks already on (delete/renew/transfer/update prohibited). Every `SHR-*` docs URL now resolves to a domain we own; what it resolves *to* is the Week 4 error index
+- [ ] Domain durability: auto-renew on with a card valid past 2027-09-17, account 2FA via authenticator app, and a registrar contact address **not** `@sheratan.dev` — the error URL is compiled into every published bundle, so a lapse breaks error messages in apps we don't control
+- [ ] Reserve `sheratan` on npm (still free on 2026-09-17; the package is publish-ready — manifest, README and tarball verified in PR #17, and `release.yml` takes over from the second release onward)
 - [ ] `git init`; monorepo skeleton: `packages/{core,check,cli}`, `examples/dashboard`, `docs/` (SPEC §11) — `packages/core`, `examples/hello` and `Docs/` exist; `check` and `cli` are Week 3, and the reference app is Week 4
 - [x] Commit SPEC / PLAN / EVAL / TASKS as the baseline — `0d7e8e1`
 
