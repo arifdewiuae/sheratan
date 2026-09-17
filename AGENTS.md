@@ -64,7 +64,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `Docs/` | SPEC, EVAL, EVAL-TASKS, TASKS, brand identity |
 | `Docs/adr/` | Decisions with a real trade-off, written up once instead of re-argued |
 | `llms.txt` | The API as an agent should learn it. Updated with every public API change |
-| `site/` | Static landing page, served at **sheratan.dev** (GitHub Pages, deployed from `main`; `site/CNAME` holds the domain and must not be deleted — Pages rewrites the setting from it on every deploy) |
+| `site/` | Static landing page, served at **sheratan.dev** (GitHub Pages, deployed from `main`; `site/CNAME` holds the domain and must not be deleted — Pages rewrites the setting from it on every deploy). Fonts are self-hosted in `site/fonts/`, so the page loads nothing from a third party; editing the one inline `<script>` means recomputing the CSP hash in `<head>` |
 | `.github/workflows/` | `ci.yml` (every push/PR, daily audit), `pages.yml` (site deploy) |
 
 ## Git and PRs
@@ -256,7 +256,7 @@ for LLM apps. For a framework, this is what applies.
 | Section | Status | Where it lands here |
 |---|---|---|
 | §1 model layer, §2 SSE, §3 API keys, §4a moderation, §5–6 chat client, §10 PWA, §11 markdown, §13 browser ML, §14 RAG, §19 voice, §20 Tauri, §22 AWS, §23 GitHub App | N/A | No LLM, server or chat UI in this repo |
-| §4 security headers | Partial, **accepted** | `site/` sends a `<meta>` CSP because GitHub Pages cannot set HTTP headers — no HSTS, no `X-Content-Type-Options`. Decided 2026-09-17: accepted rather than moving hosts, since the site is static, has no auth and takes no input. Revisit only if it ever does. The runtime escapes holes by default (SPEC §9) |
+| §4 security headers | Partial, **accepted** | `site/` sends a `<meta>` CSP because GitHub Pages cannot set HTTP headers — no HSTS, no `X-Content-Type-Options`. Decided 2026-09-17: accepted rather than moving hosts, since the site is static, has no auth and takes no input. Revisit only if it ever does. The policy itself allows no third-party origin at all — `default-src 'none'` with `'self'` for fonts and fetches, and one script hash. The runtime escapes holes by default (SPEC §9) |
 | §7–9 accessibility, mobile, web vitals | Partial | `site/` and, later, `examples/dashboard` |
 | §12 unit testing | Applies | Tests section above |
 | §15 observability | Remapped | The causal trace (SPEC §7) is the framework's observability story |
