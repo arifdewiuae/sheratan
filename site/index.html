@@ -8,6 +8,7 @@
      means recomputing it (sha256 of the exact text between the tags). -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-mrFVAYp7uUb8kgCC6UZtdrUY6X1z/dZDGpUGouOeiLE='; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
 <meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#FAFAF8">
 <title>SHERATAN</title>
 <meta name="description" content="A frontend framework with one legal way to structure an app, enforced by a checker with machine-readable fixes, plus async and live data in the core.">
 <link rel="canonical" href="https://sheratan.dev/">
@@ -80,29 +81,12 @@
     --sans: Archivo, "Helvetica Neue", Helvetica, Arial, sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ground: #000000;
-      --ink: #FAFAF8;
-      --t66: rgba(250, 250, 248, 0.70);
-      --t55: rgba(250, 250, 248, 0.58);
-      --hair: rgba(250, 250, 248, 0.20);
-      --construct: rgba(250, 250, 248, 0.30);
-      --curve: 0.30;
-    }
-  }
-  :root[data-theme="dark"] {
-    --ground: #000000;
-    --ink: #FAFAF8;
-    --t66: rgba(250, 250, 248, 0.70);
-    --t55: rgba(250, 250, 248, 0.58);
-    --hair: rgba(250, 250, 248, 0.20);
-    --construct: rgba(250, 250, 248, 0.30);
-    --curve: 0.30;
-  }
-
   * { box-sizing: border-box; }
-  html { color-scheme: light dark; }
+  /* The landing page is light only, on purpose: it is one printed page and the
+     og:image, the favicon and the wordmark are all drawn on the light ground.
+     The identity keeps both palettes and examples/hello still follows the
+     system setting — this is a decision about this page, not about the brand. */
+  html { color-scheme: light; }
   body {
     margin: 0;
     background: var(--ground);
