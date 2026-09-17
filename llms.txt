@@ -470,7 +470,7 @@ module (SHR-T001 warns when missing). End-to-end tests live in `e2e/`.
 | storing a filtered list in a signal | `computed(() => rows().filter(…))` | — |
 | `order().status` read directly in a row hole | `computed(() => order().status)` | V003 |
 | `listCustomers(): Promise<…>` without a signal | `listCustomers(opts: { signal: AbortSignal })` | L007 |
-| `items().push(x)` | `items.set([...items(), x])` | — |
+| `items().push(x)` | `items.set([...items(), x])` | L011 |
 | `watch`/`onDispose` in a view | move to effects | L004 |
 
 ## 10. Checker output
@@ -503,6 +503,7 @@ Apply the `fix`; the `message` names the allowed set.
 | SHR-L008 | circular imports between modules |
 | SHR-L009 | module stylesheet not wrapped in its `@scope` |
 | SHR-L010 | a `*.state.ts` exposes a `Signal`; only accessors and transitions leave the file |
+| SHR-L011 | mutating a value read from a signal (`items().push(x)`) instead of `.set()` |
 | SHR-V001 | inline function in a template hole (error) |
 | SHR-V002 | `unsafeHTML` with a non-literal argument (warning) |
 | SHR-V003 | signal called inside a hole (warning) |

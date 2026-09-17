@@ -25,12 +25,21 @@ to know which framework it is testing is a bug in the test.
 
 ### 1.2 Arms
 
-| Arm | Stack | "Checker clean" means |
-|---|---|---|
-| **Sheratan** | `sheratan create` scaffold, Sheratan docs in context | `sheratan check` → 0 errors |
-| **Control** | Vite + React 19 + TanStack Query v5 + Zustand, same scaffold shape | `eslint` (recommended + react-hooks) and `tsc --noEmit` → 0 errors |
+| Arm | Stack | "Checker clean" means | Gates? |
+|---|---|---|---|
+| **Sheratan** | `sheratan create` scaffold, Sheratan docs in context | `sheratan check` → 0 errors | yes |
+| **Control** | Vite + React 19 + TanStack Query v5 + Zustand, same scaffold shape | `eslint` (recommended + react-hooks) and `tsc --noEmit` → 0 errors | yes |
+| **Second control** | Vite + Svelte 5 (runes) + TanStack Query v5, same scaffold shape | `eslint` (recommended + `eslint-plugin-svelte`) and `svelte-check` → 0 errors | **no** |
 
 Pass for a task = **all hidden tests green AND checker clean**.
+
+The Svelte arm runs on the **held-out 6 tasks only** and gates nothing. React
+is the arm with the training-data advantage the claim is made against; Svelte
+is the arm that can falsify the claim that *enforcement* is what helps, rather
+than fine-grained reactivity and a strong convention. Reasoning in EVAL §2.1.
+Adding it costs a control app and agent runs, never a third suite — §1.1 is
+what makes that true, and it is why the neutrality rule there is not a style
+preference.
 
 ### 1.3 Fake backend (`evalkit`)
 

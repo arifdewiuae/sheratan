@@ -198,6 +198,7 @@ Constraints the matrix cannot express:
 | `SHR-L008` | The module import graph must be acyclic |
 | `SHR-L009` | Module and `ui/` stylesheets are wrapped in one `@scope` with a lower boundary; `global.css` holds only `tokens` and `base` (§9a) |
 | `SHR-L010` | A `*.state.ts` public surface exposes only `Accessor` values and transitions; a `Signal` never leaves the file (below) |
+| `SHR-L011` | Statically visible mutation of a value read from a signal — `items().push(x)`, `order().status = 'shipped'` (§5 Immutability, ADR 0002 layer 3) |
 
 Template rules, checked off the AST of `html` literals (§9, §13):
 

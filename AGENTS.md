@@ -77,7 +77,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 
 ## Toolchain decisions
 
-- **TypeScript 7** (native Go compiler, `typescript@7`) compiles and typechecks everything.
+- **TypeScript 7** (native Go compiler, `typescript@7`) compiles and typechecks everything. The checker (`packages/check`, Week 3) reads programs through `typescript/unstable/sync` and `typescript/unstable/ast/*` — TS 7's `.` export is a version string, not the TS 5/6 JS API. Every `unstable/*` import goes through one adapter module so a breaking change is one file's problem, and `typescript` is pinned exactly as a peer dependency. See ADR 0005.
 - **Oxlint** (`--type-aware`, via tsgolint on TS 7) is the linter, with `@stylistic` and `eslint-plugin-jsdoc` loaded as JS plugins for the two rules it has no native equivalent for. **oxfmt** formats. ESLint and typescript-eslint are gone, and with them the second TypeScript.
 - **Known compiler gap:** TS 7.0.2 applies `rewriteRelativeImportExtensions` to emitted JavaScript but not to emitted declarations. `scripts/build-prod.ts` rewrites `./x.ts` → `./x.js` in `dist/dev/*.d.ts`, and `scripts/verify-types.ts` type-checks a consumer file so a regression fails the build. Drop both when the compiler fixes it.
 - **pnpm**, for supply-chain safety. The settings live in `pnpm-workspace.yaml`; don't relax them without a TASKS decision entry:
