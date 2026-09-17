@@ -1,0 +1,5 @@
+# sheratan.dev — a static site with nothing private on it.
+User-agent: *
+Allow: /
+
+Sitemap: https://sheratan.dev/sitemap.xml
