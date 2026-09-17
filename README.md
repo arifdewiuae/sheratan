@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://arifdewiuae.github.io/sheratan/">Website</a> ·
+  <a href="https://sheratan.dev">Website</a> ·
   <a href="Docs/SPEC.md">Spec</a> ·
   <a href="Docs/guides/web-components.md">Component libraries</a> ·
   <a href="Docs/COMPARISON.md">Comparison</a> ·

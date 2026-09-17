@@ -1,10 +1,18 @@
 import { gzipSync } from 'node:zlib';
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { build } from 'esbuild';
 import { compile } from 'svelte/compiler';
 
 const root = import.meta.dirname;
-const SHERATAN = '/Users/arifdewi/Projects/Dolasoft/sheratan/packages/core/dist/prod/index.js';
+
+/**
+ * Resolved from this file, not from a machine. `Docs/comparison/` sits outside
+ * the workspace, so `sheratan` cannot be imported by name — but an absolute
+ * path that only exists on one laptop makes the README's "reproduce with
+ * comparison/" a claim nobody else can check.
+ */
+const SHERATAN = resolve(root, '../../packages/core/dist/prod/index.js');
 
 const STACKS: Record<string, string> = {
   Sheratan: `
