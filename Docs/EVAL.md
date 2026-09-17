@@ -88,8 +88,42 @@ publishable.
   [EVAL-TASKS.md](EVAL-TASKS.md) (`eval-tasks-v1`). Each has
   a hidden test suite plus `sheratan check` (or ESLint + tsc for the control).
   Pass = tests green *and* checker clean.
-- **Arms:** Sheratan vs React 19 + TanStack Query + Zustand. Same agent, same
-  model, same system prompt budget, same task text.
+- **Arms:** Sheratan vs React 19 + TanStack Query + Zustand, plus Svelte 5 on
+  the held-out set. Same agent, same model, same system prompt budget, same
+  task text.
+
+  **React is the arm the gate is written against**, and the gate does not move.
+  It has the largest training-data advantage of any stack (§2.4), so it is the
+  hardest test of the claim; an easier arm can only produce a friendlier number,
+  and a competent reader will read that as padding the win column.
+
+  **Svelte 5 runs alongside, on the held-out 6 tasks, and gates nothing.** The
+  two arms test different claims, which is the whole reason for the second one:
+
+  | Arm | The question it answers |
+  |---|---|
+  | React 19 | Do enforced boundaries beat a training-data advantage? |
+  | Svelte 5 | Is it the *enforcement*, or just fine-grained reactivity and a strong convention? |
+
+  Svelte has runes, a compiler and one idiomatic way to write a component — it
+  is the nearest neighbour to Sheratan's design, and the only mainstream stack
+  where "there is mostly one way to do this" is already half true. If Sheratan
+  beats React and ties Svelte, the honest finding is *"fine-grained plus
+  conventional is what helps; enforcement adds nothing measurable"* — and that
+  is a finding this project needs **before** launch, not after. Same reasoning
+  as the `--told` ablation on the self-repair gate: a control that can falsify
+  the mechanism is worth more than another that can only confirm it.
+
+  **Vue 3 is deliberately not an agent arm.** It sits between the two on every
+  dimension, and its Options/Composition split makes "which way is idiomatic"
+  a confound rather than a measurement. It stays in the performance benchmark
+  (§1.2) and the size comparison (`COMPARISON.md`), where it costs nothing
+  extra.
+
+  An arm is cheap here only because EVAL-TASKS §1.1 makes the hidden suites
+  framework-neutral by construction — *"a test that would need to know which
+  framework it is testing is a bug in the test."* A third arm costs a control
+  app and agent runs, never a third suite.
 - **Repetitions:** 5 seeds per task per arm. Agent runs vary enormously;
   a single run is anecdote. Report median and interquartile range.
 - **Cap:** 10 iterations per task. Failure to converge is a recorded outcome,
@@ -164,8 +198,15 @@ half ran on 2026-09-16 and is met at 60/60; the comparison half is unmeasured.
 | | ↳ self-repair: **met**, 60/60, `claude-sonnet-5`, 2026-09-16 · median iterations vs React: **not run** | |
 | Week 1 | 500-row reordering within 2× of Solid | Fix reconciliation before anything else |
 | Week 2 | Correct and leak-free first: 1000 mount/unmount cycles leave zero live subscriptions | Fix ownership before measuring anything |
-| Week 2–3 | 60fps under 1000 msg/sec, once keyed reconciliation is real | Scheduler or renderer is wrong; the headline claim dies |
+| Week 4 | 60fps under 1000 msg/sec, once keyed reconciliation is real | Scheduler or renderer is wrong; the headline claim dies |
 | Week 5 | Self-repair ≥ 80% in one turn | Ship, but lead with performance, not the AI claim |
+
+The 60fps gate sits in Week 4 because that is where its harness does (§1.2,
+TASKS Week 4). It becomes *measurable* as soon as keyed reconciliation is real,
+around Week 2–3, and measuring it early is encouraged — but a gate you have no
+instrument for is a wish, so it is not gated until there is one. Week 2's gate
+is correctness and leaks, in that order, which is what "correct, then 60fps"
+meant.
 
 ---
 

@@ -19,9 +19,9 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | Week | Focus | Status | Gate result |
 |---|---|---|---|
 | Pre-flight | Names, repo | 🟡 In progress | — |
-| 0 | Falsification | 🟡 In progress | Not reached |
+| 0 | Falsification | 🟡 In progress | Self-repair ✅ 60/60 · median iterations vs React not run |
 | 1 | Core | 🟡 In progress | No-build ✅ · reordering vs Solid not measured |
-| 2 | Async, ownership, trace | 🟡 In progress | — |
+| 2 | Async, ownership, trace | 🟡 In progress | Trace readable ✅ · leak-free not measured |
 | 3 | Checker, CLI, template | ⬜ Not started | — |
 | 4 | Agent surface, reference app | ⬜ Not started | — |
 | 5 | Re-measure, package, launch | ⬜ Not started | — |
@@ -29,7 +29,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 
 Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · ⛔ Stopped
 
-Last audited against the code on **2026-09-16**. A tick names where the work
+Last audited against the code on **2026-09-17**. A tick names where the work
 landed, so the claim can be checked without reading the diff.
 
 ---
@@ -155,7 +155,8 @@ All of the below in `packages/core/src/resource.ts`, specified by
 
 ## Week 3 — Checker, CLI, `create` template
 
-**Checker** (SPEC §4, §8) — TypeScript Compiler API, devDependency, `typescript` as peer
+**Checker** (SPEC §4, §8) — `typescript/unstable/*`, devDependency, `typescript` pinned exactly as peer (ADR 0005)
+- [ ] `[must]` One adapter module owning every `typescript/unstable/*` import — program, checker, node→range — so an unstable-API break is one file's problem (ADR 0005)
 - [ ] `[must]` Import matrix (`SHR-L001`): every cell enforced, each with a failing-case test
 - [ ] `[must]` Messages state the allowed set, not a rule number
 - [ ] `SHR-L002` I/O globals in `*.view.ts`
@@ -163,6 +164,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [ ] `SHR-L005` direct state mutation from effects (static, backstop to L010) + dev-build runtime assertion via write provenance (SPEC §13)
 - [ ] `SHR-L006` file set matches declared module kind (`view` / `full`)
 - [ ] `SHR-L008` acyclic module import graph
+- [ ] `SHR-L011` statically visible mutation of a value read from a signal — `items().push(x)`, `order().status = 'shipped'` — `fix` names the replacement write (SPEC §4, ADR 0002 layer 3)
 - [ ] `SHR-L009` style scoping over `.css`: single `@scope` with lower boundary, root matches module name, `global.css` only `tokens`/`base`, no `:root` tokens in module sheets, no `!important` outside `base` — failing-case test per violation (SPEC §9a)
 - [ ] `SHR-T001` missing state/effects tests — **warning only**
 - [ ] `SHR-L003` banned `shared/` directory; `ui/` nesting max one level
@@ -181,6 +183,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [ ] `[must]` `sheratan dev` — type stripping only, on Sheratan's own minimal server (prototyped in `examples/hello/serve.ts`) (SPEC §10c)
 - [ ] `[must]` `sheratan build` — strips types into a deployable directory of plain ESM; no bundler (SPEC §10c)
 - [ ] Logic as plain functions (`checkProject()`, `scaffoldModule()`…); CLI is a thin wrapper
+- [ ] Bun and Deno in the CI matrix alongside Node — they make `dev`/`build`'s type-stripping step a no-op, which is the case worth testing (SPEC §10c)
 
 **`create` template** (SPEC §10b)
 - [ ] `styles/global.css`: layer order `tokens, base, ui, modules`; tokens + base only, dark mode via `prefers-color-scheme` (SPEC §9a)
@@ -220,6 +223,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [ ] `bunx sheratan-eval perf` harness
 - [ ] Scenarios: ticker flood, live table, reordering list, virtualized 100k, multi-stream
 - [ ] Baselines: React 19 + TanStack Query, Vue, Svelte 5, Solid — 5 runs, median + spread
+- [ ] Week 1's Solid baseline as one scenario in `Docs/comparison/`: 500 rows, 20 swaps per frame, p95 frame time, 5 runs (defined in Spec gaps)
 
 **Docs**
 - [ ] Getting started page
@@ -237,6 +241,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [ ] Re-run Week 0 agent eval unchanged on the real runtime — same tasks, same budget
 - [ ] Commit raw logs of every run
 - [ ] `sheratan-eval agent --arm react` reproducible by a stranger
+- [ ] `--arm svelte` on the held-out 6 tasks, reported beside React and gating nothing (EVAL §2.1)
 - [ ] Size: `core` < 10 KB gzipped, 0 runtime deps, 1 package in user `package.json` (EVAL §1.3)
 - [ ] Video: app served as plain files with empty `node_modules`
 
@@ -244,6 +249,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [ ] README: results table (model + date), training-data confound, "no bundler, no config — type stripping only", SSR is a no, `typescript` peer dep
 - [ ] MIT license
 - [ ] CI
+- [ ] **Make the repository public — before the publish below.** Dependency review in CI switches itself on at that point; publishing first means the first release is the one nobody could review
 - [ ] Publish to npm
 
 **Launch**
@@ -262,6 +268,11 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [ ] `[gate]` At least one person outside your circle built a real project on Sheratan and wrote about it themselves (not stars, not likes)
       → otherwise archive the repo, keep the eval data and talk as the artifact
 
+**Devtools** (SPEC §7, dev builds only — decided post-launch 2026-09-17)
+- [ ] Chrome custom formatter so a signal prints as its value, not `ƒ read()`
+- [ ] Performance-panel track for drains and frame flushes
+- [ ] Debug names from the trace's write provenance
+
 ---
 
 ## Not in MVP — do not start, even if it looks easy
@@ -278,11 +289,11 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [x] **`stream()` priority.** Cut list marks it "if time", but SPEC §12 DoD, the canonical module (§10b) and the dashboard all require it. Resolved: built in Week 2 rather than deferred — `packages/core/src/stream.ts`, 446 B brotli.
 - [x] **Windowed `each` priority.** Marked stretch, but DoD requires a 500-row *virtualized* table and the canonical module needs `each` with a window. Resolved: built in Week 2 rather than deferred — `each(list, row, window)` in `packages/core/src/each.ts`, SPEC §9 amended to the shipped signature, ADR 0003 for the recycling trade-off.
 - [x] **Causal trace priority.** Marked stretch, but DoD says "causal trace renders for the reference app" and Week 2 gate says "trace readable". Resolved: built in Week 2 rather than deferred — `packages/core/src/trace.ts`, SPEC §7 amended to the shipped shape.
-- [ ] **Unscheduled must-items.** Widget mode and routing have no week in PLAN — tentatively placed in Week 1 and Week 4 here.
-- [ ] **Solid baseline for Week 1 gate.** "Within 2× of Solid" needs a Solid implementation, while Krausest is deferred — define the minimal comparison.
+- [x] **Unscheduled must-items.** Widget mode and routing have no week in PLAN — tentatively placed in Week 1 and Week 4 here. Resolved 2026-09-17: the tentative placement stands as the decision. Widget mode is Week 1 and its `[must]` item is already done (`render()` owns only its subtree); routing is Week 4, after the checker, because `navigate()` is an effects-only API (`SHR-L004`) and wants the rule that enforces it to exist first.
+- [x] **Solid baseline for Week 1 gate.** "Within 2× of Solid" needs a Solid implementation, while Krausest is deferred — define the minimal comparison. Resolved 2026-09-17: **one scenario, in `Docs/comparison/`** — 500 rows, 20 swaps per frame, p95 frame time over 5 runs, median and spread, same machine and same feed. That directory already installs Solid and already bundles every stack through one esbuild call, and it is outside the workspace so it cannot become a dependency. No Krausest harness, no second app: the gate asks one question and this answers exactly it.
 - [x] **`resource()` placement rule.** SPEC §6 says construction outside effects is enforced by L005, but L005 is about state mutation — needs its own code or rewording. Resolved: `SHR-L004`, effects-only APIs.
 - [x] **`onDispose()` placement.** SPEC §5b says effects-only; no rule code enforces it. Resolved: `SHR-L004`.
-- [ ] **Week 2 gate wording.** PLAN's cut-list note refers to "Week 2 gate: correct, then 60fps"; EVAL puts 60fps at Week 2–3 — pick one.
+- [x] **Week 2 gate wording.** PLAN's cut-list note refers to "Week 2 gate: correct, then 60fps"; EVAL puts 60fps at Week 2–3 — pick one. Resolved 2026-09-17: Week 2's gate is correctness and leaks, in that order — which is what "correct, then 60fps" meant. The 60fps gate moves to **Week 4 in EVAL's table too**, matching where TASKS already had it, because that is where its harness is (EVAL §1.2). It becomes *measurable* around Week 2–3 once keyed reconciliation is real, and measuring early is encouraged; a gate with no instrument is a wish, so it is not gated until there is one.
 - [x] **Intent payload inside `each` rows.** SPEC §9 bans inline arrows in holes and says intents get a typed payload, not the raw `Event`, but doesn't say how a row button tells `intent.ship` *which* order. Blocks T04. Week 0 runtime passes form-derived payloads only (submit → form entries, input/change → value or `checked`, else `undefined`). Resolved in SPEC §9: a handler inside a row receives the innermost row's current item as a second argument.
 - [x] **Row reactivity in `each`.** SPEC §9 says rows are not rebuilt when a cell changes, but a row receives a plain item. Week 0 runtime re-renders a row when its item object changes identity at the same key; fine-grained cells need a per-row accessor design before the 500-row benchmark. Resolved in SPEC §9: the row function runs once per key and receives an item accessor; cells are computeds in the row.
 - [x] **`each` key.** Unspecified. Week 0 runtime keys objects by `id` (throws without one) and primitives by value. Resolved: `id` for objects, value for primitives, no key option.
@@ -291,11 +302,11 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [ ] **Recognising a transition at run time.** With plain-function transitions (SPEC §4) nothing marks a function as a transition, so §5b rule 1 ("a transition from a dead owner does nothing") and the §13 `SHR-L005` dev assertion have no mechanism. Options: call-site provenance from the trace, or accept that late writes reach no watchers and drop the rule. Narrowed by `SHR-L010` (2026-09-17), not closed: the surface rule guarantees a write goes *through* a transition, never *when* it is called, so this and "Runtime enforcement of post-disposal no-ops" below are still the same open question.
 - [ ] **Effects tests need a scope.** `onDispose()` requires an owner, and the only public way to open one is `render()`, so `examples/hello` borrows a scope from an empty mount to unit-test effects. SPEC §4 promises `*.effects.test.ts` as a normal thing to write. Decide: export `root()`, ship a `sheratan/testing` entry, or state that effects are tested through a mount.
 - [ ] **Runtime enforcement of post-disposal no-ops.** Related: the effects layer currently checks `signal.aborted` by hand before committing a transition (SPEC §5b rule 1). If transitions become recognisable at run time, the runtime should do this.
-- [ ] **Framework comparison benchmark.** EVAL §1.2 is the high-frequency differentiator, and the dashboard in `examples/hello` is now the workload. Build the same app in React, Vue and Svelte, measure frames dropped and values applied per second at matched update rates on one machine, and publish the method with the numbers (EVAL §2.5). Blocked on nothing; do it before the Week-1 "within 2× of Solid" gate is claimed either way.
-- [ ] **Bun and Deno in the test matrix.** Both run TypeScript natively, which removes the type-stripping step entirely (SPEC §10c), and both are plausible hosts for the runtime. Add them to CI alongside Node once the CLI exists, and include them in the comparison numbers.
-- [ ] **Devtools surface.** Dev-build-only additions that belong with the causal trace (SPEC §7), not before it: a Chrome custom formatter so a signal prints as its value rather than `ƒ read()`, a Performance-panel track for drains and frame flushes, and debug names from the trace's write provenance. Decide the shape when §7 is built.
-- [ ] **Public repository before v1.0.0.** Dependency review in CI switches itself on when the repository stops being private; the release checklist has to include making it public (or buying Advanced Security).
-- [ ] **Checker on TypeScript 7.** SPEC §8 builds `packages/check` on the TypeScript compiler API. TS 7 (native) exposes only an unstable IPC API (`typescript/unstable/*`), not the TS 5/6 JS API. Decide before Week 3: pin the checker to TS 6's API, target TS 7's API, or parse with a standalone parser.
+- [ ] **Framework comparison benchmark.** EVAL §1.2 is the high-frequency differentiator, and the dashboard in `examples/hello` is now the workload. Build the same app in React, Vue and Svelte, measure frames dropped and values applied per second at matched update rates on one machine, and publish the method with the numbers (EVAL §2.5). Blocked on nothing; do it before the Week-1 "within 2× of Solid" gate is claimed either way. **Scope settled 2026-09-17, build still open:** three axes, not one. Size and capability is **done** for six stacks (`Docs/COMPARISON.md`). Performance keeps its four baselines — React, Vue, Svelte 5, Solid (EVAL §1.2). Agent authoring runs **React as the gating arm and Svelte 5 held-out and non-gating**, with Vue deliberately excluded — reasoning in EVAL §2.1, arms table in EVAL-TASKS §1.2.
+- [x] **Bun and Deno in the test matrix.** Both run TypeScript natively, which removes the type-stripping step entirely (SPEC §10c), and both are plausible hosts for the runtime. Add them to CI alongside Node once the CLI exists, and include them in the comparison numbers. Resolved 2026-09-17: **Week 3, with the CLI, not before.** Today they would run `node:test` over the same source and prove nothing the Node job does not. The claim they actually test is `sheratan dev`/`build`'s "type stripping only" (SPEC §10c) — on a native-TypeScript host that step is a no-op, which is the interesting case.
+- [x] **Devtools surface.** Dev-build-only additions that belong with the causal trace (SPEC §7), not before it: a Chrome custom formatter so a signal prints as its value rather than `ƒ read()`, a Performance-panel track for drains and frame flushes, and debug names from the trace's write provenance. Decide the shape when §7 is built. Resolved 2026-09-17, now that §7 is built: **all three are post-launch, none are MVP.** SPEC §12's definition of done does not ask for them, and the MVP surface is what shipped — `__sheratan.trace()` as JSON and `__sheratan.format()` as an indented tree, which the Week 2 gate already passed by eye. A browser-specific formatter is also the one piece that cannot be tested in happy-dom, so it would arrive with no coverage against a 100% gate.
+- [x] **Public repository before v1.0.0.** Dependency review in CI switches itself on when the repository stops being private; the release checklist has to include making it public (or buying Advanced Security). Resolved 2026-09-17: on the Week 5 **Package** checklist, ordered *before* the npm publish — going public after publishing means the first release is the one nobody could review. Advanced Security is not bought; the repo goes public, which is the plan either way.
+- [x] **Checker on TypeScript 7.** SPEC §8 builds `packages/check` on the TypeScript compiler API. TS 7 (native) exposes only an unstable IPC API (`typescript/unstable/*`), not the TS 5/6 JS API. Decide before Week 3: pin the checker to TS 6's API, target TS 7's API, or parse with a standalone parser. Resolved 2026-09-17 by **ADR 0005 — target `typescript/unstable/*`**, measured rather than argued: a probe implementing `SHR-L010` against `packages/eval` (772 files) found all 4 state surfaces, reported 0 violations clean and 1 at `notifications.state.ts:7:3` after one field was widened, in 56 ms to open the program plus 7 ms to walk it. TS 6 is rejected because it comes back only as a second TypeScript; a standalone parser is rejected because `SHR-L010` and `SHR-L007` need types, and without them the checker falls back to the naming conventions the Week 0 eval showed already carry `L001` and `L002` unaided.
 - [ ] **One prod build cannot be right for both a small import and a whole app.** Measured (gzip, esbuild + minify, 2026-09-16), bundling the same scenario from the flattened `dist/prod/index.js` against the module-preserved `dist/dev`:
 
   | scenario | from `dist/prod` (flat) | from `dist/dev` (modules) |
@@ -309,7 +320,7 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
   The flat bundle minifies across module boundaries, so it wins for a real app by about 10%; it cannot be shaken finely, so it loses by 6× for a small import. The crossover sits between "widget" and "widget with lists" — roughly, anything that renders pays the whole runtime either way. So the earlier reading ("something in the template modules is not shakeable") was wrong: nothing is broken, the two builds simply trade off, and today's `exports` map offers only the one that suits whole apps. Decide: ship a third module-preserved prod condition for consumers who import a subset, or accept it and keep one number for the whole runtime instead of five scenarios that mostly restate it.
 - [ ] **How a module stylesheet is loaded is unspecified.** SPEC §9a says `global.css` is "linked from `index.html`" and that `ui` and `modules` "are filled by the scoped component and module sheets", but never says how those sheets arrive. `examples/hello` now links each one by hand (`<link href="/modules/dashboard/dashboard.css">`), which works with no build step and is honest, but it names every module twice — once where it is wired and once in the HTML — and a module added without its link fails silently. Options: CSS module scripts attached with `adoptedStyleSheets` (already an open Week 1 item), `sheratan build` collecting module sheets into one file, or `@import` from `global.css` and accepting the extra round trip. Decide before `sheratan create` writes the wrapper.
 - [ ] **The example's page furniture is not the dashboard.** `dashboard.view.ts` also holds the lockup, the pitch and the "where to go next" guide, which are not functions of dashboard state. They pass the letter of SPEC §4 — stateless and used once, so they belong inside the module rather than in `ui/` — but they are a second feature sharing one view file. The fix is a second module composed with `mount()` (SPEC §9 "Composing modules"), which is not built. Do it when `mount()` lands; the example is also the only place `ui/` would get demonstrated.
-- [ ] **Immutability rule code.** The checker rule for statically visible mutation of a signal's value (TASKS decision 2026-09-15) needs a code and a row in SPEC §4's table. Next free code is `SHR-L011`; `L010` went to the state surface rule on 2026-09-17.
+- [x] **Immutability rule code.** The checker rule for statically visible mutation of a signal's value (TASKS decision 2026-09-15) needs a code and a row in SPEC §4's table. Resolved 2026-09-17: **`SHR-L011`**, row added to SPEC §4 and to `llms.txt`; ADR 0002's layer 3 now names it instead of pointing back here. Next free code is `SHR-L012`.
 - [x] **CSS scoping.** SPEC said `adoptedStyleSheets` on the component root, which is global on `document`. Resolved in SPEC §9a: native `@scope` + `@layer`, enforced by `SHR-L009`.
 
 ---
@@ -340,6 +351,11 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-16 | Layer boundaries enforced by lint (`no-restricted-imports` / `no-restricted-globals`, keyed by filename) until `SHR-L001` exists | The rules are the checker's, written early; a boundary nobody checks is a convention, and SPEC §3 A2 asks for early failure |
 | 2026-09-16 | `SHR-R008`: an array in a hole is an error, not `[object Object]` | Found while writing the example's filter control. `each()` is the one way to render many (A1), so the other way must fail loudly |
 | 2026-09-17 | `SHR-L010`: a `*.state.ts` public surface exposes only `Accessor` values and transitions; the `Signal` handles stay in the file (SPEC §4, §13). `SHR-L005` is kept as the best-effort backstop | Week 0 eval: the L005 violation could not be injected until the state interface was widened `Accessor` → `Signal`, and one repair removed the write while leaving the widening behind. L010 is one declaration per field instead of a dataflow check per call site, makes the write a type error (A2), and covers the view and `index.ts` too — no runtime change, no new API |
+| 2026-09-17 | The checker targets `typescript/unstable/*`, not a second TypeScript and not a standalone parser (ADR 0005) | Measured, not argued: a probe implementing `SHR-L010` over 772 files found all 4 state surfaces and reported the injected one at `notifications.state.ts:7:3`, in 56 ms + 7 ms. TS 6 returns only as a second compiler — two versions of the truth about one codebase; a syntax-only parser cannot tell `Accessor<string>` from `Signal<string>`, which is most of the rule set |
+| 2026-09-17 | `SHR-L011` assigned to statically visible mutation of a signal's value (SPEC §4, ADR 0002 layer 3) | The rule had been specified since 2026-09-15 with no code, so it could not be reported, documented or tested. Next free code is `SHR-L012` |
+| 2026-09-17 | Agent-authoring eval gains Svelte 5 as a held-out, non-gating second control; React stays the gating arm; Vue stays out (EVAL §2.1) | React and Svelte answer different questions. React tests "do enforced boundaries beat a training-data advantage"; Svelte — runes, a compiler, one idiomatic shape — tests whether it is the *enforcement* at all or just fine-grained reactivity plus convention. A tie with Svelte is a finding needed before launch. Vue adds an Options/Composition confound and no new question. Cheap because EVAL-TASKS §1.1 keeps the hidden suites framework-neutral |
+| 2026-09-17 | The 60fps gate is Week 4 in EVAL too, not Week 2–3; Week 2's gate is correctness and leaks | It is gated where its harness is (EVAL §1.2). Measurable earlier, and measuring early is encouraged — but a gate with no instrument is a wish |
+| 2026-09-17 | Devtools (Chrome formatter, Performance track, debug names) are post-launch, not MVP | SPEC §12's DoD does not ask for them, `__sheratan.trace()`/`format()` is the shipped surface, and a browser-only formatter cannot be covered in happy-dom against a 100% gate |
 | 2026-09-16 | Effects skip their transition when the mount is already disposed | SPEC §5b rule 1 asks for post-disposal no-ops and the runtime cannot see a late response yet; the example shows the pattern, and a test pins it |
 | 2026-09-16 | `pnpm audit signatures` moved out of the PR gate to the daily run (ADR 0001); advisories still block every PR | Signature verification needs a packument per lockfile entry, including platforms we never install, and fails a few per run for reasons unrelated to the change |
 | 2026-09-16 | Editor support is workspace recommendations (lit-html for `html` templates, oxc for lint and format), not an extension of our own | A Sheratan extension is worth writing when the checker can feed it real diagnostics (Week 3); before that it would only re-highlight what lit-html already does |

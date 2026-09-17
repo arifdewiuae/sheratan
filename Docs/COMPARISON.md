@@ -62,11 +62,18 @@ the five frameworks above is designed for that reader.
 | `--json` on every CLI command | Specified (SPEC §10) | Partial at best |
 | One package decision instead of five | Yes | State, data, virtualization, routing and forms are all open choices |
 
-**What of that is built today: `llms.txt`, and the lint rules standing in for the
-checker.** The checker, the CLI, the trace and `SKILL.md` are specified and
-unwritten. And the claim that any of it makes an agent measurably better is
-**unproven** — that is exactly what [EVAL](EVAL.md)'s Week 0 gate exists to
-test, and it has not been run. This section describes a design, not a result.
+**What of that is built today: `llms.txt`, the causal trace, and the lint rules
+standing in for the checker.** The checker, the CLI and `SKILL.md` are specified
+and unwritten.
+
+The claim that any of it makes an agent measurably better is **half tested.**
+[EVAL](EVAL.md)'s Week 0 gate has two conditions, and only one has been run:
+structured boundary errors produce a correct one-turn repair 60/60 times
+against a threshold of 80% ([EVAL-RESULTS](EVAL-RESULTS.md), `claude-sonnet-5`,
+2026-09-16). What has **not** been run is the half this table is about — whether
+any of it beats the stacks above, which needs a control arm that does not exist
+yet. Nothing here is a comparative result, and the self-repair number is not
+one either: it has no control framework in it.
 
 ## What Sheratan does not have
 

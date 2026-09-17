@@ -20,8 +20,8 @@ Three layers, cheapest first:
    that are already frozen, so with structural sharing the cost is bounded by
    the nodes the caller just allocated — which they paid for anyway. It stays
    on in production.
-3. **Check time.** Mutation visible on the AST becomes a checker error with a
-   `fix` (code to be assigned; TASKS "Spec gaps").
+3. **Check time.** Mutation visible on the AST becomes `SHR-L011` (SPEC §4)
+   with a `fix` naming the replacement write — `items.set([...items(), x])`.
 
 Values that break when frozen are left alone: DOM nodes, `Date`, `Map`, `Set`
 and class instances.
