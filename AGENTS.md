@@ -75,6 +75,30 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 - A PR is mergeable when CI is green and the description states what changed, why, and how it was verified.
 - Commit subjects are imperative and scoped, as in the existing history ("Core: …", "Spec: …").
 
+## Releases
+
+`packages/core` publishes as `sheratan`. Nothing publishes from a laptop except
+the first `0.0.1`, which had to exist before npm would let trusted publishing be
+configured against it.
+
+1. Bump `packages/core/package.json`, land it through a PR like anything else.
+2. Tag `main` with `v<version>` — the tag must match the manifest, and
+   `.github/workflows/release.yml` fails the run if it doesn't.
+3. Approve the `npm` environment in the Actions run. That approval is the one
+   manual gate on a publish.
+
+The workflow authenticates with **npm trusted publishing (OIDC)**: no
+`NPM_TOKEN`, no `.npmrc` credentials, nothing to leak. pnpm exchanges the
+`id-token: write` identity for a publish credential that expires in minutes,
+and attaches a provenance attestation automatically — never pass
+`--provenance`, and never add `publishConfig.provenance`, which breaks a local
+publish outside CI.
+
+npm matches its trusted-publisher configuration on repository, **workflow
+filename** and **environment name**. Renaming `release.yml` or the `npm`
+environment breaks publishing until the configuration on npmjs.com is updated
+to match.
+
 ## Toolchain decisions
 
 - **TypeScript 7** (native Go compiler, `typescript@7`) compiles and typechecks everything. The checker (`packages/check`, Week 3) reads programs through `typescript/unstable/sync` and `typescript/unstable/ast/*` — TS 7's `.` export is a version string, not the TS 5/6 JS API. Every `unstable/*` import goes through one adapter module so a breaking change is one file's problem, and `typescript` is pinned exactly as a peer dependency. See ADR 0005.
