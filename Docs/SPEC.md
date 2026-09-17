@@ -2,8 +2,10 @@
 
 > Name: β Arietis — Arabic aš-šaraṭān, "the two signs"; with Mesarthim it
 > marked the vernal equinox, the reference point of the year. Free on npm as of
-> 2026-09-14. Still to verify: the GitHub org handle and `sheratan.dev`, which
-> goes into checker error links and cannot be changed later.
+> 2026-09-14, still free on 2026-09-17. **`sheratan.dev` is registered
+> (2026-09-17)** — it goes into checker error links and cannot be changed later,
+> so it is now a fixed constraint rather than an assumption. Still to verify:
+> the GitHub org handle.
 > Error codes use the `SHR-` prefix.
 > This document is the source of truth for implementation. If code and spec
 > disagree, the spec wins or the spec gets amended — never silently diverge.
