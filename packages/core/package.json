@@ -1,7 +1,26 @@
 {
   "name": "sheratan",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Architectural boundaries, enforced. Signals, templates and async in the core.",
+  "keywords": [
+    "framework",
+    "signals",
+    "reactive",
+    "frontend",
+    "no-build",
+    "agent",
+    "architecture"
+  ],
+  "author": "Arif Dewi",
+  "homepage": "https://github.com/arifdewiuae/sheratan#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arifdewiuae/sheratan.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/arifdewiuae/sheratan/issues"
+  },
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -16,6 +35,9 @@
     "src"
   ],
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=24.15.0"
   },

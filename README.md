@@ -25,9 +25,9 @@
 
 ---
 
-> **Pre-release.** Nothing is published to npm yet. This repository holds the
-> specification, the evaluation plan, the website and the core runtime while the
-> MVP is built.
+> **Pre-release.** `sheratan@0.0.1` on npm is a name reservation, not usable
+> software — don't build on it. This repository holds the specification, the
+> evaluation plan, the website and the core runtime while the MVP is built.
 
 [![CI](https://github.com/arifdewiuae/sheratan/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/arifdewiuae/sheratan/actions/workflows/ci.yml)
 
