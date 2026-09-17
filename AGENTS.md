@@ -84,8 +84,10 @@ configured against it.
 1. Bump `packages/core/package.json`, land it through a PR like anything else.
 2. Tag `main` with `v<version>` — the tag must match the manifest, and
    `.github/workflows/release.yml` fails the run if it doesn't.
-3. Approve the `npm` environment in the Actions run. That approval is the one
-   manual gate on a publish.
+3. Watch the run. **Pushing the tag is the gate** — there is no approval step,
+   so a tag push publishes. The workflow refuses a tag that is not on `main`
+   and a tag that disagrees with the manifest, and runs `pnpm check` before it
+   publishes, but nothing asks a human twice.
 
 The workflow authenticates with **npm trusted publishing (OIDC)**: no
 `NPM_TOKEN`, no `.npmrc` credentials, nothing to leak. pnpm exchanges the
@@ -94,10 +96,16 @@ and attaches a provenance attestation automatically — never pass
 `--provenance`, and never add `publishConfig.provenance`, which breaks a local
 publish outside CI.
 
-npm matches its trusted-publisher configuration on repository, **workflow
-filename** and **environment name**. Renaming `release.yml` or the `npm`
-environment breaks publishing until the configuration on npmjs.com is updated
-to match.
+npm matches its trusted-publisher configuration on repository and **workflow
+filename**. Renaming `release.yml` breaks publishing until the configuration on
+npmjs.com is updated to match.
+
+npm's **environment** field is deliberately blank, and the job has no
+`environment:` to match it. A GitHub environment would buy a required-reviewer
+prompt before each publish; for a single maintainer who pushes the tag anyway,
+it is a second click rather than a second pair of eyes. Fill that field in and
+the job needs the matching `environment:` back, or the OIDC exchange fails with
+a mismatch that does not name the cause.
 
 ## Toolchain decisions
 

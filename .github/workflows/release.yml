@@ -6,9 +6,11 @@
 # attached automatically as a side effect — the `--provenance` flag is not
 # needed and is deliberately absent.
 #
-# npm matches its trusted-publisher configuration on repository, workflow
-# filename and environment, so renaming this file or the `npm` environment
-# breaks publishing until the configuration on npmjs.com is updated to match.
+# npm matches its trusted-publisher configuration on repository and workflow
+# filename, so renaming this file breaks publishing until the configuration on
+# npmjs.com is updated to match. The environment field there is deliberately
+# left blank; if it is ever filled in, this job needs a matching `environment:`
+# or the OIDC exchange fails.
 name: Release
 
 on:
@@ -30,13 +32,12 @@ jobs:
       contents: read
       # The whole point: a short-lived OIDC token instead of a stored secret.
       id-token: write
-    environment:
-      name: npm
-      url: https://www.npmjs.com/package/sheratan
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Ancestry against main is checked below, which needs real history.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
@@ -59,6 +60,20 @@ jobs:
             exit 1
           fi
           echo "publishing sheratan@$packaged"
+
+      # Pushing the tag is now the only human decision in a release, so it has
+      # to be the right commit: AGENTS.md says releases are tagged on `main`,
+      # and a tag on a feature branch would otherwise publish from it.
+      - name: Tag is on main
+        run: |
+          # FETCH_HEAD, not origin/main: checkout narrows the refspec, so the
+          # remote-tracking ref is not guaranteed to exist. Anonymous fetch is
+          # fine while the repo is public, which is why no token is needed.
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "::error::$GITHUB_REF_NAME is not on main; releases are tagged on main"
+            exit 1
+          fi
 
       # Everything CI runs, in CI order. A release is not the place to find out
       # the tree is red.
