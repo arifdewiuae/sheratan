@@ -1,0 +1,60 @@
+{
+  "name": "sheratan",
+  "version": "0.0.1",
+  "description": "Architectural boundaries, enforced. Signals, templates and async in the core.",
+  "keywords": [
+    "framework",
+    "signals",
+    "reactive",
+    "frontend",
+    "no-build",
+    "agent",
+    "architecture"
+  ],
+  "author": "Arif Dewi",
+  "homepage": "https://github.com/arifdewiuae/sheratan#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arifdewiuae/sheratan.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/arifdewiuae/sheratan/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/dev/index.d.ts",
+      "development": "./dist/dev/index.js",
+      "default": "./dist/prod/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/build-prod.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 \"test/**/*.test.ts\"",
+    "verify": "node scripts/verify-types.ts && publint --strict && attw --pack . --profile esm-only && node scripts/size.ts && node scripts/llms.ts --check",
+    "llms": "node scripts/llms.ts"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@types/node": "24.13.4",
+    "esbuild": "0.28.2",
+    "happy-dom": "20.14.5",
+    "publint": "0.3.24",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,55 @@
+===== modules/customers/customers.effects.ts
+// Effects: the only impure file (SPEC §4). It calls the contract and then
+// invokes one transition; it never decides what the data means.
+
+import { onDispose } from 'sheratan';
+
+import type { Api } from '../../services/api.contract.ts';
+import type { NotificationsEffects } from '../notifications/index.ts';
+import type { CustomersState } from './customers.state.ts';
+
+/** What this module can do. The view declares the same shape for itself. */
+export interface CustomersEffects {
+  load(this: void): void;
+  retry(this: void): void;
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : 'unknown error';
+}
+
+/** Wires the state to the API, and gives the mount its teardown. */
+export function createCustomersEffects(
+  api: Api,
+  state: CustomersState,
+  notifications: NotificationsEffects,
+): CustomersEffects {
+  const controller = new AbortController();
+
+  onDispose(() => {
+    controller.abort();
+  });
+
+  const run = async (): Promise<void> => {
+    state.started();
+
+    try {
+      const rows = await api.customers(controller.signal);
+
+      if (!controller.signal.aborted) state.loaded(rows);
+    } catch (error: unknown) {
+      if (controller.signal.aborted) return;
+
+      const message = messageOf(error);
+
+      state.failed(message);
+      notifications.raise(message);
+    }
+  };
+
+  const load = (): void => {
+    void run();
+  };
+
+  return { load, retry: load };
+}

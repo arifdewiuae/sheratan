@@ -1,0 +1,31 @@
+version: 2
+
+updates:
+  # Keeps the SHA pins in .github/workflows current; the `# vX.Y.Z` comments
+  # are updated alongside.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Mirrors minimumReleaseAge in pnpm-workspace.yaml: no version younger than
+  # three days is proposed.
+  - package-ecosystem: npm
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    versioning-strategy: increase
+    groups:
+      lint:
+        patterns: ["eslint", "@eslint/*", "@stylistic/*", "eslint-plugin-*", "typescript-eslint"]
+      types:
+        patterns: ["typescript", "@types/*"]

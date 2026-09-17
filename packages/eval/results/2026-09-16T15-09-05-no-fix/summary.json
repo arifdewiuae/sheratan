@@ -1,0 +1,16 @@
+{
+  "when": "2026-09-16T15-09-05",
+  "model": "claude-sonnet-5",
+  "told": "no-fix",
+  "cases": 12,
+  "seeds": 3,
+  "total": 36,
+  "passed": 36,
+  "rate": 1,
+  "gate": 0.8,
+  "met": true,
+  "costUSD": 3.7624080000000006,
+  "repairedButBroke": 0,
+  "brokeNothingFixedNothing": 0,
+  "introducedACycle": 0
+}

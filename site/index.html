@@ -3,7 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>sheratan</title>
+<!-- GitHub Pages can't send headers, so the policy is a meta tag. The script hash
+     covers the one inline <script> at the end of <body>: editing that script
+     means recomputing it (sha256 of the exact text between the tags). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-mrFVAYp7uUb8kgCC6UZtdrUY6X1z/dZDGpUGouOeiLE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>SHERATAN</title>
 <meta name="description" content="A frontend framework with one legal way to structure an app, enforced by a checker with machine-readable fixes, plus async and live data in the core.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%23FAFAF8'/%3E%3Cg fill='%23000'%3E%3Crect x='2' y='12' width='1' height='1'/%3E%3Crect x='7' y='8' width='1' height='1'/%3E%3Crect x='6' y='9' width='3' height='1'/%3E%3Crect x='7' y='10' width='1' height='1'/%3E%3Crect x='12' y='3' width='2' height='2'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,7 +21,6 @@
     --ink: #000000;
     --t66: rgba(0, 0, 0, 0.66);
     --t55: rgba(0, 0, 0, 0.55);
-    --t45: rgba(0, 0, 0, 0.45);
     --hair: rgba(0, 0, 0, 0.12);
     --construct: rgba(0, 0, 0, 0.30);
     --curve: 0.12;
@@ -29,7 +33,6 @@
       --ink: #FAFAF8;
       --t66: rgba(250, 250, 248, 0.70);
       --t55: rgba(250, 250, 248, 0.58);
-      --t45: rgba(250, 250, 248, 0.48);
       --hair: rgba(250, 250, 248, 0.20);
       --construct: rgba(250, 250, 248, 0.30);
       --curve: 0.30;
@@ -40,7 +43,6 @@
     --ink: #FAFAF8;
     --t66: rgba(250, 250, 248, 0.70);
     --t55: rgba(250, 250, 248, 0.58);
-    --t45: rgba(250, 250, 248, 0.48);
     --hair: rgba(250, 250, 248, 0.20);
     --construct: rgba(250, 250, 248, 0.30);
     --curve: 0.30;
@@ -63,7 +65,7 @@
 
   .label {
     font-size: 10px; font-weight: 400; line-height: 1.4;
-    letter-spacing: 0.34em; text-transform: uppercase; color: var(--t45);
+    letter-spacing: 0.34em; text-transform: uppercase; color: var(--t55);
   }
   .wordmark { font-weight: 400; letter-spacing: 0.4em; text-indent: 0.4em; text-transform: lowercase; line-height: 1; }
   .mark { display: block; overflow: visible; flex: none; color: var(--ink); }
@@ -76,7 +78,7 @@
   .links { display: flex; gap: 28px; flex-wrap: wrap; align-items: baseline; }
   .links a, .links .soon { font-size: 11px; font-weight: 400; letter-spacing: 0.24em; text-transform: uppercase; }
   .links a:hover { color: var(--t55); }
-  .soon { color: var(--t45); cursor: default; }
+  .soon { color: var(--t55); cursor: default; }
   .soon::after { content: " · soon"; letter-spacing: 0.1em; text-transform: none; font-weight: 300; }
 
   /* ---------- hero ---------- */
@@ -117,7 +119,7 @@
   .btn.line:hover { background: var(--ink); color: var(--ground); }
   .btn.soon { border-color: var(--hair); padding: 15px 22px; }
   .install { font: 400 13px var(--mono); color: var(--t55); }
-  .install span { color: var(--t45); }
+  .install span { color: var(--t55); }
 
   .hero-mark { display: flex; justify-content: center; align-items: center; }
   .hero-mark svg { width: min(100%, 400px); height: auto; overflow: visible; color: var(--ink); }
@@ -125,7 +127,7 @@
   .hero-mark .frame { stroke: var(--hair); }
   .hero-mark .far { stroke: var(--hair); }
   .hero-mark .curve { stroke-opacity: var(--curve); }
-  .hero-mark text { font: 400 2.1px var(--sans); letter-spacing: 0.3em; fill: var(--t45); }
+  .hero-mark text { font: 400 2.1px var(--sans); letter-spacing: 0.3em; fill: var(--t55); }
 
   @media (prefers-reduced-motion: no-preference) {
     /* Construction first, then the curve, then the points in order of magnitude: γ, α, β. */
@@ -173,18 +175,18 @@
     margin: 0; padding: 22px 24px; border: 1px solid var(--hair);
     font-size: 13px; line-height: 1.75; overflow-x: auto; color: var(--ink); max-width: 100%;
   }
-  pre.code .dim { color: var(--t45); }
+  pre.code .dim { color: var(--t55); }
   .caption { font-size: 12px; line-height: 1.8; color: var(--t55); margin: 12px 0 0; max-width: 60ch; }
 
   /* matrix */
   .matrix-wrap { overflow-x: auto; }
   table.matrix { width: 100%; min-width: 440px; border-collapse: collapse; font-size: 13px; }
   .matrix th, .matrix td { border-bottom: 1px solid var(--hair); padding: 11px 6px; text-align: center; }
-  .matrix thead th { font-size: 9.5px; font-weight: 400; letter-spacing: 0.2em; text-transform: uppercase; color: var(--t45); vertical-align: bottom; }
+  .matrix thead th { font-size: 9.5px; font-weight: 400; letter-spacing: 0.2em; text-transform: uppercase; color: var(--t55); vertical-align: bottom; }
   .matrix tbody th { text-align: left; font: 400 12.5px var(--mono); padding-left: 0; white-space: nowrap; }
   .matrix td.y { font-weight: 500; }
-  .matrix td.n { color: var(--t45); }
-  .matrix td small { display: block; font-size: 9.5px; color: var(--t45); letter-spacing: 0.04em; font-weight: 300; }
+  .matrix td.n { color: var(--t55); }
+  .matrix td small { display: block; font-size: 9.5px; color: var(--t55); letter-spacing: 0.04em; font-weight: 300; }
 
   /* module tree */
   .tree { border: 1px solid var(--hair); }
@@ -192,9 +194,9 @@
   .tree .row:first-child { border-top: 0; }
   .tree code { font-size: 13px; }
   .tree span { font-size: 14px; color: var(--t55); }
-  .tree .dir { color: var(--t45); }
-  .tree .row.test code { color: var(--t45); }
-  .tree .row.test span { color: var(--t45); }
+  .tree .dir { color: var(--t55); }
+  .tree .row.test code { color: var(--t55); }
+  .tree .row.test span { color: var(--t55); }
   @media (max-width: 520px) { .tree .row { grid-template-columns: 1fr; gap: 2px; } }
   .flow svg { width: 100%; height: auto; display: block; color: var(--ink); }
   .flow text { font: 400 11px var(--mono); fill: currentColor; }
@@ -214,11 +216,12 @@
 
   /* closing */
   .closing { border-top: 1px solid var(--hair); margin-top: 144px; padding-block: 96px; display: flex; flex-direction: column; align-items: center; gap: 36px; text-align: center; }
-  .closing .wordmark { font-size: clamp(28px, 5vw, 56px); }
+  /* Display size, so the wordmark is uppercase; the 11-15px nav lockup is not. */
+  .closing .wordmark { font-size: clamp(28px, 5vw, 56px); text-transform: uppercase; }
   .closing p { margin: 0; max-width: 52ch; font-size: 13px; line-height: 1.85; color: var(--t55); }
 
   footer { border-top: 1px solid var(--hair); padding-block: 32px 48px; display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; align-items: center; }
-  footer .meta { font-size: 11px; letter-spacing: 0.08em; color: var(--t45); }
+  footer .meta { font-size: 11px; letter-spacing: 0.08em; color: var(--t55); }
 </style>
 </head>
 <body>
@@ -337,8 +340,8 @@
   "severity": "error",
   "file": "modules/todo/todo.view.ts",
   "range": { "line": 3, "column": 1 },
-  "message": "View imports effects. Views are
-              pure functions of state.",
+  "message": "view cannot import effects;
+              allowed: lib, ui, own state.",
   "fix": "Move the call into todo.effects.ts
           and expose the result via todo.state.ts.",
   "docs": "https://sheratan.dev/errors/L001"

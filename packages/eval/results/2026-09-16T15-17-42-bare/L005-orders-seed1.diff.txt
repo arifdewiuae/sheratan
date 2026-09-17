@@ -1,0 +1,189 @@
+===== modules/orders/orders.effects.ts
+// Effects: the only impure file (SPEC §4). It calls the contract and then
+// invokes one transition; it never decides what the data means.
+
+import { onDispose } from 'sheratan';
+
+import type { Api, Order } from '../../services/api.contract.ts';
+import type { NotificationsEffects } from '../notifications/index.ts';
+import type { OrdersState } from './orders.state.ts';
+
+/** What this module can do. The view declares the same shape for itself. */
+export interface OrdersEffects {
+  load(this: void): void;
+  ship(this: void, payload: unknown, order?: unknown): void;
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : 'unknown error';
+}
+
+/** The row an intent fired from, which `each` hands the handler (SPEC §9). */
+function idOf(order: unknown): number | undefined {
+  if (typeof order !== 'object' || order === null) return undefined;
+
+  return (order as Order).id;
+}
+
+/** Wires the state to the API, and gives the mount its teardown. */
+export function createOrdersEffects(
+  api: Api,
+  state: OrdersState,
+  notifications: NotificationsEffects,
+): OrdersEffects {
+  const controller = new AbortController();
+
+  onDispose(() => {
+    controller.abort();
+  });
+
+  const list = async (): Promise<void> => {
+    try {
+      const rows = await api.orders(controller.signal);
+
+      if (!controller.signal.aborted) state.listed(rows);
+    } catch (error: unknown) {
+      if (!controller.signal.aborted) notifications.raise(messageOf(error));
+    }
+  };
+
+  // Read the status before the optimistic write, because that write is what a
+  // rollback has to undo.
+  const send = async (id: number, previous: string): Promise<void> => {
+    try {
+      await api.shipOrder(id, controller.signal);
+
+      if (!controller.signal.aborted) {
+        const waiting = new Set(state.inFlight());
+
+        waiting.delete(id);
+        state.inFlight.set(waiting);
+      }
+    } catch (error: unknown) {
+      if (controller.signal.aborted) return;
+
+      state.reverted(id, previous);
+      notifications.raise(messageOf(error));
+    }
+  };
+
+  return {
+    load(): void {
+      void list();
+    },
+
+    ship(_payload: unknown, order?: unknown): void {
+      const id = idOf(order);
+
+      if (id === undefined) return;
+
+      const previous = state.statusOf(id);
+
+      state.shipping(id);
+
+      void send(id, previous);
+    },
+  };
+}
+
+===== modules/orders/orders.state.ts
+// State: signals and pure transitions. No I/O, no DOM (SPEC §4).
+
+import { batch, computed, signal, type Accessor } from 'sheratan';
+
+import type { Order } from '../../services/api.contract.ts';
+
+/** The one status T04 moves an order into, optimistically. */
+export const SHIPPED = 'shipped';
+
+const NO_ROWS: readonly Order[] = [];
+
+/** Readable state plus the transitions that may change it. */
+export interface OrdersState {
+  readonly rows: Accessor<readonly Order[]>;
+  readonly loaded: Accessor<boolean>;
+  /** Orders whose PATCH has not come back yet, so the list cannot overwrite them. */
+  readonly inFlight: Signal<ReadonlySet<number>>;
+
+  listed(rows: readonly Order[]): void;
+  /** Moves one order to `shipped` before the server has agreed (T04). */
+  shipping(id: number): void;
+  /** Puts one order back to what it was, leaving the others alone. */
+  reverted(id: number, status: string): void;
+  /** The status an order shows now, which is what a rollback restores. */
+  statusOf(id: number): string;
+}
+
+function replace(rows: readonly Order[], id: number, status: string): readonly Order[] {
+  return rows.map((order) => (order.id === id ? { ...order, status } : order));
+}
+
+function without(ids: ReadonlySet<number>, id: number): ReadonlySet<number> {
+  const next = new Set(ids);
+
+  next.delete(id);
+
+  return next;
+}
+
+/** Builds the module's state. Called once per mount, inside the mount's scope. */
+export function createOrdersState(): OrdersState {
+  const rows = signal(NO_ROWS);
+  const listed = signal(false);
+  const inFlight = signal<ReadonlySet<number>>(new Set<number>());
+
+  /** A later list response must not undo an optimistic change still in flight. */
+  const keepInFlight = (next: readonly Order[]): readonly Order[] => {
+    const pending = inFlight();
+
+    if (pending.size === 0) return next;
+
+    const current = new Map(rows().map((order) => [order.id, order.status]));
+
+    return next.map((order) =>
+      pending.has(order.id) ? { ...order, status: current.get(order.id) ?? order.status } : order,
+    );
+  };
+
+  return {
+    rows,
+    loaded: listed,
+    inFlight,
+
+    listed(next: readonly Order[]): void {
+      batch(() => {
+        rows.set(keepInFlight(next));
+        listed.set(true);
+      });
+    },
+
+    shipping(id: number): void {
+      batch(() => {
+        rows.set(replace(rows(), id, SHIPPED));
+        inFlight.set(new Set(inFlight()).add(id));
+      });
+    },
+
+
+    reverted(id: number, status: string): void {
+      batch(() => {
+        rows.set(replace(rows(), id, status));
+        inFlight.set(without(inFlight(), id));
+      });
+    },
+
+    statusOf(id: number): string {
+      return statusOf(rows(), id);
+    },
+  };
+}
+
+/** The status an order shows now, which is what a rollback restores. */
+export function statusOf(rows: readonly Order[], id: number): string {
+  return rows.find((order) => order.id === id)?.status ?? SHIPPED;
+}
+
+/** Whether anything is waiting on the server, for the list's busy affordance. */
+export function isBusy(state: OrdersState): Accessor<boolean> {
+  return computed(() => state.inFlight().size > 0);
+}

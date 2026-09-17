@@ -1,0 +1,79 @@
+===== modules/notifications/notifications.effects.ts
+// Effects: sequencing only. It owns the clock and calls one transition (SPEC §4).
+
+import { onDispose } from 'sheratan';
+
+import { SHIPPED } from '../orders/index.ts';
+import type { NotificationsState } from './notifications.state.ts';
+
+/** How long a toast stays up before it takes itself away. */
+const LINGER_MS = 4000;
+
+/** What this module can do. The view declares the same shape for itself. */
+export interface NotificationsEffects {
+  raise(this: void, message: string): void;
+  dismiss(this: void): void;
+}
+
+/** Wires the state to the host's timer, and gives the mount its teardown. */
+export function createNotificationsEffects(state: NotificationsState): NotificationsEffects {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const clear = (): void => {
+    if (timer !== undefined) clearTimeout(timer);
+
+    timer = undefined;
+  };
+
+  onDispose(clear);
+
+  return {
+    raise(message: string): void {
+      clear();
+      state.raised(message);
+
+      // Good news is worth a longer look than a failure.
+      const linger = message.includes(SHIPPED) ? LINGER_MS * 2 : LINGER_MS;
+
+      timer = setTimeout(() => {
+        state.dismissed();
+      }, linger);
+    },
+
+    dismiss(): void {
+      clear();
+      state.dismissed();
+    },
+  };
+}
+
+===== modules/orders/index.ts
+// The module's only public surface (SPEC §4).
+
+import type { Template } from 'sheratan';
+
+import type { Api } from '../../services/api.contract.ts';
+import type { NotificationsEffects } from '../notifications/index.ts';
+import { createOrdersEffects } from './orders.effects.ts';
+import { createOrdersState, SHIPPED } from './orders.state.ts';
+import { ordersView } from './orders.view.ts';
+
+export { SHIPPED };
+
+/** `full`: this module has state, effects and a view (SHR-L006). */
+export const kind = 'full';
+
+/**
+ * A factory returning a view function. `render()` calls it inside its own
+ * scope, so state, watchers and teardown belong to the mount (SPEC §4).
+ */
+export function createOrders(api: Api, notifications: NotificationsEffects): () => Template {
+  return () => {
+    const state = createOrdersState();
+    const effects = createOrdersEffects(api, state, notifications);
+
+    effects.load();
+
+    return ordersView(state, effects);
+  };
+}

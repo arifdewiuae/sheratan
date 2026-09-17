@@ -1,9 +1,11 @@
-# Sheratan — Technical Specification (draft v0.1)
+# SHERATAN — Technical Specification (draft v0.1)
 
 > Name: β Arietis — Arabic aš-šaraṭān, "the two signs"; with Mesarthim it
 > marked the vernal equinox, the reference point of the year. Free on npm as of
-> 2026-09-14. Still to verify: the GitHub org handle and `sheratan.dev`, which
-> goes into checker error links and cannot be changed later.
+> 2026-09-14, still free on 2026-09-17. **`sheratan.dev` is registered
+> (2026-09-17)** — it goes into checker error links and cannot be changed later,
+> so it is now a fixed constraint rather than an assumption. Still to verify:
+> the GitHub org handle.
 > Error codes use the `SHR-` prefix.
 > This document is the source of truth for implementation. If code and spec
 > disagree, the spec wins or the spec gets amended — never silently diverge.
@@ -16,9 +18,12 @@ A frontend framework with **one legal way to structure an app**, enforced by a
 checker with machine-readable fixes, plus async and live data in the core.
 
 Precise version of the enforcement claim, because the loose one is an
-overclaim: **the import matrix is enforced statically**; `SHR-L005` falls back
-to a dev-time runtime assertion (§13). Never write "all architectural
-violations are compile errors."
+overclaim: **the import matrix is enforced statically**, and a write to state
+from outside `*.state.ts` is a **type** error, because the state surface exposes
+no `Signal` to write through (`SHR-L010`, §4). What is not a guarantee:
+`SHR-L005`, which has to find the writes the type system can no longer see, and
+falls back to a dev-time runtime assertion (§13). Never write "all
+architectural violations are compile errors."
 
 Why this needs a framework rather than an ESLint plugin: React's problem for a
 code-generating agent is not a missing linter, it is that there are too many
@@ -128,7 +133,7 @@ app.ts              composition root
 e2e/                end-to-end tests
 ```
 
-`shared/` is a banned directory name. It groups by ownership ("used in more
+`shared/` is a banned directory name (`SHR-L003`). It groups by ownership ("used in more
 than one place") rather than by purpose, and becomes a second application
 without rules. Everything that would go there belongs to one of the categories
 above.
@@ -139,7 +144,7 @@ above.
 - **`ui/` components are folders, not files:** `ui/button/button.view.ts`,
   `button.css`, `button.test.ts`, `index.ts`. They have no state and no
   effects, so they are not modules. Nesting inside `ui/` is at most one level —
-  the component itself. Namespacing is by prefix (`ui/form-input/`,
+  the component itself (`SHR-L003`). Namespacing is by prefix (`ui/form-input/`,
   `ui/data-table/`), never by subdirectory.
 - A component used by exactly one module lives **inside that module**, not in
   `ui/`. Most "hundreds of components" are local things parked in a shared
@@ -165,28 +170,88 @@ rather than a numbered list.
 | `*.state.ts` | `lib/`, own module |
 | `*.effects.ts` | `lib/`, `services/` contracts, own state, other modules' `index.ts` |
 | `*.view.ts` | `lib/`, `ui/`, own state, module instances received as parameters |
+| `index.ts` | own module files |
 | `app.ts` | everything (composition root) |
 
-Error codes are cells in this matrix, and messages state the allowed set rather
-than citing a rule number: *"view cannot import services; allowed: lib, ui, own
-state."* For self-repair this beats a link to a rule.
+Plus one exception for every module file: **`import type` from
+`services/*.contract.ts`** is always allowed. Contracts are the app's shared
+vocabulary (`Customer`, `Order`), type imports are erased at run time, and the
+alternatives — domain types in `lib/`, or a copy per module — either give `lib/`
+app knowledge or duplicate shapes that drift. A value import from `services/`
+is still `SHR-L001`.
 
-Three constraints the matrix cannot express:
+Every cell of this matrix reports as **one code, `SHR-L001`**. The message names
+the cell and states the allowed set rather than citing a rule number: *"view
+cannot import services; allowed: lib, ui, own state."* For self-repair this
+beats a link to a rule. A deep import — reaching past another module's
+`index.ts` into its state, effects or view — is an `SHR-L001` cell like any
+other.
+
+Constraints the matrix cannot express:
 
 | Code | Rule |
 |------|------|
 | `SHR-L002` | `*.view.ts` must not call an I/O global (`fetch`, `localStorage`, `document`, timers) |
-| `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts` |
-| `SHR-L008` | The module import graph must be acyclic |
+| `SHR-L003` | Project layout: no `shared/` directory; `ui/` nests at most one level (below) |
+| `SHR-L004` | Effects-only APIs — `resource()`, `mutation()`, `stream()`, `onDispose()`, `navigate()` — are called only inside `*.effects.ts` |
+| `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts`. Best-effort backstop to `SHR-L010` (§13) |
 | `SHR-L006` | Module file set matches its declared kind (below) |
+| `SHR-L007` | Every `Promise`-returning method in a `*.contract.ts` takes an `AbortSignal` (§5b) |
+| `SHR-L008` | The module import graph must be acyclic |
 | `SHR-L009` | Module and `ui/` stylesheets are wrapped in one `@scope` with a lower boundary; `global.css` holds only `tokens` and `base` (§9a) |
-| `SHR-T001` | **warning** — module has no `*.state.test.ts` / `*.effects.test.ts` |
+| `SHR-L010` | A `*.state.ts` public surface exposes only `Accessor` values and transitions; a `Signal` never leaves the file (below) |
+| `SHR-L011` | Statically visible mutation of a value read from a signal — `items().push(x)`, `order().status = 'shipped'` (§5 Immutability, ADR 0002 layer 3) |
+
+Template rules, checked off the AST of `html` literals (§9, §13):
+
+| Code | Severity | Rule |
+|------|----------|------|
+| `SHR-V001` | error | No inline function in a template hole; handlers are named intents |
+| `SHR-V002` | warning | `unsafeHTML()` with a non-literal argument |
+| `SHR-V003` | warning | Reactivity trap: a signal or computed *called* inside a template hole (`${s.total()}`) instead of passed (`${s.total}`) (§9) |
+| `SHR-V004` | error | Malformed template: unclosed tag, unknown attribute or binding |
+
+| Code | Severity | Rule |
+|------|----------|------|
+| `SHR-T001` | warning | Module has no `*.state.test.ts` / `*.effects.test.ts` |
+
+**Code scheme.** The letter is the family: `L` structure and layers, `V` view
+templates, `T` tests; `R` is reserved for structured runtime errors. Numbers
+are stable — never renumbered, never reused; a retired code stays reserved.
+A violation caught at run time by a dev-build assertion reports under the same
+code as its static check (`SHR-L005`, §13). The docs URL is the code without
+the prefix: `sheratan.dev/errors/L001`.
 
 `SHR-L008` exists because of shared modules specifically: without it,
 `session` and `orders` will import each other within a week.
 
 Data flows in exactly one direction: `effects → state → view`. Views emit
 intents; they never act.
+
+### Wiring a module
+
+```ts
+// index.ts
+export const kind = 'full';                      // or 'view' (SHR-L006)
+export const createCustomers = (api: Api) => () => {
+  const state = createCustomersState();          // signals, computeds, transitions
+  const effects = createCustomersEffects(api, state);
+  effects.load();
+  return customersView(state, effects);          // (state, intents) => html
+};
+
+// app.ts
+render(createCustomers(createHttpApi('/api')), document.getElementById('app')!);
+```
+
+- `index.ts` exports the kind and **a factory returning a view function**.
+  `render()` calls that function inside its owner, so state, watchers and
+  `onDispose` created there belong to the mount and die with it.
+- State is a factory (`create<Name>State()`), so every mount and every test
+  starts fresh.
+- The view is `(state, intents) => html`. It declares the intents it needs as a
+  `<Name>Intents` interface; the effects object satisfies it structurally, so
+  the view never imports effects.
 
 ### Atomic transitions
 
@@ -203,6 +268,59 @@ state.ordersLoaded({ orders, customers });   // one transition, one commit
 
 Arbitrary interdependent logic inside the transition is fine — it is a pure
 function. Complexity belongs in transitions; orchestration belongs in effects.
+
+A transition is a plain function exported by `*.state.ts`; there is no
+`transition()` wrapper. One that writes more than one signal wraps its writes in
+`batch()`, so watchers see the commit, never the steps:
+
+```ts
+// orders.state.ts
+export const ordersLoaded = ({ orders, customers }) => batch(() => {
+  ordersById.set(orders);
+  customersById.set(customers);
+});
+```
+
+Intent handlers already run inside a batch (§9), so a transition called from
+one commits once either way.
+
+### The state surface: accessors out, transitions in
+
+`create<Name>State()` returns a **declared** interface, and every member of it
+is an `Accessor` or a transition. The writable handles stay private to the file
+(`SHR-L010`):
+
+```ts
+// customers.state.ts
+interface Signals {                          // private: the writable handles
+  readonly rows: Signal<readonly Customer[]>;
+  readonly status: Signal<Status>;
+}
+
+export interface CustomersState {            // public: reads and transitions
+  readonly rows: Accessor<readonly Customer[]>;
+  readonly count: Accessor<number>;
+  readonly loaded: (rows: readonly Customer[]) => void;
+}
+```
+
+`Accessor<T>` is `() => T` and has no `.set`, so the write `SHR-L005` describes
+— `state.rows.set(list)` from `*.effects.ts` — **stops compiling**. It is a type
+error at the call site, in the editor, before any checker runs (A2), and it
+cannot be written at all without first widening the declaration in
+`*.state.ts`, which is the thing `SHR-L010` reports.
+
+The gain is where the check lives: `SHR-L010` reads **one declaration per
+field** in the file that owns it, where `SHR-L005` has to follow a value
+through every call site that touches it (§13). It also covers callers L005
+never named — a view or an `index.ts` handed the state object gets the same
+type error — and it needs nothing new in the runtime.
+
+The rule is on the *public surface*, not on the file. Inside `*.state.ts` the
+signals are written freely; that is what a transition is for. An inferred
+return type (`ReturnType<typeof createCustomersState>`) is not a surface, it is
+whatever the factory happened to return, so a state factory declares its
+interface.
 
 ### State holds only what cannot be derived
 
@@ -343,6 +461,20 @@ code-generating agent cannot accidentally mutate a nested object, which it does
 routinely. Cost is verbosity on deep updates; addressed with a structural
 update helper in `core`, not with an Immer-style dependency.
 
+Immutability is enforced, not requested, in three layers:
+
+1. **Types.** Reading a signal or computed yields `DeepReadonly<T>`, so
+   `items().push(x)` or `order().status = 'shipped'` fails type-checking.
+2. **Run time.** `signal.set(value)` deep-freezes plain objects and arrays.
+   Subtrees that are already frozen are skipped, so with structural sharing
+   only the newly allocated nodes are frozen — the cost is bounded by what the
+   caller already allocated, and it stays on in production. A mutation then
+   throws a `TypeError` (ES modules are strict). DOM nodes, `Date`, `Map`,
+   `Set` and class instances are left alone: freezing them breaks them.
+3. **Check time.** Mutation visible on the AST (a mutating method or an
+   assignment through a signal read) is a checker error with a `fix` (code to
+   be assigned, see TASKS "Spec gaps").
+
 ### Declared transitions (no `machine()` primitive)
 
 Where state is a finite automaton, the legal moves are declared next to the
@@ -384,13 +516,16 @@ External subscriptions the runtime cannot see — `addEventListener` on `window`
 onDispose(() => window.removeEventListener('resize', onResize));
 ```
 
-Legal in `*.effects.ts` only.
+Legal in `*.effects.ts` only (`SHR-L004`).
 
 ### Three rules that prevent leaks
 
 1. **Post-disposal async is a no-op.** A response arriving after unmount must
-   not throw and must not write to a discarded state. A transition invoked from
-   a dead owner does nothing, checked by an owner flag.
+   not throw and must not write to a discarded state. Watchers and template
+   holes of a disposed owner are unlinked, so a late write reaches nothing and
+   renders nothing. Making the write itself a no-op needs a way to recognise a
+   transition, which plain-function transitions (§4) do not give — open, see
+   TASKS "Spec gaps".
 2. **Disposal order:** stop watchers → tear down subscriptions → remove nodes.
    Any other order lets a final stream message write into detached DOM.
 3. **Cancellation is not failure.** `AbortError` must not become
@@ -402,7 +537,7 @@ Legal in `*.effects.ts` only.
 Every `Promise`-returning method in a `*.contract.ts` takes an `AbortSignal`.
 An adapter that ignores it makes cancellation cosmetic: the response is
 discarded but the request still runs. Checked: a contract method returning a
-promise without a `signal` parameter is an error.
+promise without a `signal` parameter is an error (`SHR-L007`).
 
 Cancellation triggers: key change, owner disposal, explicit `resource.abort()`.
 
@@ -423,7 +558,32 @@ user.status();   // 'idle' | 'loading' | 'ready' | 'error' | 'refreshing'
 user.data();     // T | undefined  — previous value retained while refreshing
 user.error();    // Error | undefined
 user.invalidate();
+user.abort();
 ```
+
+`'idle'` means nothing in flight and nothing to show, which only `abort()`
+produces: a resource fetches as soon as it is constructed, so it is never idle
+on the way in.
+
+**A key change is a different question.** `data()` and `error()` are cleared
+and the status goes to `'loading'`, because the value that is there answers the
+old key. A *failure* is the other way round: `data()` is kept, so a stale value
+beside an error beats an empty screen.
+
+`staleAfter` is milliseconds of freshness. When it elapses the resource
+revalidates itself — `'refreshing'` with `data()` still readable, then
+`'ready'` — and the timer is owned by the mount, so unmounting stops it.
+Omitted, a key is fetched once and never goes stale.
+
+`retry.attempts` counts the first try: `3` is one try and two retries. The
+first wait is 100 ms; `'exponential'` doubles it each attempt, `'fixed'` does
+not. A cancelled request is never retried.
+
+**No shared cache.** A resource owns its value and nothing else's: two modules
+asking for the same key make two requests, and `invalidate()` on one does not
+reach the other. A cache is a second place state lives, which A1 does not
+allow, and it is the part of a query library an app can least often use
+unchanged (ADR 0004).
 
 **Separate signals, not one union.** `status()`, `data()` and `error()` are
 independent signals, so a hole that renders a spinner reads only `status()`
@@ -435,18 +595,20 @@ Narrowing comes from one type-guard method, since TypeScript cannot narrow
 `data()` from a separate `status() === 'ready'` comparison:
 
 ```ts
-if (user.is('ready'))   user.data();    // T — `this is Ready<T>`
-if (user.is('error'))   user.error();   // Error
+if (user.is('ready'))   user.data();    // T — `this is LoadedResource<T>`
+if (user.is('error'))   user.error();   // Error — `this is FailedResource<T>`
 if (user.is('refreshing')) user.data(); // T — previous value retained
 ```
 
 `is()` reads `status()` only, so it has the same reactivity as the comparison.
 Comparing `status()` directly remains legal but leaves `data()` as `T | undefined`.
+A value arrives `DeepReadonly` like every other value a signal hands out
+(§5 Immutability), so `T` above means the read-only view of it.
 
 Guarantees: in-flight request is aborted when the key changes; identical keys
 are de-duplicated; out-of-order responses are discarded, never applied; errors
 are values, not thrown. `resource()` may only be constructed inside
-`*.effects.ts` (enforced by `SHR-L005`).
+`*.effects.ts` (enforced by `SHR-L004`, as are `mutation()` and `stream()`).
 
 ### `mutation()` — writes in the core
 
@@ -495,6 +657,27 @@ messages arriving faster than a frame are folded and committed once per frame
 reconnection state is exposed as `ticks.status()` so views can show staleness
 instead of silently rendering old numbers.
 
+A stream is read like any other value — `ticks()` — with `ticks.status()` and
+`ticks.error()` beside it, rather than a `data()` accessor: unlike a resource
+it always has a value, because `initial` is one.
+
+`status()` is `'connecting' | 'open' | 'closed'`. A `subscribe` that returns a
+teardown directly is open the moment it returns; one that returns a *promise*
+of a teardown stays `'connecting'` until it resolves, and messages that arrive
+during the handshake are still folded. A subscription that resolves after its
+key changed is torn down as soon as it exists.
+
+`subscribe` is handed `close(reason?)` as well as `emit`. An adapter whose
+source ends calls it, and the stream goes `'closed'` with the last value still
+readable, so a view can show stale numbers and say they are stale. The teardown
+still runs on unmount. A `subscribe` that throws, or whose promise rejects, is
+the same `'closed'` state with the error in `error()` — never a throw.
+
+A new key tears the subscription down, resubscribes, and resets the value to
+`initial`: the fold belonged to the key that went away. Messages from a
+torn-down subscription are ignored, so an adapter that keeps emitting cannot
+corrupt the new key's fold.
+
 ## 7. Causal trace
 
 The runtime records a causal chain for every update, behind a flag in
@@ -506,10 +689,32 @@ write(count, 0 -> 1) @ todo.effects.ts:24
       └─ view(TodoList) patched 1 node: <span data-s="3">
 ```
 
-Retention is bounded: a fixed-size ring buffer (default 500 entries), opt-in
-per signal for previous-value capture, and sampling above a write-rate
-threshold. Holding a previous value for every write at 1000 writes/sec would
-exhaust memory and produce a log unreadable by human or agent alike.
+Retention is bounded: a fixed-size ring buffer of 500 entries, and sampling —
+past 1000 writes in a second only one in twenty is kept, and the rest are
+counted as `dropped`. Without the sampling the trace would spend the frame
+budget of the very flood it exists to explain.
+
+**Previous values need no opt-in.** The original concern was memory: holding a
+previous value for every write at 1000 writes/sec exhausts it. A ring buffer
+already bounds that to 500, and entries keep a *short rendering* of the value
+rather than the value, so nothing is retained at all — an object is `{id, name}`
+and a list is `Array(500)`. One less option to configure, and one less thing an
+agent must remember to switch on.
+
+Recording is off until `__sheratan.start()`. When off, a hook is one boolean
+test; the flag is the mechanism SPEC asks for, not a default.
+
+**A write inside a running chain continues it.** `each` rewriting a row's item
+*is* the list update, not a second one, so it is nested under the write that
+caused it rather than opening a chain of its own. A write with no application
+frame on the stack is attributed to `sheratan` rather than to whichever runtime
+frame happened to be innermost.
+
+An entry is `{ at, cause, kind, source, from?, to? }`, where `cause` is the
+write the step follows from — steps sharing one are one chain — and `source` is
+a write's call site, a derivation's id, or the element a patch wrote.
+`__sheratan.trace()` returns them; `__sheratan.format()` renders the same
+chains as the tree above, for eyes rather than for a program.
 
 Note the tension, acknowledged rather than hidden: `__sheratan` is a global
 registry, which this spec rejects for DI and for event buses. It is defensible
@@ -518,7 +723,16 @@ code, and it is absent from production builds entirely.
 
 Exposed as `__sheratan.trace()` returning structured JSON — timestamp, cause,
 propagation path, DOM patches. This is the artifact an agent reads to debug
-itself (section 10). Off in production; zero cost when disabled.
+itself (section 10). Installed by `render()`, not on import, because a module
+that reaches for `globalThis` when loaded is a side effect and the package
+promises it has none.
+
+**Absent in production, and the build proves it.** Guarding the call sites is
+not enough on its own: esbuild folds the branch but keeps the module, so the
+code would ship unreachable. `scripts/build-prod.ts` therefore swaps `trace.ts`
+for a no-op `trace.prod.ts`, the way it swaps `env.ts`, and then fails the build
+if the bundle still contains `__sheratan`. What remains in production is the
+boolean test at each hook: 11 bytes brotli across the whole runtime.
 
 ## 8. Checker
 
@@ -533,7 +747,7 @@ Error format is fixed and stable:
   "severity": "error",
   "file": "modules/todo/todo.view.ts",
   "range": { "line": 3, "column": 1 },
-  "message": "View imports effects. Views are pure functions of state.",
+  "message": "view cannot import effects; allowed: lib, ui, own state.",
   "fix": "Move the call into todo.effects.ts and expose the result via todo.state.ts.",
   "docs": "https://sheratan.dev/errors/L001"
 }
@@ -549,22 +763,65 @@ Tagged template literals — works with no build step:
 ```ts
 export const view = (s: TodoState) => html`
   <ul>
-    ${each(s.items, (item) => html`<li>${item.title}</li>`)}
+    ${each(s.items, (item) => {
+      const title = computed(() => item().title);
+      return html`<li>${title} <button @click=${intent.remove}>×</button></li>`;
+    })}
   </ul>
   <button @click=${intent.add}>Add</button>
 `;
 ```
 
-Keyed list reconciliation, event binding via `@event`, attribute binding via
-`.prop`.
+Keyed list reconciliation, event binding via `@event`, property binding via
+`.prop`, attribute binding via a bare name.
 
-`each` takes an optional `window` parameter: instead of creating and destroying
-nodes on scroll, it keeps a fixed set of rows and rewrites values in place.
-Virtualization is cheap here precisely because the framework owns both the
-scheduler and the renderer — a userland library has to measure through
-`getBoundingClientRect` and fight the renderer for write timing. Mechanism in
-core, policy outside: row-height strategy and buffer size are supplied by the
-caller, not decided by the framework. An optional compiler (post-MVP) can pre-compile templates and add
+**`each(list, row)`.** `list` is a signal or computed of an array (or a plain
+array, rendered once). Rows are keyed by `item.id` for objects and by value for
+primitives; an object without `id`, or a duplicate key, is an error. There is
+no key option. The row function runs **once per key** and receives an
+**accessor for the row's item**, not the item: when a new object arrives under
+the same key the accessor updates, and only the holes whose values changed are
+written. Cells read the item through computeds in the row, the same rule as any
+other derived value (§9 "Holes take signals by reference"). `${item().title}`
+reads once and is the trap.
+
+**`each(list, row, window)`.** A third argument turns the list positional:
+instead of creating and destroying nodes on scroll, `each` keeps a fixed pool
+of rows and rewrites their items in place, with a spacer above and below
+standing in for the rows that are not in the DOM. Virtualization is cheap here
+precisely because the framework owns both the scheduler and the renderer — a
+userland library has to measure through `getBoundingClientRect` and fight the
+renderer for write timing.
+
+```ts
+interface EachWindow {
+  readonly start: number;     // index of the first row rendered
+  readonly count: number;     // how many rows exist — the size of the pool
+  readonly rowHeight: number; // CSS pixels, for the spacers
+}
+
+each(s.rows, row, window: Accessor<EachWindow>)
+```
+
+Mechanism in core, policy outside: the window is supplied by the caller, not
+decided by the framework. A scroll listener in `*.effects.ts` owns the
+container's height and the overscan and hands over one value — which is also
+the only place a measurement can come from, because the list's first reconcile
+happens while its rows are still in a detached fragment. An out-of-range window
+is clamped rather than rejected: a rubber-banding scroll reports a negative
+offset, and that is not an error.
+
+The scroll container needs `overflow-anchor: none`. This is not a nicety: the
+spacer above the rows changes height on every scroll step, the browser moves
+`scrollTop` to hold its anchor element still, and that move fires another
+scroll event. Six wheel ticks carry the list to the end of its own accord.
+
+A windowed list is **positional, not keyed**. A slot is recycled, so a row's
+DOM node no longer follows its item when the list reorders, and `SHR-R006` /
+`SHR-R007` key validation does not run. That is what makes scrolling
+allocation-free; see ADR 0003.
+
+An optional compiler (post-MVP) can pre-compile templates and add
 typed template checking; it must remain optional.
 
 ### How a view updates (the most important runtime decision)
@@ -573,11 +830,27 @@ The view function runs **once**, at mount. It is not re-run on state change and
 there is no re-render.
 
 At mount the template is parsed once into a `<template>`, hole positions are
-recorded as direct node references, and each hole gets its own micro-watcher:
+recorded as direct node references, and each hole that receives a signal or
+computed gets its own micro-watcher:
 
 ```ts
-// html`<span>${s.total()}</span>` becomes roughly
+// html`<span>${s.total}</span>` becomes roughly
 watch(() => { textNode.data = String(s.total()); });
+```
+
+**Holes take signals by reference.** JavaScript evaluates every `${…}` before
+the `html` tag runs, so a hole cannot observe a call made inside it: in
+`${s.total()}` the runtime receives a plain number and cannot know which signal
+produced it. Without a compiler there is exactly one way for a hole to be
+reactive: it receives the signal or computed itself, `${s.total}`, and the
+runtime reads it inside the hole's watcher. A plain value in a hole is rendered
+once. An expression — `${s.total() * 2}`, a ternary choosing between templates
+— is a derivation, and derivations are named computeds (§4): in state when they
+shape data, in the view when they choose markup:
+
+```ts
+const body = computed(() => s.status() === 'error' ? errorBox : table);
+html`<main>${body}</main>`
 ```
 
 A signal write therefore wakes only the watchers for the holes that read it and
@@ -587,23 +860,56 @@ entirely on this: if the view function rebuilt 500 `<li>` descriptions per
 tick, the number would be unreachable. `each` creates per-row watchers and
 reconciles by key; rows are not rebuilt when a cell value changes.
 
-**The trap agents will hit:** `${s.total()}` inside a hole is reactive;
-`const t = s.total()` above the template is read once at mount and never
-updates. First item in `llms.txt`, and a checker warning where detectable.
+**The trap agents will hit:** `${s.total}` is reactive; `${s.total()}` reads
+once at mount and never updates — and so does `const t = s.total()` above the
+template, for the same reason. It looks like every other framework and is
+wrong here. First item in `llms.txt`, and a checker warning (`SHR-V003`): a
+call expression inside a hole is visible on the AST, so unlike the old
+formulation this one is detectable exactly.
 
 ### Intents
 
 `@click=${intent.add}` is sugar for a named handler exported by the view's
-module, invoked with a typed payload; the raw `Event` is not passed on. Views
+module, invoked with a typed payload; the raw `Event` is not passed on.
+
+| Event | Payload |
+|---|---|
+| `submit` | form fields as an object (`Object.fromEntries(new FormData(form))`); default prevented |
+| anything else | the element's `value`, or `checked` when its `type` is `checkbox`; `undefined` when it has neither |
+
+**The payload is read from the element the handler is on, not chosen by the
+event's name.** A component library announces changes under its own name —
+`sl-change`, `md-input` — and no table of event types can hold them all, so a
+name-keyed rule hands every one of them `undefined` while looking like it
+worked. Reading the element is one rule instead of a list that is always
+incomplete, and it makes a custom element a first-class control with no adapter.
+
+Two consequences worth stating. A `<button value="ascending">` reports
+`"ascending"`, so one intent can serve several buttons without a `data-`
+attribute. And a plain `<button>` reports `""` rather than `undefined`, because
+a button has a value and an empty one is still one; only an element with no
+`value` at all — a `<div>`, a `<li>` — reports nothing.
+
+Inside an `each` row the handler receives a **second argument: the row's
+current item**, read when the event fires, from the innermost row. That is how
+a row's button names its order without an inline arrow:
+
+```ts
+html`<button @click=${intent.ship}>Ship</button>`   // in a row
+ship: (_payload, order) => …                         // in effects
+```
+
+Every handler runs inside `batch()`. Views
 declare intents, effects implement them, and the wiring is generated by
 `sheratan generate`. An inline arrow function in a template is a checker error
-— that is where logic starts leaking back into views.
+(`SHR-V001`) — that is where logic starts leaking back into views.
 
 ### Escaping and `unsafeHTML`
 
 Every hole is escaped as text by default; interpolated values never become
 markup. Injecting markup requires the explicit `unsafeHTML(value)` directive,
-which the checker flags whenever its argument is not a literal. Agents
+which the checker flags whenever its argument is not a literal (`SHR-V002`,
+a warning: sanitized markup is a legitimate non-literal). Agents
 interpolate user data without thinking, so the default must be the safe one.
 
 ### CSS without a build step
@@ -749,7 +1055,7 @@ what therefore ships in core:
 - delegated click interception for `<a>` (same origin, primary button, no
   Ctrl/Cmd/Shift, no `target`, no `download`) — trivial, and always written
   wrong when left to the user
-- `navigate()`, callable only from `*.effects.ts`
+- `navigate()`, callable only from `*.effects.ts` (`SHR-L004`)
 - scroll and focus restoration on back/forward
 - **flat path matching** — a thin wrapper over `URLPattern`, roughly thirty
   lines, and a plain `computed` rather than new machinery:
@@ -808,12 +1114,13 @@ sheratan check [--json]
 sheratan explain <error-code> [--json]
 sheratan trace [--json]        # pulls the causal trace from the dev server
 sheratan dev
+sheratan build                 # strips types into a deployable directory
 ```
 
 - **`llms.txt`** at the repo and docs root: full API surface, the import
   matrix, canonical module example, error-code index, and — first item — the
-  reactivity trap (`${s.total()}` inside the template hole is reactive;
-  `const t = s.total()` above the template is not). Must fit in ~8k tokens.
+  reactivity trap (`${s.total}` in a hole is reactive; `${s.total()}` is read
+  once). Must fit in ~8k tokens.
 - **Skill** (`SKILL.md`): when to use, how to scaffold via the CLI, how to read
   checker output, how to read a trace, the "one way to do each thing" table.
 - **Generation over recall.** Agents call `sheratan generate` instead of writing
@@ -880,13 +1187,27 @@ comment thread: user code is TypeScript, and browsers do not run TypeScript.
 The honest formulation, and the only one to use in the README:
 
 - **`core` requires no build.** It ships as plain ESM and can be used from a
-  `<script type="module">` with an empty `node_modules`. The zero-build demo is
-  JavaScript.
+  `<script type="module">` with an empty `node_modules`, served by **any static
+  file server** (`python3 -m http.server`, `npx serve`). Not from `file://`:
+  browsers refuse ES module scripts from an opaque origin, and a `file://`
+  build would be a second way to load core. The zero-build demo is JavaScript.
 - **TypeScript projects need type stripping.** `sheratan dev` strips types and
   serves ESM — no bundling, no transform of the templates, no plugin
   configuration. Under Bun or Deno, which run TypeScript natively, even that
   disappears.
-- Production is ESM served as-is. Bundling is optional and the user's choice.
+- Production is ESM served as-is: `sheratan build` strips types from `src/`
+  into a directory of plain ESM and copies everything else, so what ships is
+  what a static host serves. No bundler is involved, and `dev` and `build`
+  differ only in where the stripped output goes. Bundling afterwards is
+  optional and the user's choice.
+- Both commands are served by Sheratan's own minimal server rather than a
+  third-party dev server: a framework that promises no plugin pipeline should
+  not require one to run (ADR pending; prototyped in `examples/hello/serve.ts`).
+
+"No build" is a promise to users, not a constraint on how Sheratan itself is
+written. The core's source is strict TypeScript, compiled once before publish
+to plain ESM plus generated `.d.ts`; the package users install contains only
+the compiled output, so nothing above changes for them.
 
 Never write "no build step" unqualified. Write "no bundler, no config, no
 plugin pipeline — type stripping only".
@@ -916,6 +1237,7 @@ widget mode, since the host app owns routing).
 ```
 packages/
   core/        signals, resource, html, render, trace   (zero runtime deps)
+               src/ TypeScript → dist/ ESM + .d.ts, published
   check/       TS-API based rule checker                (dev only)
   cli/         create / generate / check / dev
   router/      post-MVP, optional — path matching, layouts, guards
@@ -935,10 +1257,11 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
 (must) survive a schedule slip; everything else is cuttable.
 
 
-- `examples/dashboard` runs from a plain `index.html` with no build step and
+- `examples/dashboard` runs from a plain `index.html` on a static file server with no build step and
   holds 60fps under a synthetic 1000 msg/sec feed into a 500-row table.
-- Every cell of the import matrix is enforced, plus L002, L005, L006, L008 and L009,
-  each with a failing-case test; `SHR-T001` reports as a warning only.
+- Every cell of the import matrix is enforced (`SHR-L001`), plus L002–L009 and
+  V001–V004, each with a failing-case test; `SHR-V002`, `SHR-V003` and
+  `SHR-T001` report as warnings only.
 - Error messages state the allowed import set, not a rule number.
 - `resource()` passes tests for: abort on key change, dedup, out-of-order
   discard, stale-while-revalidate, retry with backoff.
@@ -959,8 +1282,8 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
   Reliable instead: typed holes (`string | number | Node | Directive`) plus
   generics on `each` and `mount`, dev-time runtime validation at first parse
   (unknown attributes, unclosed tags), and the checker parsing template
-  literals off the AST to emit template errors in the same JSON shape as layer
-  errors. The optional compiler stays on the roadmap for template
+  literals off the AST to emit template errors (`SHR-V001`–`V004`) in the same
+  JSON shape as layer errors. The optional compiler stays on the roadmap for template
   precompilation (start-up speed); typing arrives with it as a side effect.
 
 - **SSR: a stated no, not a "later".** Sheratan targets app-shaped UIs behind
@@ -970,12 +1293,36 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
   README says so plainly. Two cheap constraints keep the door open: no
   `document` access at module construction, and templates stay serializable.
 
-- **`SHR-L005` is not a compile-time guarantee, and the positioning must not
-  claim it is.** Static analysis catches direct writes but loses the trail
-  through ordinary indirection. A signal held in a variable, passed to a `lib/`
-  helper, destructured — that is a TypeScript limitation, not a checker bug. Backstop: dev builds already record write provenance for the
-  causal trace, so asserting "the writer is a transition" is nearly free.
-  Checker before run, assertion on first run.
+- **The state surface is a compile-time guarantee; `SHR-L005` is the backstop,
+  and the positioning must not claim more.** The rule that carries the weight is
+  `SHR-L010` (§4): a `*.state.ts` exposes `Accessor` values and transitions,
+  never a `Signal`. That is one declaration per field, checked in the file that
+  writes it, and it makes `state.rows.set(…)` from anywhere outside a compile
+  error rather than a finding — the guarantee L005 was asked for and could not
+  give.
+
+  `SHR-L005` stays, and stays best-effort. It catches a direct write while the
+  surface is still wrong — a partly repaired module, a state factory with no
+  declared interface — and it loses the trail through ordinary indirection: a
+  signal held in a variable, passed to a `lib/` helper, destructured. That is a
+  TypeScript limitation, not a checker bug. Statically, a transition is any
+  function exported by `*.state.ts` (§4), and L005 flags a `.set()` on state
+  reached from `*.effects.ts`. Backstop: dev builds record write provenance for
+  the causal trace; with plain-function transitions the assertion has to
+  identify the writer by call site rather than by a marker — open, see TASKS
+  "Spec gaps". Both report `SHR-L005`.
+
+  Neither rule says **when** a transition may be called: `SHR-L010` guarantees
+  that a write goes through one, not that the one called was the right one, or
+  that its owner is still alive (§5b rule 1). That is the same open gap, and the
+  `transition()` marker is its answer, not this.
+
+  Evidence for the split, from the Week 0 self-repair eval
+  (`Docs/EVAL-RESULTS.md`): the `SHR-L005` violation could not be injected at
+  all until the state interface had been widened from `Accessor` to `Signal`
+  first, and one repair removed the write while leaving the widened declaration
+  behind — a module that passed the write check and was still wrong. `L005` was
+  also the only rule of the three measured that ever failed to be repaired.
 
 ## 14. To be settled by the reference app
 

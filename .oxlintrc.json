@@ -1,0 +1,387 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "promise", "node"],
+  "jsPlugins": [
+    "@stylistic/eslint-plugin",
+    {
+      "name": "jsdoc-js",
+      "specifier": "eslint-plugin-jsdoc"
+    }
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "env": {
+    "builtin": true,
+    "es2024": true
+  },
+  "ignorePatterns": ["**/dist/**", "**/coverage/**", "site/**", "Docs/**"],
+  "rules": {
+    "@stylistic/padding-line-between-statements": [
+      "error",
+      {
+        "blankLine": "always",
+        "prev": "directive",
+        "next": "*"
+      },
+      {
+        "blankLine": "always",
+        "prev": "import",
+        "next": "*"
+      },
+      {
+        "blankLine": "any",
+        "prev": "import",
+        "next": "import"
+      },
+      {
+        "blankLine": "always",
+        "prev": ["const", "let"],
+        "next": "*"
+      },
+      {
+        "blankLine": "any",
+        "prev": ["singleline-const", "singleline-let"],
+        "next": ["singleline-const", "singleline-let"]
+      },
+      {
+        "blankLine": "always",
+        "prev": "*",
+        "next": ["multiline-block-like", "multiline-expression", "multiline-const", "multiline-let"]
+      },
+      {
+        "blankLine": "always",
+        "prev": [
+          "multiline-block-like",
+          "multiline-expression",
+          "multiline-const",
+          "multiline-let"
+        ],
+        "next": "*"
+      },
+      {
+        "blankLine": "always",
+        "prev": "block-like",
+        "next": "*"
+      },
+      {
+        "blankLine": "always",
+        "prev": "*",
+        "next": ["return", "throw"]
+      },
+      {
+        "blankLine": "always",
+        "prev": ["function", "class"],
+        "next": "*"
+      }
+    ],
+    "@stylistic/max-statements-per-line": [
+      "error",
+      {
+        "max": 1
+      }
+    ],
+    "@stylistic/lines-between-class-members": ["error", "always"],
+    "jsdoc-js/require-jsdoc": [
+      "error",
+      {
+        "publicOnly": true,
+        "require": {
+          "FunctionDeclaration": true,
+          "ClassDeclaration": true,
+          "ArrowFunctionExpression": true
+        },
+        "contexts": [
+          "TSInterfaceDeclaration",
+          "TSTypeAliasDeclaration",
+          "ExportNamedDeclaration > VariableDeclaration"
+        ]
+      }
+    ],
+    "curly": ["error", "multi-line"],
+    "eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
+    "no-console": "error",
+    "no-nested-ternary": "error",
+    "no-param-reassign": "error",
+    "prefer-const": "error",
+    "no-var": "error",
+    "object-shorthand": "error",
+    "complexity": ["error", 10],
+    "max-depth": ["error", 3],
+    "max-params": ["error", 4],
+    "max-lines": [
+      "error",
+      {
+        "max": 400,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "max-lines-per-function": [
+      "error",
+      {
+        "max": 50,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "max-nested-callbacks": ["error", 3],
+    "typescript/no-magic-numbers": [
+      "error",
+      {
+        "ignore": [-1, 0, 1],
+        "ignoreArrayIndexes": true,
+        "ignoreDefaultValues": true,
+        "ignoreEnums": true,
+        "ignoreNumericLiteralTypes": true,
+        "ignoreReadonlyClassProperties": true,
+        "ignoreTypeIndexes": true,
+        "enforceConst": true
+      }
+    ],
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/consistent-type-definitions": ["error", "interface"],
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/no-unnecessary-condition": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/strict-boolean-expressions": [
+      "error",
+      {
+        "allowNullableObject": true,
+        "allowString": false,
+        "allowNumber": false
+      }
+    ],
+    "typescript/prefer-nullish-coalescing": "error",
+    "typescript/prefer-optional-chain": "error",
+    "typescript/restrict-template-expressions": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/return-await": "error",
+    "typescript/only-throw-error": "error",
+    "import/no-cycle": "error",
+    "import/no-default-export": "error",
+    "import/no-duplicates": "error",
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/no-array-for-each": "error",
+    "unicorn/prefer-at": "error",
+    "unicorn/throw-new-error": "error",
+    "typescript/no-unsafe-type-assertion": "off",
+    "no-underscore-dangle": [
+      "error",
+      {
+        "allow": ["__sheratan"]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["packages/core/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**", "!./**", "!../**"],
+                "message": "Runtime code imports only relative modules (SPEC A4: zero runtime dependencies)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/test/**", "**/*.test.ts", "**/scripts/**", "**/e2e/**", "**/*.e2e.ts"],
+      "rules": {
+        "typescript/no-magic-numbers": "off",
+        "typescript/no-non-null-assertion": "off",
+        "max-lines": "off",
+        "max-lines-per-function": "off",
+        "max-nested-callbacks": "off",
+        "jsdoc-js/require-jsdoc": "off",
+        "no-console": "off",
+        "typescript/no-floating-promises": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-return": "off"
+      }
+    },
+    {
+      "files": ["**/*.view.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/*.effects.ts", "./*.effects.ts", "*.effects.ts"],
+                "message": "A view declares the intents it needs; effects satisfy them structurally, so the view never imports them (SPEC \u00a74)."
+              },
+              {
+                "group": [
+                  "**/services/**",
+                  "../services/**",
+                  "../../services/**",
+                  "!**/services/*.contract.ts",
+                  "!../services/*.contract.ts",
+                  "!../../services/*.contract.ts"
+                ],
+                "message": "Modules depend on services/*.contract.ts; only app.ts may name an adapter (SPEC \u00a74b)."
+              }
+            ]
+          }
+        ],
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "fetch",
+            "message": "I/O lives in *.effects.ts, behind a service contract (SPEC \u00a74)."
+          },
+          {
+            "name": "XMLHttpRequest",
+            "message": "I/O lives in *.effects.ts, behind a service contract (SPEC \u00a74)."
+          },
+          {
+            "name": "localStorage",
+            "message": "Storage is I/O: put it in *.effects.ts behind a contract (SPEC \u00a74)."
+          },
+          {
+            "name": "sessionStorage",
+            "message": "Storage is I/O: put it in *.effects.ts behind a contract (SPEC \u00a74)."
+          },
+          {
+            "name": "document",
+            "message": "Views describe markup with html``; direct DOM access belongs in *.effects.ts (SPEC \u00a74)."
+          },
+          {
+            "name": "window",
+            "message": "Browser APIs belong in *.effects.ts, with teardown in onDispose() (SPEC \u00a74)."
+          },
+          {
+            "name": "navigator",
+            "message": "Browser APIs belong in *.effects.ts, with teardown in onDispose() (SPEC \u00a74)."
+          },
+          {
+            "name": "setTimeout",
+            "message": "Timers are effects: schedule them in *.effects.ts and clear them in onDispose() (SPEC \u00a74)."
+          },
+          {
+            "name": "setInterval",
+            "message": "Timers are effects: schedule them in *.effects.ts and clear them in onDispose() (SPEC \u00a74)."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.state.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/*.effects.ts", "./*.effects.ts", "*.effects.ts"],
+                "message": "State is pure: sequencing and I/O live in *.effects.ts, which calls transitions (SPEC \u00a74)."
+              },
+              {
+                "group": ["**/*.view.ts", "./*.view.ts", "*.view.ts"],
+                "message": "State knows nothing about markup (SPEC \u00a74)."
+              },
+              {
+                "group": [
+                  "**/services/**",
+                  "../services/**",
+                  "../../services/**",
+                  "!**/services/*.contract.ts",
+                  "!../services/*.contract.ts",
+                  "!../../services/*.contract.ts"
+                ],
+                "message": "Modules depend on services/*.contract.ts; only app.ts may name an adapter (SPEC \u00a74b)."
+              }
+            ]
+          }
+        ],
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "fetch",
+            "message": "I/O lives in *.effects.ts, behind a service contract (SPEC \u00a74)."
+          },
+          {
+            "name": "XMLHttpRequest",
+            "message": "I/O lives in *.effects.ts, behind a service contract (SPEC \u00a74)."
+          },
+          {
+            "name": "localStorage",
+            "message": "Storage is I/O: put it in *.effects.ts behind a contract (SPEC \u00a74)."
+          },
+          {
+            "name": "sessionStorage",
+            "message": "Storage is I/O: put it in *.effects.ts behind a contract (SPEC \u00a74)."
+          },
+          {
+            "name": "document",
+            "message": "Views describe markup with html``; direct DOM access belongs in *.effects.ts (SPEC \u00a74)."
+          },
+          {
+            "name": "window",
+            "message": "Browser APIs belong in *.effects.ts, with teardown in onDispose() (SPEC \u00a74)."
+          },
+          {
+            "name": "navigator",
+            "message": "Browser APIs belong in *.effects.ts, with teardown in onDispose() (SPEC \u00a74)."
+          },
+          {
+            "name": "setTimeout",
+            "message": "Timers are effects: schedule them in *.effects.ts and clear them in onDispose() (SPEC \u00a74)."
+          },
+          {
+            "name": "setInterval",
+            "message": "Timers are effects: schedule them in *.effects.ts and clear them in onDispose() (SPEC \u00a74)."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.effects.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/*.view.ts", "./*.view.ts", "*.view.ts"],
+                "message": "Effects implement intents; the view is wired to them in index.ts (SPEC \u00a74)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/playwright.config.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+===== modules/customers/customers.effects.ts
+// Effects: the only impure file (SPEC §4). It calls the contract and then
+// invokes one transition; it never decides what the data means.
+
+import { onDispose } from 'sheratan';
+
+import type { Api } from '../../services/api.contract.ts';
+import type { NotificationsEffects } from '../notifications/index.ts';
+import type { CustomersState } from './customers.state.ts';
+
+/** What this module can do. The view declares the same shape for itself. */
+export interface CustomersEffects {
+  load(this: void): void;
+  retry(this: void): void;
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : 'unknown error';
+}
+
+/** Wires the state to the API, and gives the mount its teardown. */
+export function createCustomersEffects(
+  api: Api,
+  state: CustomersState,
+  notifications: NotificationsEffects,
+): CustomersEffects {
+  const controller = new AbortController();
+
+  onDispose(() => {
+    controller.abort();
+  });
+
+  const run = async (): Promise<void> => {
+    state.started();
+
+    try {
+      const rows = await api.customers(controller.signal);
+
+      if (!controller.signal.aborted) state.loaded(rows);
+    } catch (error: unknown) {
+      if (controller.signal.aborted) return;
+
+      const message = messageOf(error);
+
+      state.failed(message);
+      notifications.raise(message);
+    }
+  };
+
+  const load = (): void => {
+    void run();
+  };
+
+  return { load, retry: load };
+}
+
+===== modules/customers/customers.state.ts
+// State: signals and pure transitions. No I/O, no DOM (SPEC §4).
+
+import { batch, computed, signal, type Accessor } from 'sheratan';
+
+import type { Customer } from '../../services/api.contract.ts';
+
+/** Where the list is in its load cycle. Exactly one of these is true (T01). */
+export const Status = {
+  Loading: 'loading',
+  Ready: 'ready',
+  Failed: 'failed',
+} as const;
+
+/** One of {@link Status}. */
+export type Status = (typeof Status)[keyof typeof Status];
+
+/** Readable state plus the transitions that may change it. */
+export interface CustomersState {
+  readonly rows: Accessor<readonly Customer[]>;
+  readonly status: Accessor<Status>;
+  readonly error: Accessor<string>;
+  readonly isLoading: Accessor<boolean>;
+  readonly hasFailed: Accessor<boolean>;
+
+  started(): void;
+  loaded(rows: readonly Customer[]): void;
+  failed(message: string): void;
+}
+
+const NO_ERROR = '';
+
+const NO_ROWS: readonly Customer[] = [];
+
+/** Builds the module's state. Called once per mount, inside the mount's scope. */
+export function createCustomersState(): CustomersState {
+  const rows = signal(NO_ROWS);
+  const status = signal<Status>(Status.Loading);
+  const error = signal(NO_ERROR);
+
+  return {
+    rows,
+    status,
+    error,
+    isLoading: computed(() => status() === Status.Loading),
+    hasFailed: computed(() => status() === Status.Failed),
+
+    started(): void {
+      batch(() => {
+        status.set(Status.Loading);
+        error.set(NO_ERROR);
+      });
+    },
+
+    loaded(next: readonly Customer[]): void {
+      batch(() => {
+        rows.set(next);
+        status.set(Status.Ready);
+      });
+    },
+
+    failed(message: string): void {
+      batch(() => {
+        rows.set(NO_ROWS);
+        status.set(Status.Failed);
+        error.set(message);
+      });
+    },
+  };
+}
