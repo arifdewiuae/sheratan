@@ -160,6 +160,27 @@ Set out here rather than left to be found. The longer version is in
   The 86% is 31 of 36, and the one cell that moved did not reproduce its own
   margin when measured again.
 
+## What changed because of this
+
+One spec amendment, 2026-09-17. `SHR-L005` — *"effects must not mutate state
+directly"* — was the only rule that ever failed to be repaired, and the run
+showed why in the injection rather than in the score: the violation **could not
+be written** until the state interface was first widened from `Accessor<T>` to
+`Signal<T>`, because `Accessor<T>` is `() => T` and has no `.set`. In
+`L005-notifications` a repair then removed the write and left the widened
+declaration behind — a module that passed the check and was still wrong.
+
+So the check moved to the declaration. `SHR-L010` (SPEC §4) says a `*.state.ts`
+exposes only `Accessor` values and transitions; a `Signal` never leaves the
+file. That is one declaration per field rather than a dataflow check on every
+call site, it makes the write a compile error instead of a finding, and it
+covers the view and `index.ts`, which L005 never named. `SHR-L005` stays as the
+best-effort backstop, and SPEC §13's caveat now says which half is a guarantee.
+
+Worth stating plainly: this came out of the instrument's *mechanics*, not its
+numbers. The `bare` arm's margin is the part of this document that did not
+survive re-measurement; this part did not depend on it.
+
 ## Next
 
 1. **Build the comparison arm** — `evalkit`, the hidden suites, the React app.

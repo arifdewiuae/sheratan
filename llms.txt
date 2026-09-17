@@ -303,6 +303,13 @@ factory. It is the only thing that writes signals. One that writes several
 signals wraps them in `batch()`. An effect that gathers several results calls
 **one** transition with all of them — two calls render an in-between state.
 
+**The state surface is read-only (SHR-L010).** `create<Name>State()` declares an
+interface whose members are `Accessor` values and transitions; the `Signal`
+handles stay private to `<name>.state.ts`. `Accessor<T>` is `() => T` with no
+`.set`, so `state.rows.set(list)` from effects or a view does not compile.
+Never type a state factory as `ReturnType<typeof create…>` — that leaks the
+signals.
+
 **State holds only what cannot be derived.** Filters, joins, counts, formatted
 values and "is anything selected" are computeds, never stored.
 
@@ -329,22 +336,34 @@ export const createHttpApi = (base: string): Api => ({
 });
 
 // modules/customers/customers.state.ts
-import { signal, computed, batch } from 'sheratan';
+import { signal, computed, batch, type Accessor } from 'sheratan';
 import type { Customer } from '../../services/api.contract.ts';
 
-export const createCustomersState = () => {
-  const status = signal<'loading' | 'error' | 'ready'>('loading');
-  const rows = signal<Customer[]>([]);
+type Status = 'loading' | 'error' | 'ready';
+
+// Declared, not inferred: accessors and transitions leave the file, signals don't (SHR-L010).
+export interface CustomersState {
+  readonly status: Accessor<Status>;
+  readonly rows: Accessor<readonly Customer[]>;
+  readonly error: Accessor<string | undefined>;
+  readonly count: Accessor<number>;
+  readonly loadStarted: () => void;
+  readonly loaded: (list: readonly Customer[]) => void;
+  readonly failed: (message: string) => void;
+}
+
+export const createCustomersState = (): CustomersState => {
+  const status = signal<Status>('loading');
+  const rows = signal<readonly Customer[]>([]);
   const error = signal<string | undefined>(undefined);
   return {
     status, rows, error,
     count: computed(() => rows().length),
     loadStarted: () => batch(() => { status.set('loading'); error.set(undefined); }),
-    loaded: (list: Customer[]) => batch(() => { rows.set(list); status.set('ready'); }),
+    loaded: (list: readonly Customer[]) => batch(() => { rows.set(list); status.set('ready'); }),
     failed: (message: string) => batch(() => { error.set(message); status.set('error'); }),
   };
 };
-export type CustomersState = ReturnType<typeof createCustomersState>;
 
 // modules/customers/customers.effects.ts
 import { onDispose } from 'sheratan';
@@ -418,6 +437,8 @@ render(createCustomers(createHttpApi('/api')), document.getElementById('app')!);
 Why it is shaped this way: `index.ts` returns a function, so state and effects
 are created inside `render()` and everything they start is disposed with it.
 The view declares the intents it needs; the effects object satisfies them.
+`CustomersState` is declared rather than inferred, so effects and view hold
+accessors and cannot write a signal even by accident.
 
 ## 8. Tests
 
@@ -442,6 +463,7 @@ module (SHR-T001 warns when missing). End-to-end tests live in `e2e/`.
 | `@click=${() => intent.ship(id)}` | `@click=${intent.ship}` inside the row; handler reads its 2nd argument | V001 |
 | `fetch(…)` in a view or state | contract method in `services/`, called from effects | L002 / L001 |
 | `state.rows.set(list)` in effects | a transition: `state.loaded(list)` | L005 |
+| state exposes `rows: Signal<T>` | `rows: Accessor<T>` plus a transition that writes it | L010 |
 | `import { x } from '../orders/orders.state.ts'` | `import { … } from '../orders/index.ts'` (effects only) | L001 |
 | view imports effects | the view receives intents as a parameter | L001 |
 | `state.a(x); state.b(y);` after one await | one transition taking `{ x, y }` | — |
@@ -480,6 +502,7 @@ Apply the `fix`; the `message` names the allowed set.
 | SHR-L007 | Promise-returning contract method without an `AbortSignal` |
 | SHR-L008 | circular imports between modules |
 | SHR-L009 | module stylesheet not wrapped in its `@scope` |
+| SHR-L010 | a `*.state.ts` exposes a `Signal`; only accessors and transitions leave the file |
 | SHR-V001 | inline function in a template hole (error) |
 | SHR-V002 | `unsafeHTML` with a non-literal argument (warning) |
 | SHR-V003 | signal called inside a hole (warning) |

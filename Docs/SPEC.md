@@ -16,9 +16,12 @@ A frontend framework with **one legal way to structure an app**, enforced by a
 checker with machine-readable fixes, plus async and live data in the core.
 
 Precise version of the enforcement claim, because the loose one is an
-overclaim: **the import matrix is enforced statically**; `SHR-L005` falls back
-to a dev-time runtime assertion (§13). Never write "all architectural
-violations are compile errors."
+overclaim: **the import matrix is enforced statically**, and a write to state
+from outside `*.state.ts` is a **type** error, because the state surface exposes
+no `Signal` to write through (`SHR-L010`, §4). What is not a guarantee:
+`SHR-L005`, which has to find the writes the type system can no longer see, and
+falls back to a dev-time runtime assertion (§13). Never write "all
+architectural violations are compile errors."
 
 Why this needs a framework rather than an ESLint plugin: React's problem for a
 code-generating agent is not a missing linter, it is that there are too many
@@ -189,11 +192,12 @@ Constraints the matrix cannot express:
 | `SHR-L002` | `*.view.ts` must not call an I/O global (`fetch`, `localStorage`, `document`, timers) |
 | `SHR-L003` | Project layout: no `shared/` directory; `ui/` nests at most one level (below) |
 | `SHR-L004` | Effects-only APIs — `resource()`, `mutation()`, `stream()`, `onDispose()`, `navigate()` — are called only inside `*.effects.ts` |
-| `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts` |
+| `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts`. Best-effort backstop to `SHR-L010` (§13) |
 | `SHR-L006` | Module file set matches its declared kind (below) |
 | `SHR-L007` | Every `Promise`-returning method in a `*.contract.ts` takes an `AbortSignal` (§5b) |
 | `SHR-L008` | The module import graph must be acyclic |
 | `SHR-L009` | Module and `ui/` stylesheets are wrapped in one `@scope` with a lower boundary; `global.css` holds only `tokens` and `base` (§9a) |
+| `SHR-L010` | A `*.state.ts` public surface exposes only `Accessor` values and transitions; a `Signal` never leaves the file (below) |
 
 Template rules, checked off the AST of `html` literals (§9, §13):
 
@@ -276,6 +280,44 @@ export const ordersLoaded = ({ orders, customers }) => batch(() => {
 
 Intent handlers already run inside a batch (§9), so a transition called from
 one commits once either way.
+
+### The state surface: accessors out, transitions in
+
+`create<Name>State()` returns a **declared** interface, and every member of it
+is an `Accessor` or a transition. The writable handles stay private to the file
+(`SHR-L010`):
+
+```ts
+// customers.state.ts
+interface Signals {                          // private: the writable handles
+  readonly rows: Signal<readonly Customer[]>;
+  readonly status: Signal<Status>;
+}
+
+export interface CustomersState {            // public: reads and transitions
+  readonly rows: Accessor<readonly Customer[]>;
+  readonly count: Accessor<number>;
+  readonly loaded: (rows: readonly Customer[]) => void;
+}
+```
+
+`Accessor<T>` is `() => T` and has no `.set`, so the write `SHR-L005` describes
+— `state.rows.set(list)` from `*.effects.ts` — **stops compiling**. It is a type
+error at the call site, in the editor, before any checker runs (A2), and it
+cannot be written at all without first widening the declaration in
+`*.state.ts`, which is the thing `SHR-L010` reports.
+
+The gain is where the check lives: `SHR-L010` reads **one declaration per
+field** in the file that owns it, where `SHR-L005` has to follow a value
+through every call site that touches it (§13). It also covers callers L005
+never named — a view or an `index.ts` handed the state object gets the same
+type error — and it needs nothing new in the runtime.
+
+The rule is on the *public surface*, not on the file. Inside `*.state.ts` the
+signals are written freely; that is what a transition is for. An inferred
+return type (`ReturnType<typeof createCustomersState>`) is not a surface, it is
+whatever the factory happened to return, so a state factory declares its
+interface.
 
 ### State holds only what cannot be derived
 
@@ -1248,15 +1290,36 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
   README says so plainly. Two cheap constraints keep the door open: no
   `document` access at module construction, and templates stay serializable.
 
-- **`SHR-L005` is not a compile-time guarantee, and the positioning must not
-  claim it is.** Static analysis catches direct writes but loses the trail
-  through ordinary indirection. A signal held in a variable, passed to a `lib/`
-  helper, destructured — that is a TypeScript limitation, not a checker bug.
-  Statically, a transition is any function exported by `*.state.ts` (§4), and
-  L005 flags a `.set()` on state reached from `*.effects.ts`. Backstop: dev
-  builds record write provenance for the causal trace; with plain-function
-  transitions the assertion has to identify the writer by call site rather
-  than by a marker — open, see TASKS "Spec gaps". Both report `SHR-L005`.
+- **The state surface is a compile-time guarantee; `SHR-L005` is the backstop,
+  and the positioning must not claim more.** The rule that carries the weight is
+  `SHR-L010` (§4): a `*.state.ts` exposes `Accessor` values and transitions,
+  never a `Signal`. That is one declaration per field, checked in the file that
+  writes it, and it makes `state.rows.set(…)` from anywhere outside a compile
+  error rather than a finding — the guarantee L005 was asked for and could not
+  give.
+
+  `SHR-L005` stays, and stays best-effort. It catches a direct write while the
+  surface is still wrong — a partly repaired module, a state factory with no
+  declared interface — and it loses the trail through ordinary indirection: a
+  signal held in a variable, passed to a `lib/` helper, destructured. That is a
+  TypeScript limitation, not a checker bug. Statically, a transition is any
+  function exported by `*.state.ts` (§4), and L005 flags a `.set()` on state
+  reached from `*.effects.ts`. Backstop: dev builds record write provenance for
+  the causal trace; with plain-function transitions the assertion has to
+  identify the writer by call site rather than by a marker — open, see TASKS
+  "Spec gaps". Both report `SHR-L005`.
+
+  Neither rule says **when** a transition may be called: `SHR-L010` guarantees
+  that a write goes through one, not that the one called was the right one, or
+  that its owner is still alive (§5b rule 1). That is the same open gap, and the
+  `transition()` marker is its answer, not this.
+
+  Evidence for the split, from the Week 0 self-repair eval
+  (`Docs/EVAL-RESULTS.md`): the `SHR-L005` violation could not be injected at
+  all until the state interface had been widened from `Accessor` to `Signal`
+  first, and one repair removed the write while leaving the widened declaration
+  behind — a module that passed the write check and was still wrong. `L005` was
+  also the only rule of the three measured that ever failed to be repaired.
 
 ## 14. To be settled by the reference app
 
