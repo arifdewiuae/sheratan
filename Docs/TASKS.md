@@ -250,7 +250,9 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [ ] MIT license
 - [ ] CI
 - [ ] **Make the repository public — before the publish below.** Dependency review in CI switches itself on at that point; publishing first means the first release is the one nobody could review
-- [ ] Publish to npm
+- [ ] Configure trusted publishing on npmjs.com against `arifdewiuae/sheratan`, workflow `release.yml`, environment `npm` — possible only once the package exists
+- [ ] Create the `npm` GitHub environment with required reviewers, so every publish has one manual gate
+- [ ] Publish to npm by tagging `v<version>` on `main`; `.github/workflows/release.yml` does the rest, tokenless and with provenance
 
 **Launch**
 - [ ] 5-minute demo: agent violates a layer → checker catches → agent self-repairs
@@ -355,6 +357,7 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-17 | `SHR-L011` assigned to statically visible mutation of a signal's value (SPEC §4, ADR 0002 layer 3) | The rule had been specified since 2026-09-15 with no code, so it could not be reported, documented or tested. Next free code is `SHR-L012` |
 | 2026-09-17 | Agent-authoring eval gains Svelte 5 as a held-out, non-gating second control; React stays the gating arm; Vue stays out (EVAL §2.1) | React and Svelte answer different questions. React tests "do enforced boundaries beat a training-data advantage"; Svelte — runes, a compiler, one idiomatic shape — tests whether it is the *enforcement* at all or just fine-grained reactivity plus convention. A tie with Svelte is a finding needed before launch. Vue adds an Options/Composition confound and no new question. Cheap because EVAL-TASKS §1.1 keeps the hidden suites framework-neutral |
 | 2026-09-17 | The 60fps gate is Week 4 in EVAL too, not Week 2–3; Week 2's gate is correctness and leaks | It is gated where its harness is (EVAL §1.2). Measurable earlier, and measuring early is encouraged — but a gate with no instrument is a wish |
+| 2026-09-17 | Releases publish from CI via npm trusted publishing (OIDC), never a stored token; `release.yml` + an `npm` environment gate; provenance is automatic | pnpm 12.4.1 does the OIDC exchange natively — its binary carries `ACTIONS_ID_TOKEN_REQUEST_URL`, npm's `/-/npm/v1/oidc/token/exchange/package/` endpoint and the sigstore attestation machinery — so AGENTS.md's "never npm or yarn" does not have to bend. A long-lived `NPM_TOKEN` in repo secrets is the single most attacked artifact in the npm ecosystem |
 | 2026-09-17 | Devtools (Chrome formatter, Performance track, debug names) are post-launch, not MVP | SPEC §12's DoD does not ask for them, `__sheratan.trace()`/`format()` is the shipped surface, and a browser-only formatter cannot be covered in happy-dom against a 100% gate |
 | 2026-09-16 | Effects skip their transition when the mount is already disposed | SPEC §5b rule 1 asks for post-disposal no-ops and the runtime cannot see a late response yet; the example shows the pattern, and a test pins it |
 | 2026-09-16 | `pnpm audit signatures` moved out of the PR gate to the daily run (ADR 0001); advisories still block every PR | Signature verification needs a packument per lockfile entry, including platforms we never install, and fails a few per run for reasons unrelated to the change |
