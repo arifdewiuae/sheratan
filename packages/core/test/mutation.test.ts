@@ -25,7 +25,7 @@ interface Saved {
   version: number;
 }
 
-/** One call to `run`, held open until the test decides how it ends. */
+/** One call to `send`, held open until the test decides how it ends. */
 interface Call {
   input: Order;
   signal: AbortSignal;
@@ -34,15 +34,18 @@ interface Call {
 }
 
 /** A request that never settles on its own, so every race is the test's to run. */
-function controlled(): { run: (context: MutationContext<Order>) => Promise<Saved>; calls: Call[] } {
+function controlled(): {
+  send: (context: MutationContext<Order>) => Promise<Saved>;
+  calls: Call[];
+} {
   const calls: Call[] = [];
 
-  const run = ({ input, signal }: MutationContext<Order>): Promise<Saved> =>
+  const send = ({ input, signal }: MutationContext<Order>): Promise<Saved> =>
     new Promise<Saved>((resolve, reject) => {
       calls.push({ input, signal, resolve, reject });
     });
 
-  return { run, calls };
+  return { send, calls };
 }
 
 /** Every transition and callback, in the order the mutation made them. */
@@ -90,9 +93,9 @@ afterEach(() => {
 });
 
 test('a mutation is idle until it is run', () => {
-  const { run, calls } = controlled();
+  const { send, calls } = controlled();
 
-  const save = mounted(() => mutation({ run }));
+  const save = mounted(() => mutation({ send }));
 
   assert.equal(save.status(), MutationStatus.Idle);
   assert.equal(save.error(), undefined);
@@ -100,8 +103,8 @@ test('a mutation is idle until it is run', () => {
 });
 
 test('a run hands over its input and a signal, and settles done', async () => {
-  const { run, calls } = controlled();
-  const save = mounted(() => mutation({ run }));
+  const { send, calls } = controlled();
+  const save = mounted(() => mutation({ send }));
 
   void save.run({ id: 1 });
 
@@ -118,15 +121,15 @@ test('a run hands over its input and a signal, and settles done', async () => {
 });
 
 test('the optimistic transition runs before the request, and success follows it', async () => {
-  const { run, calls } = controlled();
+  const { send, calls } = controlled();
   const { log, ...callbacks } = journal();
 
   const save = mounted(() =>
     mutation({
-      run: (context) => {
+      send: (context) => {
         log.push(`request ${String(context.input.id)}`);
 
-        return run(context);
+        return send(context);
       },
       ...callbacks,
     }),
@@ -140,9 +143,9 @@ test('the optimistic transition runs before the request, and success follows it'
 });
 
 test('a failure rolls back and becomes a value, not a throw', async () => {
-  const { run, calls } = controlled();
+  const { send, calls } = controlled();
   const { log, ...callbacks } = journal();
-  const save = mounted(() => mutation({ run, ...callbacks }));
+  const save = mounted(() => mutation({ send, ...callbacks }));
 
   const done = save.run({ id: 1 });
 
@@ -155,8 +158,8 @@ test('a failure rolls back and becomes a value, not a throw', async () => {
 });
 
 test('a thrown non-Error is wrapped, so error() is always an Error', async () => {
-  const { run, calls } = controlled();
-  const save = mounted(() => mutation({ run }));
+  const { send, calls } = controlled();
+  const save = mounted(() => mutation({ send }));
 
   const done = save.run({ id: 1 });
 
@@ -168,8 +171,8 @@ test('a thrown non-Error is wrapped, so error() is always an Error', async () =>
 });
 
 test('run() resolves when that run settles, and never rejects', async () => {
-  const { run, calls } = controlled();
-  const save = mounted(() => mutation({ run }));
+  const { send, calls } = controlled();
+  const save = mounted(() => mutation({ send }));
 
   const first = save.run({ id: 1 });
   const second = save.run({ id: 2 });
@@ -186,9 +189,9 @@ test('run() resolves when that run settles, and never rejects', async () => {
 });
 
 test('runs are serialized: the second request waits for the first', async () => {
-  const { run, calls } = controlled();
+  const { send, calls } = controlled();
   const { log, ...callbacks } = journal();
-  const save = mounted(() => mutation({ run, ...callbacks }));
+  const save = mounted(() => mutation({ send, ...callbacks }));
 
   void save.run({ id: 1 });
   void save.run({ id: 2 });
@@ -212,10 +215,69 @@ test('runs are serialized: the second request waits for the first', async () => 
   assert.equal(save.status(), MutationStatus.Done);
 });
 
-test('a failed run does not stop the queue behind it', async () => {
-  const { run, calls } = controlled();
+test('with a key, runs for different keys are in flight at once', async () => {
+  const { send, calls } = controlled();
   const { log, ...callbacks } = journal();
-  const save = mounted(() => mutation({ run, ...callbacks }));
+  const save = mounted(() => mutation({ key: (order) => order.id, send, ...callbacks }));
+
+  void save.run({ id: 1 });
+  void save.run({ id: 2 });
+
+  assert.equal(calls.length, 2, 'two different orders do not wait for each other');
+
+  // The second answers first; the first failing afterwards reverts only itself.
+  calls[1]!.resolve({ version: 3 });
+  await settled();
+
+  assert.equal(save.status(), MutationStatus.Running, 'order 1 is still in flight');
+
+  calls[0]!.reject(new Error('conflict'));
+  await settled();
+
+  assert.deepEqual(log, ['optimistic 1', 'optimistic 2', 'success 2 v3', 'rollback 1']);
+  assert.equal(save.status(), MutationStatus.Error, 'the last run to settle decides');
+});
+
+test('with a key, runs for the same key still wait their turn', async () => {
+  const { send, calls } = controlled();
+  const save = mounted(() => mutation({ key: (order) => order.id, send }));
+
+  void save.run({ id: 1 });
+  void save.run({ id: 1 });
+  void save.run({ id: 2 });
+
+  assert.deepEqual(
+    calls.map((call) => call.input.id),
+    [1, 2],
+    'the second save of order 1 waits; order 2 does not',
+  );
+
+  calls[0]!.resolve({ version: 2 });
+  await settled();
+
+  assert.deepEqual(
+    calls.map((call) => call.input.id),
+    [1, 2, 1],
+  );
+});
+
+test('unmounting aborts every key in flight', () => {
+  const { send, calls } = controlled();
+  const save = mounted(() => mutation({ key: (order) => order.id, send }));
+
+  void save.run({ id: 1 });
+  void save.run({ id: 2 });
+
+  close?.();
+  close = undefined;
+
+  assert.ok(calls.every((call) => call.signal.aborted));
+});
+
+test('a failed run does not stop the queue behind it', async () => {
+  const { send, calls } = controlled();
+  const { log, ...callbacks } = journal();
+  const save = mounted(() => mutation({ send, ...callbacks }));
 
   void save.run({ id: 1 });
   void save.run({ id: 2 });
@@ -234,8 +296,8 @@ test('a failed run does not stop the queue behind it', async () => {
 });
 
 test('status and error describe the last run to settle', async () => {
-  const { run, calls } = controlled();
-  const save = mounted(() => mutation({ run }));
+  const { send, calls } = controlled();
+  const save = mounted(() => mutation({ send }));
 
   void save.run({ id: 1 });
   calls[0]!.reject(new Error('conflict'));
@@ -257,9 +319,9 @@ test('status and error describe the last run to settle', async () => {
 });
 
 test('a request cancelled by its adapter rolls back but is not an error', async () => {
-  const { run, calls } = controlled();
+  const { send, calls } = controlled();
   const { log, ...callbacks } = journal();
-  const save = mounted(() => mutation({ run, ...callbacks }));
+  const save = mounted(() => mutation({ send, ...callbacks }));
 
   const done = save.run({ id: 1 });
 
@@ -274,12 +336,12 @@ test('a request cancelled by its adapter rolls back but is not an error', async 
 });
 
 test('onSuccess throwing is reported without rolling back a write that landed', async () => {
-  const { run, calls } = controlled();
+  const { send, calls } = controlled();
   const { log, rollback } = journal();
 
   const save = mounted(() =>
     mutation({
-      run,
+      send,
       rollback,
       onSuccess: () => {
         throw new Error('refresh failed');
@@ -298,9 +360,9 @@ test('onSuccess throwing is reported without rolling back a write that landed', 
 });
 
 test('unmounting aborts the request in flight and drops the queue', async () => {
-  const { run, calls } = controlled();
+  const { send, calls } = controlled();
   const { log, ...callbacks } = journal();
-  const save = mounted(() => mutation({ run, ...callbacks }));
+  const save = mounted(() => mutation({ send, ...callbacks }));
 
   const first = save.run({ id: 1 });
   const second = save.run({ id: 2 });
@@ -320,9 +382,9 @@ test('unmounting aborts the request in flight and drops the queue', async () => 
 });
 
 test('a late failure after unmount rolls nothing back', async () => {
-  const { run, calls } = controlled();
+  const { send, calls } = controlled();
   const { log, ...callbacks } = journal();
-  const save = mounted(() => mutation({ run, ...callbacks }));
+  const save = mounted(() => mutation({ send, ...callbacks }));
 
   const done = save.run({ id: 1 });
 
@@ -337,9 +399,9 @@ test('a late failure after unmount rolls nothing back', async () => {
 });
 
 test('run() after unmount does nothing, and says so by resolving', async () => {
-  const { run, calls } = controlled();
+  const { send, calls } = controlled();
   const { log, ...callbacks } = journal();
-  const save = mounted(() => mutation({ run, ...callbacks }));
+  const save = mounted(() => mutation({ send, ...callbacks }));
 
   close?.();
   close = undefined;
@@ -352,22 +414,22 @@ test('run() after unmount does nothing, and says so by resolving', async () => {
 });
 
 test('a mutation outside an owner fails loudly with SHR-R001', () => {
-  const { run } = controlled();
+  const { send } = controlled();
 
   assert.throws(
-    () => mutation({ run }),
+    () => mutation({ send }),
     (error: unknown) =>
       error instanceof SheratanError && error.code === ErrorCode.DisposeOutsideOwner,
   );
 });
 
 test('mount and dispose cycles leak no subscriptions', async () => {
-  const { run, calls } = controlled();
+  const { send, calls } = controlled();
   const before = liveSubscriptions();
 
   for (let cycle = 0; cycle < CYCLES; cycle++) {
     const stop = root(() => {
-      void mutation({ run }).run({ id: cycle });
+      void mutation({ send }).run({ id: cycle });
     });
 
     stop();

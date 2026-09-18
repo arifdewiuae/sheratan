@@ -1,14 +1,19 @@
-// Writes in the core (SPEC §6). `resource()` reads; this is its write path:
-// an optimistic transition the moment a run is asked for, the request, and
-// then either what follows a success or the rollback of a write that did not
-// land. Runs are serialized, so two saves of one form cannot race each other
-// to the server and land in the wrong order.
+// Writes in the core (SPEC §6), alongside `resource()` for reads. The two need
+// opposite rules — a newer read makes the older one worthless, a newer write
+// makes the older one no less real — so they are two primitives, not one.
+// A run is an optimistic transition the moment it is asked for, the request,
+// and then either what follows a success or the rollback of a write that did
+// not land. Runs for one key are serialized, so two saves of one record cannot
+// race to the server and land in the wrong order; different keys do not wait.
 
 import { isAbort, toError } from './async.ts';
 import { onDispose } from './owner.ts';
 import { batch } from './scheduler.ts';
 import { signal } from './signal.ts';
 import type { Signal } from './types.ts';
+
+/** Every run shares this lane when no `key` is given. */
+const UNKEYED: unique symbol = Symbol('unkeyed');
 
 /** Where a mutation is. Every state but `running` is the outcome of the last run to settle. */
 export const MutationStatus = {
@@ -25,7 +30,7 @@ export const MutationStatus = {
 /** One of the four states a mutation can be in. */
 export type MutationStatus = (typeof MutationStatus)[keyof typeof MutationStatus];
 
-/** What `run` is handed: the input it was called with, and the signal that cancels. */
+/** What `send` is handed: the input it was called with, and the signal that cancels. */
 export interface MutationContext<I> {
   /** The input passed to `mutation.run(input)`. */
   readonly input: I;
@@ -33,10 +38,16 @@ export interface MutationContext<I> {
   readonly signal: AbortSignal;
 }
 
-/** How a mutation is described. Only `run` is required. */
+/** How a mutation is described. Only `send` is required. */
 export interface MutationOptions<I, R> {
-  /** The request that performs the write. */
-  readonly run: (context: MutationContext<I>) => Promise<R>;
+  /** The request that performs the write. It must pass `signal` on. */
+  readonly send: (context: MutationContext<I>) => Promise<R>;
+  /**
+   * Which record a run writes. Runs with the same key wait for each other;
+   * runs with different keys are in flight at once. Without it, every run
+   * waits for the one before.
+   */
+  readonly key?: (input: I) => string | number;
   /** A transition applied before the request, so the screen does not wait for it. */
   readonly optimistic?: (input: I) => void;
   /** A transition that undoes `optimistic` when the write did not land. */
@@ -52,8 +63,9 @@ export interface Mutation<I> {
   /** Why the last run to settle failed. Cancellation never lands here (SPEC §5b). */
   error(): Error | undefined;
   /**
-   * Queues a run behind any in flight. Resolves when this run has settled and
-   * never rejects: the outcome is in `status()` and `error()`.
+   * Applies `optimistic` and sends the write, behind any run in flight for the
+   * same key. Resolves when this run has settled and never rejects: the
+   * outcome is in `status()` and `error()`.
    */
   run(input: I): Promise<void>;
 }
@@ -73,11 +85,13 @@ class MutationNode<I, R> implements Mutation<I> {
 
   private readonly errorSignal: Signal<Error | undefined> = signal<Error | undefined>(undefined);
 
-  private readonly queue: Queued<I>[] = [];
+  /** Runs waiting per key. A lane exists exactly while its key has a run in flight. */
+  private readonly lanes = new Map<string | number | typeof UNKEYED, Queued<I>[]>();
 
-  private controller: AbortController | undefined = undefined;
+  private readonly inFlight = new Set<AbortController>();
 
-  private draining = false;
+  /** Runs asked for and not yet settled, across every lane. */
+  private unsettled = 0;
 
   private disposed = false;
 
@@ -97,10 +111,21 @@ class MutationNode<I, R> implements Mutation<I> {
       this.statusSignal.set(MutationStatus.Running);
     });
 
-    return new Promise<void>((settle) => {
-      this.queue.push({ input, settle });
+    this.unsettled += 1;
 
-      if (!this.draining) void this.drain();
+    const key = this.options.key === undefined ? UNKEYED : this.options.key(input);
+
+    return new Promise<void>((settle) => {
+      const lane = this.lanes.get(key);
+
+      if (lane !== undefined) {
+        lane.push({ input, settle });
+
+        return;
+      }
+
+      this.lanes.set(key, []);
+      void this.drain(key, { input, settle });
     });
   };
 
@@ -116,37 +141,39 @@ class MutationNode<I, R> implements Mutation<I> {
   }
 
   /**
-   * One request on the wire at a time, in the order they were asked for.
+   * One request per key on the wire, in the order they were asked for.
    * Recursive rather than a loop: serial awaiting is the point, and a loop
    * that awaits reads as an accident.
    */
-  private async drain(): Promise<void> {
-    const next = this.queue.shift();
+  private async drain(key: string | number | typeof UNKEYED, run: Queued<I>): Promise<void> {
+    await this.execute(run.input);
+    run.settle();
 
-    this.draining = next !== undefined;
+    const next = this.lanes.get(key)?.shift();
 
-    if (next === undefined) return;
+    if (next === undefined) {
+      this.lanes.delete(key);
 
-    await this.execute(next.input);
-    next.settle();
+      return;
+    }
 
-    return this.drain();
+    return this.drain(key, next);
   }
 
   private async execute(input: I): Promise<void> {
     const controller = new AbortController();
 
-    this.controller = controller;
+    this.inFlight.add(controller);
 
     try {
-      const result = await this.options.run({ input, signal: controller.signal });
+      const result = await this.options.send({ input, signal: controller.signal });
 
       if (!this.disposed) this.succeed(result, input);
     } catch (error: unknown) {
       if (!this.disposed) this.fail(input, error);
     }
 
-    this.controller = undefined;
+    this.inFlight.delete(controller);
   }
 
   /** The write landed: whatever throws after it is reported, and nothing is rolled back. */
@@ -175,41 +202,48 @@ class MutationNode<I, R> implements Mutation<I> {
     });
   }
 
-  /** Records a run's outcome; the status stays `running` while the queue still has work. */
+  /** Records a run's outcome; the status stays `running` while any other run is unsettled. */
   private settle(outcome: MutationStatus, error: Error | undefined): void {
+    this.unsettled -= 1;
+
     batch(() => {
       this.errorSignal.set(error);
-      this.statusSignal.set(this.queue.length > 0 ? MutationStatus.Running : outcome);
+      this.statusSignal.set(this.unsettled > 0 ? MutationStatus.Running : outcome);
     });
   }
 
-  /** Aborts the request in flight and releases every run still waiting. */
+  /** Aborts every request in flight and releases every run still waiting. */
   private stop(): void {
     this.disposed = true;
-    this.controller?.abort();
 
-    for (const queued of this.queue) queued.settle();
+    for (const controller of this.inFlight) controller.abort();
 
-    this.queue.length = 0;
+    for (const lane of this.lanes.values()) {
+      for (const queued of lane) queued.settle();
+    }
+
+    this.lanes.clear();
   }
 }
 
 /**
  * A write with its optimistic update, rollback and follow-up specified rather
- * than left to each app. Runs are serialized; `optimistic` and `rollback` are
- * transitions, never direct writes; a failure is a value in `error()`, and a
- * cancelled run is not a failure. Unmounting aborts the request in flight and
- * drops the queue. Legal in `*.effects.ts` only (`SHR-L004`).
+ * than left to each app. Runs for one `key` are serialized and different keys
+ * run at once; `optimistic` and `rollback` are transitions, passed by
+ * reference; a failure is a value in `error()`, and a cancelled run is not a
+ * failure. Unmounting aborts every request in flight and drops the queue.
+ * Legal in `*.effects.ts` only (`SHR-L004`).
  *
  * @example
- * const save = mutation({
- *   run: ({ input, signal }) => api.saveOrder(input, signal),
- *   optimistic: (input) => state.orderDraftApplied(input),
- *   rollback: (input) => state.orderDraftReverted(input),
- *   onSuccess: () => orders.invalidate(),
+ * const ship = mutation({
+ *   key: (order) => order.id,
+ *   send: ({ input, signal }) => api.shipOrder(input.id, signal),
+ *   optimistic: state.orderShipped,
+ *   rollback: state.orderShipReverted,
+ *   onSuccess: orders.invalidate,
  * });
  *
- * void save.run(draft);
+ * void ship.run(order);
  */
 export function mutation<I, R>(options: MutationOptions<I, R>): Mutation<I> {
   const node = new MutationNode(options);

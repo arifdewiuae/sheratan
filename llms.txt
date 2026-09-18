@@ -37,7 +37,7 @@ import { signal, computed, watch, batch, resource, mutation, stream, onDispose, 
 | `watch(fn: () => void): Disposer` | Runs `fn` now, and again whenever something it read changes. Returns the disposer; the owning module disposes it automatically (SPEC §5b). |
 | `batch<T>(fn: () => T): T` | Writes inside `fn` commit once, when the outermost batch ends. |
 | `resource<T, K extends readonly unknown[]>(options: ResourceOptions<T, K>): Resource<T>` | Async state on a reactive key. The request is aborted when the key changes, when `abort()` is called and when the owning module unmounts; an identical key is not refetched, a superseded response is discarded, and errors are values. Legal in `*.effects.ts` only (`SHR-L004`). |
-| `mutation<I, R>(options: MutationOptions<I, R>): Mutation<I>` | A write with its optimistic update, rollback and follow-up specified rather than left to each app. Runs are serialized; `optimistic` and `rollback` are transitions, never direct writes; a failure is a value in `error()`, and a cancelled run is not a failure. Unmounting aborts the request in flight and drops the queue. Legal in `*.effects.ts` only (`SHR-L004`). |
+| `mutation<I, R>(options: MutationOptions<I, R>): Mutation<I>` | A write with its optimistic update, rollback and follow-up specified rather than left to each app. Runs for one `key` are serialized and different keys run at once; `optimistic` and `rollback` are transitions, passed by reference; a failure is a value in `error()`, and a cancelled run is not a failure. Unmounting aborts every request in flight and drops the queue. Legal in `*.effects.ts` only (`SHR-L004`). |
 | `stream<T, M, K extends readonly unknown[]>(options: StreamOptions<T, M, K>): Stream<T>` | Push data on a reactive key. The subscription is torn down when the key changes and when the owning module unmounts; messages are folded as they arrive and the value is committed once per frame, so a flood coalesces instead of queueing. Legal in `*.effects.ts` only (`SHR-L004`). |
 | `onDispose(fn: () => void): void` | Registers teardown for a subscription the runtime cannot see, such as `addEventListener` or `setInterval`. Legal in `*.effects.ts` only (SHR-L004). |
 | `flush(): void` | Applies pending DOM updates now, for tests and for code that must read layout immediately after a write. |
@@ -200,23 +200,29 @@ between modules. Two modules asking for the same key make two requests, and
 `invalidate()` on one does not touch the other.
 
 A write is `mutation()`. `optimistic` and `rollback` are transitions from the
-state module, never direct writes:
+state module, **passed by reference** — never wrapped in an arrow, never a
+direct write:
 
 ```ts
 // orders.effects.ts
-const save = mutation({
-  run: ({ input, signal }) => api.saveOrder(input, signal),
-  optimistic: (input) => state.draftApplied(input),
-  rollback: (input) => state.draftReverted(input),
-  onSuccess: () => orders.invalidate(),
+const ship = mutation({
+  key: (order) => order.id,
+  send: ({ input, signal }) => api.shipOrder(input.id, signal),
+  optimistic: state.orderShipped,
+  rollback: state.orderShipReverted,
+  onSuccess: orders.invalidate,
 });
 
-void save.run(draft);   // resolves when this run settles; never rejects
+void ship.run(order);   // resolves when this run settles; never rejects
 ```
 
-- `optimistic` runs the moment `run()` is called; the request follows.
-- **Runs are serialized:** a second `run()` waits for the first to settle, so
-  two saves cannot land in the wrong order. Each is optimistic at once.
+- `optimistic` runs the moment `run()` is called; `send` follows.
+- **Same key waits, different keys don't.** Two saves of one record are
+  serialized so they cannot land in the wrong order; two different records are
+  in flight at once. Leave `key` out and every run waits for the one before —
+  right for a form. A key is a `string | number`, usually an id.
+- A double-click is not a second write: guard with
+  `if (save.status() === 'running') return;` in the effect.
 - A failure calls `rollback` and lands in `error()`. A cancelled request calls
   `rollback` too — the write did not happen — but is not an error.
 - An exception from `onSuccess` is reported in `error()` and rolls nothing
@@ -543,4 +549,3 @@ Apply the `fix`; the `message` names the allowed set.
 ## Not in v0
 
 `mount()`, `unsafeHTML` and routing are specified but not shipped.
-`mutation()` runs one request at a time; there is no parallel opt-out yet.

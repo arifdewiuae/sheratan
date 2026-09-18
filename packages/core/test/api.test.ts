@@ -74,7 +74,8 @@ test('the resource options type is exported in the shape callers write', () => {
 
 // And for writes: what an effects file hands `mutation()`, every hook included.
 const save: MutationOptions<{ id: number }, { version: number }> = {
-  run: async ({ input, signal }) => {
+  key: (input) => input.id,
+  send: async ({ input, signal }) => {
     signal.throwIfAborted();
 
     return { version: input.id };
@@ -85,7 +86,13 @@ const save: MutationOptions<{ id: number }, { version: number }> = {
 };
 
 test('the mutation options type is exported in the shape callers write', () => {
-  assert.deepEqual(Object.keys(save).toSorted(), ['onSuccess', 'optimistic', 'rollback', 'run']);
+  assert.deepEqual(Object.keys(save).toSorted(), [
+    'key',
+    'onSuccess',
+    'optimistic',
+    'rollback',
+    'send',
+  ]);
 
   assert.deepEqual(Object.values(MutationStatus).toSorted(), ['done', 'error', 'idle', 'running']);
 });
