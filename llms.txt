@@ -25,7 +25,7 @@ hole gets the computed.
 ## 2. API
 
 ```ts
-import { signal, computed, watch, batch, resource, stream, onDispose, flush, html, each, render } from 'sheratan';
+import { signal, computed, watch, batch, resource, mutation, stream, onDispose, flush, html, each, render } from 'sheratan';
 ```
 
 <!-- generated from TSDoc by packages/core/scripts/llms.ts -->
@@ -37,6 +37,7 @@ import { signal, computed, watch, batch, resource, stream, onDispose, flush, htm
 | `watch(fn: () => void): Disposer` | Runs `fn` now, and again whenever something it read changes. Returns the disposer; the owning module disposes it automatically (SPEC §5b). |
 | `batch<T>(fn: () => T): T` | Writes inside `fn` commit once, when the outermost batch ends. |
 | `resource<T, K extends readonly unknown[]>(options: ResourceOptions<T, K>): Resource<T>` | Async state on a reactive key. The request is aborted when the key changes, when `abort()` is called and when the owning module unmounts; an identical key is not refetched, a superseded response is discarded, and errors are values. Legal in `*.effects.ts` only (`SHR-L004`). |
+| `mutation<I, R>(options: MutationOptions<I, R>): Mutation<I>` | A write with its optimistic update, rollback and follow-up specified rather than left to each app. Runs for one `key` are serialized and different keys run at once; `optimistic` and `rollback` are transitions, passed by reference; a failure is a value in `error()`, and a cancelled run is not a failure. Unmounting aborts every request in flight and drops the queue. Legal in `*.effects.ts` only (`SHR-L004`). |
 | `stream<T, M, K extends readonly unknown[]>(options: StreamOptions<T, M, K>): Stream<T>` | Push data on a reactive key. The subscription is torn down when the key changes and when the owning module unmounts; messages are folded as they arrive and the value is committed once per frame, so a flood coalesces instead of queueing. Legal in `*.effects.ts` only (`SHR-L004`). |
 | `onDispose(fn: () => void): void` | Registers teardown for a subscription the runtime cannot see, such as `addEventListener` or `setInterval`. Legal in `*.effects.ts` only (SHR-L004). |
 | `flush(): void` | Applies pending DOM updates now, for tests and for code that must read layout immediately after a write. |
@@ -151,7 +152,7 @@ node stays with the screen position rather than with its item, and `id` is not
 required or checked. An out-of-range window is clamped, not an error. Use the
 plain two-argument form unless the list is long enough to need this.
 
-## 5a. Async: `resource()` and `stream()`
+## 5a. Async: `resource()`, `mutation()` and `stream()`
 
 Effects only. One primitive replaces a query library: it fetches on a reactive
 key, cancels what the key replaced, retries, and keeps showing the previous
@@ -197,6 +198,41 @@ What it guarantees, so you never write it again:
 A resource holds its own value and nothing else's: there is no cache shared
 between modules. Two modules asking for the same key make two requests, and
 `invalidate()` on one does not touch the other.
+
+A write is `mutation()`. `optimistic` and `rollback` are transitions from the
+state module, **passed by reference** — never wrapped in an arrow, never a
+direct write:
+
+```ts
+// orders.effects.ts
+const ship = mutation({
+  key: (order) => order.id,
+  send: ({ input, signal }) => api.shipOrder(input.id, signal),
+  optimistic: state.orderShipped,
+  rollback: state.orderShipReverted,
+  onSuccess: orders.invalidate,
+});
+
+void ship.run(order);   // resolves when this run settles; never rejects
+```
+
+- `optimistic` runs the moment `run()` is called; `send` follows.
+- **Same key waits, different keys don't.** Two saves of one record are
+  serialized so they cannot land in the wrong order; two different records are
+  in flight at once. Leave `key` out and every run waits for the one before —
+  right for a form. A key is a `string | number`, usually an id.
+- A double-click is not a second write: guard with
+  `if (save.status() === 'running') return;` in the effect.
+- A failure calls `rollback` and lands in `error()`. A cancelled request calls
+  `rollback` too — the write did not happen — but is not an error.
+- An exception from `onSuccess` is reported in `error()` and rolls nothing
+  back: the write already landed.
+- `status()` is `'idle' | 'running' | 'done' | 'error'`. `'running'` while
+  anything is in flight or queued; otherwise the outcome of the last run to
+  settle, with `error()` describing that same run.
+- Unmounting aborts the request in flight and drops the queue. Nothing — no
+  rollback, no `onSuccess` — runs against a module that is gone, and `run()`
+  after unmount does nothing.
 
 `resource()` is request/response. Push data — a socket, an event source, a
 `BroadcastChannel` — is `stream()`:
@@ -496,7 +532,7 @@ Apply the `fix`; the `message` names the allowed set.
 | SHR-L001 | import not allowed by the matrix, including deep imports past another module's `index.ts` |
 | SHR-L002 | I/O global (`fetch`, `localStorage`, `document`, timers) in a view |
 | SHR-L003 | `shared/` folder, or `ui/` nested more than one level |
-| SHR-L004 | `watch`, `onDispose` (and later `resource`, `mutation`, `stream`, `navigate`) outside effects |
+| SHR-L004 | `watch`, `onDispose`, `resource`, `mutation`, `stream` (and later `navigate`) outside effects |
 | SHR-L005 | effects write a signal directly instead of calling a transition |
 | SHR-L006 | module files don't match its declared `kind` |
 | SHR-L007 | Promise-returning contract method without an `AbortSignal` |
@@ -512,6 +548,4 @@ Apply the `fix`; the `message` names the allowed set.
 
 ## Not in v0
 
-`mutation()`, `mount()`, `unsafeHTML` and routing are specified but not
-shipped. For a write, call the service from `*.effects.ts` and invoke
-one transition with the result, as in §7.
+`mount()`, `unsafeHTML` and routing are specified but not shipped.

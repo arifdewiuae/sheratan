@@ -6,9 +6,11 @@ import assert from 'node:assert/strict';
 import * as api from '../src/index.ts';
 import {
   ErrorCode,
+  MutationStatus,
   ResourceStatus,
   SheratanError,
   type EachWindow,
+  type MutationOptions,
   type ResourceOptions,
   type StreamOptions,
   StreamStatus,
@@ -17,6 +19,7 @@ import {
 test('the package exports exactly its documented names', () => {
   assert.deepEqual(Object.keys(api).toSorted(), [
     'ErrorCode',
+    'MutationStatus',
     'ResourceStatus',
     'SheratanError',
     'StreamStatus',
@@ -25,6 +28,7 @@ test('the package exports exactly its documented names', () => {
     'each',
     'flush',
     'html',
+    'mutation',
     'onDispose',
     'render',
     'resource',
@@ -66,6 +70,31 @@ test('the resource options type is exported in the shape callers write', () => {
     'ready',
     'refreshing',
   ]);
+});
+
+// And for writes: what an effects file hands `mutation()`, every hook included.
+const save: MutationOptions<{ id: number }, { version: number }> = {
+  key: (input) => input.id,
+  send: async ({ input, signal }) => {
+    signal.throwIfAborted();
+
+    return { version: input.id };
+  },
+  optimistic: () => undefined,
+  rollback: () => undefined,
+  onSuccess: () => undefined,
+};
+
+test('the mutation options type is exported in the shape callers write', () => {
+  assert.deepEqual(Object.keys(save).toSorted(), [
+    'key',
+    'onSuccess',
+    'optimistic',
+    'rollback',
+    'send',
+  ]);
+
+  assert.deepEqual(Object.values(MutationStatus).toSorted(), ['done', 'error', 'idle', 'running']);
 });
 
 // And for push data: the shape an effects file writes, with the reducer the

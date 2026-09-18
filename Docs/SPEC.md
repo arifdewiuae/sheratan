@@ -617,19 +617,68 @@ reference app has forms. Optimistic update, rollback and invalidation are where
 async UI actually hurts, so they are specified rather than left to each app:
 
 ```ts
-const save = mutation({
-  run: ({ input, signal }) => api.saveOrder(input, { signal }),
-  optimistic: (input) => state.orderDraftApplied(input),   // a transition
-  rollback: (input) => state.orderDraftReverted(input),    // a transition
-  onSuccess: () => orders.invalidate(),
+const ship = mutation({
+  key: (order) => order.id,
+  send: ({ input, signal }) => api.shipOrder(input.id, signal),
+  optimistic: state.orderShipped,       // a transition, by reference
+  rollback: state.orderShipReverted,    // a transition, by reference
+  onSuccess: orders.invalidate,
 });
 
-save.run(input);  save.status();  save.error();
+ship.run(order);  ship.status();  ship.error();
 ```
 
+**Why not one primitive with `resource()`.** Reads and writes need opposite
+rules. A newer read makes the older one worthless, so `resource()` cancels it
+and discards a late answer; a newer write makes the older one no less real, so
+a mutation never cancels one for another and always applies what the server
+says. One primitive would carry both policies behind one name (A1). A write
+also rarely belongs to one read — saving an order refreshes the list and the
+totals — and some writes have no read at all.
+
 `optimistic` and `rollback` name transitions, never mutate — the L005 rule
-holds. Concurrent runs of the same mutation are serialized by default; opting
-out is explicit.
+holds. They are passed **by reference**, not wrapped in an arrow: a transition
+is a plain function of the input (§4), so `optimistic: state.orderShipped` is
+the whole of it, the same way a template takes an intent rather than an inline
+arrow (`SHR-V001`). Only `send` keeps an arrow, because it has to hand the
+signal to the service. It is named for what it does, as `fetch` and
+`subscribe` are, and so that it cannot be confused with the `run()` method.
+
+**Concurrency is per key.** Runs with the same `key` are serialized, so two
+saves of one record cannot race and land in the wrong order; runs with
+different keys are in flight at once, so shipping two orders does not make the
+second wait for the first. Without a `key` every run shares one queue — the
+safe default for a form. A key is a `string | number`, typically an id, and
+the type says so: an array would compare by identity and never match.
+
+The order is the contract:
+
+- `optimistic(input)` runs when `run(input)` is called, in the same commit that
+  sets `status()` to `'running'`. The request follows it — immediately if
+  nothing for its key is in flight, otherwise when the runs ahead of it have
+  settled. Every queued run is optimistic at once.
+- A failure calls `rollback(input)` and puts the error in `error()`. A
+  cancelled request calls `rollback` as well, because the write did not
+  happen, but is not an error (§5b rule 3).
+- A success calls `onSuccess(result, input)`. If *that* throws, the error is
+  reported and nothing is rolled back: the write already landed, and undoing
+  the screen would make it disagree with the server.
+- A failed run does not stop the queue behind it.
+
+`status()` is `'idle' | 'running' | 'done' | 'error'`. It is `'running'` while
+any run, for any key, is in flight or queued; otherwise it is the outcome of the last run to
+settle, and `error()` describes that same run — so a failure followed by a
+success reads `'done'` with no error. `'idle'` means never run, or the last run
+was cancelled.
+
+`run()` returns a promise that resolves when *that* run has settled and never
+rejects, so an effect can sequence on it without a `try`: the outcome is in
+`status()` and `error()`, not in the promise.
+
+Unmounting aborts every request in flight and releases every queue unrun. No
+rollback, no `onSuccess` and no status change happens afterwards, and `run()`
+on a disposed mutation does nothing — §5b rule 1, enforced for this primitive
+because it owns the transitions it calls.
 
 ### `stream()` — subscriptions in the core
 
