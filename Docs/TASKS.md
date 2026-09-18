@@ -24,7 +24,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | 2 | Async, ownership, trace | 🟡 In progress | Trace readable ✅ · leak-free not measured |
 | 3 | Checker, CLI, template | ⬜ Not started | — |
 | 4 | Agent surface, reference app | ⬜ Not started | — |
-| 5 | Re-measure, package, launch | ⬜ Not started | — |
+| 5 | Re-measure, package, launch | 🟡 In progress | — |
 | +8 wks | Outside production use | ⬜ Not started | — |
 
 Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · ⛔ Stopped
@@ -39,8 +39,8 @@ landed, so the claim can be checked without reading the diff.
 - [ ] Verify GitHub org handle `sheratan` is available and claim it
 - [x] Verify and register `sheratan.dev` — it goes into checker `docs` links and can't change later (SPEC header, §8) — **registered 2026-09-17**, GoDaddy, expires 2027-09-17, all four client locks already on (delete/renew/transfer/update prohibited). Every `SHR-*` docs URL now resolves to a domain we own; what it resolves *to* is the Week 4 error index
 - [ ] Domain durability: auto-renew on with a card valid past 2027-09-17, account 2FA via authenticator app, and a registrar contact address **not** `@sheratan.dev` — the error URL is compiled into every published bundle, so a lapse breaks error messages in apps we don't control
-- [ ] Reserve `sheratan` on npm (still free on 2026-09-17; the package is publish-ready — manifest, README and tarball verified in PR #17, and `release.yml` takes over from the second release onward)
-- [ ] `git init`; monorepo skeleton: `packages/{core,check,cli}`, `examples/dashboard`, `docs/` (SPEC §11) — `packages/core`, `examples/hello` and `Docs/` exist; `check` and `cli` are Week 3, and the reference app is Week 4
+- [x] Reserve `sheratan` on npm — **`sheratan@0.0.1` published 2026-09-17**, then deprecated the same day ("Pre-release name reservation — not usable software. See https://sheratan.dev") so nobody installs it by accident. Published from a laptop because npm will not configure trusted publishing against a package that does not exist; `release.yml` takes over from the second release onward. The deprecation is reversible — `npm deprecate sheratan@0.0.1 ""` clears it at v0.1.0
+- [x] `git init`; monorepo skeleton (SPEC §11) — pnpm workspace over `packages/*` and `examples/*`, with every root script `pnpm -r --if-present`, so a new package joins by existing. `packages/eval` proved it: nothing at the root changed to admit it. `packages/check` and `packages/cli` are Week 3 items and `examples/dashboard` is Week 4 — they are tracked there, not held open here
 - [x] Commit SPEC / PLAN / EVAL / TASKS as the baseline — `0d7e8e1`
 
 ---
@@ -51,7 +51,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 
 **Setup**
 - [x] `llms.txt` v0: API, import matrix, reactivity trap as the first item, canonical module (SPEC §10) — [llms.txt](../llms.txt), ~4.0–4.7k tokens estimated (recount with the evaluated model's counter before the first run); canonical module executed end to end
-- [x] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro) — `packages/core`: signals, scheduler, `html`, keyed `each`, `render`; TypeScript; 1,708 non-blank lines, 81 unit tests and 5.3 KB brotli as of 2026-09-16
+- [x] Small **real** signal runtime, 200–300 lines — not a stub (EVAL intro) — `packages/core`: signals, scheduler, `html`, keyed `each`, `render`; TypeScript; 2,554 non-blank lines, 141 unit tests and 6.4 KB brotli as of 2026-09-17 (it was 1,708 lines, 81 tests and 5.3 KB when Week 0 ran — `resource`, `stream`, the trace and the windowed pool landed since)
 - [x] Freeze and version 12 eval tasks (EVAL §2.1) — [EVAL-TASKS.md](EVAL-TASKS.md), tag `eval-tasks-v1`, SHA-256 `7a19d6474fbcb1a417d60fb3c2be815c908d8cb68bd50a7a60a3a5a9a317f1ce`
 - [x] Split: 6 headline tasks + 6 held-out (EVAL-TASKS §2)
 - [x] Fix the documentation token budget for both arms **and write it down** before the first run — 8,000 tokens (EVAL-TASKS §1.5)
@@ -137,7 +137,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [x] `[must]` `onDispose()` — `packages/core/src/owner.ts`; `SHR-R001` when there is no owner
 - [x] `[must]` Disposal order: watchers → subscriptions → nodes — `OwnerNode.dispose()` runs `teardown()` (a watcher drops its sources) before `reset()` (children, then owned subscribers, then cleanups last-registered-first)
 - [ ] `[must]` Post-disposal async is a no-op (owner flag on transitions) — **blocked:** nothing marks a transition at run time (see the spec gap below). `examples/hello` checks `signal.aborted` by hand instead, which is the pattern but not the enforcement
-- [x] `[must]` Leak test: 1000 mount/unmount cycles → live subscription count returns to 0 — `reactive.test.ts:465` and `html.test.ts:622`; the windowed list has its own at `window.test.ts:268`
+- [x] `[must]` Leak test: 1000 mount/unmount cycles → live subscription count returns to 0 — `reactive.test.ts:465` ('leak: 1000 root mount/dispose cycles…') and `html.test.ts:680` ('render: dispose removes its nodes…'); `resource.test.ts:552` and `stream.test.ts:495` each have one, and the windowed list has its own at `window.test.ts:304`
 
 **Streams & windowing**
 - [x] `[stretch]` `stream()`: subscribe/teardown on key change and disposal, per-frame folding, `reduceMany`, `status()` reconnect (SPEC §6) — `packages/core/src/stream.ts`, 17 tests; the fold is committed by a scheduler job on the frame queue, so a thousand messages are a thousand O(1) folds and one write; SPEC §6 amended with the shipped status values and `close(reason?)`
@@ -155,6 +155,9 @@ All of the below in `packages/core/src/resource.ts`, specified by
 ---
 
 ## Week 3 — Checker, CLI, `create` template
+
+`packages/check` and `packages/cli` are **folders, not products**: one tarball
+publishes, and it is `sheratan`. See the spec gap on package count below.
 
 **Checker** (SPEC §4, §8) — `typescript/unstable/*`, devDependency, `typescript` pinned exactly as peer (ADR 0005)
 - [ ] `[must]` One adapter module owning every `typescript/unstable/*` import — program, checker, node→range — so an unstable-API break is one file's problem (ADR 0005)
@@ -215,6 +218,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 
 **Reference app** (SPEC §11, §12)
 - [ ] `[must]` `examples/dashboard`: modules/ + services/ + `app.ts` + `e2e/`
+- [ ] **Scaffolded by `sheratan create`, not hand-written, and depending on `sheratan` from the registry** (`pnpm add sheratan`) rather than `workspace:*` — so it resolves through the published `exports` map and loads `dist/prod`, the flat minified build a real user gets. Two things come free: the Week 3 `sheratan create` gate leaves a permanent artifact instead of a one-off check, and the prod-build question in Spec gaps gets measured on a real app instead of six synthetic scenarios. `examples/hello` deliberately stays on `workspace:*` — it is the runtime's own test bed and has to break when core breaks
 - [ ] Streams, 500-row virtualized table, error states, forms
 - [ ] Runs from plain `index.html`, no build
 - [ ] Built without `@sheratan/router` (validates routing boundary)
@@ -251,9 +255,14 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [ ] MIT license
 - [ ] CI
 - [x] **Make the repository public** — done 2026-09-17, ahead of schedule: GitHub Pages is free only on public repos. Dependency review in CI switches itself on from here
-- [ ] Configure trusted publishing on npmjs.com against `arifdewiuae/sheratan`, workflow `release.yml`, environment `npm` — possible only once the package exists
-- [ ] Create the `npm` GitHub environment with required reviewers, so every publish has one manual gate
-- [ ] Publish to npm by tagging `v<version>` on `main`; `.github/workflows/release.yml` does the rest, tokenless and with provenance
+- [ ] Configure trusted publishing on npmjs.com against `arifdewiuae/sheratan`, workflow `release.yml`, **environment field left blank** — unblocked since 0.0.1 exists. Blank is not an oversight: it has to match the workflow, which carries no `environment:` (decision 2026-09-17). Fill it in and the OIDC exchange fails with a mismatch that does not name the cause
+- [ ] Publish to npm by tagging `v<version>` on `main`; `.github/workflows/release.yml` does the rest, tokenless and with provenance. Pushing the tag is the only gate — the workflow refuses a tag that is not on `main` and one that disagrees with the manifest, then runs `pnpm check`, but nothing asks a human twice
+
+**Site** — `sheratan.dev`, brought forward with the public repository
+- [x] **Live on GitHub Pages**, deployed from `main` by `pages.yml`; `site/CNAME` holds the domain and Pages rewrites the setting from it on every deploy. Apex A/AAAA and a `www` CNAME at GoDaddy
+- [x] **100 / 100 / 100 / 100 on Lighthouse**, measured against the live site 2026-09-17 — fonts self-hosted so nothing renders-blocks and no third-party origin is contacted, `connect-src 'self'` so the CSP stops blocking the `robots.txt` audit, `robots.txt` + `sitemap.xml`, Open Graph and Twitter card over `site/og.png`, light-only palette
+- [ ] Tick **Enforce HTTPS** — `https_enforced` is still `false`; the certificate re-reads `dns_changed` while GitHub re-provisions it to cover `www.sheratan.dev`, and the box is only tickable once it is `approved` again
+- [ ] Verify the domain at account-level Settings → Pages (adds a `_github-pages-challenge-arifdewiuae` TXT record), so no other GitHub account can claim `sheratan.dev` if a DNS record is ever left dangling
 
 **Launch**
 - [ ] 5-minute demo: agent violates a layer → checker catches → agent self-repairs
@@ -275,6 +284,11 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [ ] Chrome custom formatter so a signal prints as its value, not `ƒ read()`
 - [ ] Performance-panel track for drains and frame flushes
 - [ ] Debug names from the trace's write provenance
+- [ ] Browser extension: a panel over `__sheratan.trace()` — the causal chain as a tree you can scrub, rather than JSON in the console. The data already exists and is already absent from production builds (`trace.prod.ts`), so this is a viewer, not new runtime surface. Post-launch for the same reason as the formatter: it cannot be covered in happy-dom against a 100% gate, and it is the piece most likely to be rewritten once someone has used the trace in anger
+
+**Editor** (post-MVP — extends the 2026-09-16 decision, which deferred this to Week 3)
+- [ ] VS Code extension surfacing `sheratan check` diagnostics inline, with the checker's `fix` as a code action — the rule set's whole premise is a machine-readable repair, and an editor is where a human collects one. Blocked on the checker existing (Week 3); before that an extension would only re-highlight what the recommended lit-html extension already does, which is why workspace recommendations were chosen instead
+- [ ] Decide LSP or direct `--json` invocation once `sheratan check`'s schema is versioned — an LSP is also what a JetBrains plugin would need, so it is the choice that decides whether there is ever a second editor
 
 ---
 
@@ -324,6 +338,7 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 - [ ] **How a module stylesheet is loaded is unspecified.** SPEC §9a says `global.css` is "linked from `index.html`" and that `ui` and `modules` "are filled by the scoped component and module sheets", but never says how those sheets arrive. `examples/hello` now links each one by hand (`<link href="/modules/dashboard/dashboard.css">`), which works with no build step and is honest, but it names every module twice — once where it is wired and once in the HTML — and a module added without its link fails silently. Options: CSS module scripts attached with `adoptedStyleSheets` (already an open Week 1 item), `sheratan build` collecting module sheets into one file, or `@import` from `global.css` and accepting the extra round trip. Decide before `sheratan create` writes the wrapper.
 - [ ] **The example's page furniture is not the dashboard.** `dashboard.view.ts` also holds the lockup, the pitch and the "where to go next" guide, which are not functions of dashboard state. They pass the letter of SPEC §4 — stateless and used once, so they belong inside the module rather than in `ui/` — but they are a second feature sharing one view file. The fix is a second module composed with `mount()` (SPEC §9 "Composing modules"), which is not built. Do it when `mount()` lands; the example is also the only place `ui/` would get demonstrated.
 - [x] **Immutability rule code.** The checker rule for statically visible mutation of a signal's value (TASKS decision 2026-09-15) needs a code and a row in SPEC §4's table. Resolved 2026-09-17: **`SHR-L011`**, row added to SPEC §4 and to `llms.txt`; ADR 0002's layer 3 now names it instead of pointing back here. Next free code is `SHR-L012`.
+- [x] **How many packages publish.** SPEC §11 lays out `packages/{core,check,cli}` and annotates only `core` as "published", but never says what happens to the other two — so "`packages/check`" reads equally as a folder and as `@sheratan/check` on npm. SPEC A4's corollary already answers it — **"one package in the user's `package.json`"** — and three tarballs break it in the way that matters: a project running `sheratan check` in CI would carry `sheratan` *and* a CLI that depends on a checker, which is two entries and a version matrix. Resolved 2026-09-17: **one published package, `sheratan`, with a `bin`.** `check` and `cli` stay workspace folders for the complexity bounds and their own test suites, and are folded into the one tarball at publish time. Two things that decision now owes Week 3: `typescript` becomes a peer dependency of `sheratan` itself, marked `peerDependenciesMeta.optional` so a runtime-only consumer is never nagged for a compiler it will not use; and `exports` must expose the checker on its own subpath and keep it out of `"."`, or a bundler following a stray import pulls the TypeScript compiler into an application bundle. Install size grows, bundle size does not — worth stating that way round in the README. ADR when the subpath layout is actually designed
 - [x] **CSS scoping.** SPEC said `adoptedStyleSheets` on the component root, which is global on `document`. Resolved in SPEC §9a: native `@scope` + `@layer`, enforced by `SHR-L009`.
 
 ---
@@ -360,7 +375,7 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-17 | The 60fps gate is Week 4 in EVAL too, not Week 2–3; Week 2's gate is correctness and leaks | It is gated where its harness is (EVAL §1.2). Measurable earlier, and measuring early is encouraged — but a gate with no instrument is a wish |
 | 2026-09-17 | `sheratan.dev` stays on GitHub Pages (`site/CNAME`), rather than moving to Cloudflare or Netlify | The site is one static page plus the Week 4 error index: no auth, no input, nothing to protect with the HTTP headers Pages cannot set, so the `<meta>` CSP is enough. Netlify and Vercel were rejected on a specific risk, not taste — their free tiers cap bandwidth, and `sheratan.dev/errors/<code>` is compiled into other people's production bundles, so traffic we don't control must never be able to throttle or suspend the host |
 | 2026-09-17 | Repository made public ahead of the Week 5 checklist | GitHub Pages is free only for public repositories, and the site had to be served from somewhere. Brought forward two benefits with it: dependency review in CI switches itself on, and the eval results become checkable by a stranger, which is what `Docs/EVAL-RESULTS.md` claims for itself |
-| 2026-09-17 | Releases publish from CI via npm trusted publishing (OIDC), never a stored token; `release.yml` + an `npm` environment gate; provenance is automatic | pnpm 12.4.1 does the OIDC exchange natively — its binary carries `ACTIONS_ID_TOKEN_REQUEST_URL`, npm's `/-/npm/v1/oidc/token/exchange/package/` endpoint and the sigstore attestation machinery — so AGENTS.md's "never npm or yarn" does not have to bend. A long-lived `NPM_TOKEN` in repo secrets is the single most attacked artifact in the npm ecosystem |
+| 2026-09-17 | Releases publish from CI via npm trusted publishing (OIDC), never a stored token; `release.yml` + an `npm` environment gate; provenance is automatic — **the environment half was reversed the same day; see the "No GitHub environment on the release workflow" row below** | pnpm 12.4.1 does the OIDC exchange natively — its binary carries `ACTIONS_ID_TOKEN_REQUEST_URL`, npm's `/-/npm/v1/oidc/token/exchange/package/` endpoint and the sigstore attestation machinery — so AGENTS.md's "never npm or yarn" does not have to bend. A long-lived `NPM_TOKEN` in repo secrets is the single most attacked artifact in the npm ecosystem |
 | 2026-09-17 | Devtools (Chrome formatter, Performance track, debug names) are post-launch, not MVP | SPEC §12's DoD does not ask for them, `__sheratan.trace()`/`format()` is the shipped surface, and a browser-only formatter cannot be covered in happy-dom against a 100% gate |
 | 2026-09-16 | Effects skip their transition when the mount is already disposed | SPEC §5b rule 1 asks for post-disposal no-ops and the runtime cannot see a late response yet; the example shows the pattern, and a test pins it |
 | 2026-09-16 | `pnpm audit signatures` moved out of the PR gate to the daily run (ADR 0001); advisories still block every PR | Signature verification needs a packument per lockfile entry, including platforms we never install, and fails a few per run for reasons unrelated to the change |
@@ -390,4 +405,7 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-17 | Site CSP gained `connect-src 'self'`; `robots.txt` and `sitemap.xml` added | `default-src 'none'` blocked Lighthouse's own fetch of `/robots.txt` — the audit failed with "CSP violation", not a missing file, which cost SEO 9 points and would have blocked any same-origin fetch the site later wants |
 | 2026-09-17 | Open Graph and Twitter card metadata added, with `site/og.png` rendered from the page's own tokens | With no summary to find, link unfurlers quoted the first text in the document — visitors were being sent a preview of the stylesheet |
 | 2026-09-17 | Landing page is light only: the `prefers-color-scheme` block and the `[data-theme]` overrides are gone from `site/index.html`, `color-scheme` is `light`. The identity keeps both palettes and `examples/hello` still follows the system setting | The page is one printed page, and the `og:image`, the favicon and the wordmark are all drawn on the light ground — a dark variant made the shared preview disagree with the page it links to. A decision about this page, not about the brand |
+| 2026-09-17 | One published package — `sheratan`, with a `bin`. `packages/check` and `packages/cli` are folders that fold into that tarball, not `@sheratan/*` on npm | SPEC A4's corollary already promised "one package in the user's `package.json`", and SPEC §11's layout was being read as three products. Three tarballs put `sheratan` + a CLI + a checker in a CI project's manifest and create a version matrix between them, for no gain the folders do not already give. Cost, and it is real: `typescript` becomes an optional peer of `sheratan` itself, and the checker needs its own export subpath so nothing can pull a compiler into an app bundle |
+| 2026-09-17 | `examples/dashboard` will be generated by `sheratan create` and install `sheratan` from the registry; `examples/hello` keeps `workspace:*` | A scaffolder nobody runs on a real app is a scaffolder that rots, and a reference app linked by `workspace:*` never exercises the `exports` map, so the published prod build is the one artifact no example loads. The two examples answer different questions: `hello` breaks when core breaks, `dashboard` breaks when the *package* breaks |
+| 2026-09-17 | Tracker audited against the code a second time: npm reservation and the monorepo skeleton were done but unticked, Week 5 still read "Not started", the Week 0 runtime snapshot understated the code by 50%, two leak-test citations had drifted, and the site — live, and the most visible artifact so far — had no task line anywhere, only decisions-log rows | Same reason as the 2026-09-16 audit: the next decision is which week to work on. Two of the stale rows contradicted a decision recorded lower down in this same file, which is worse than being out of date — a reader hits the wrong one first. Line-number citations are now paired with the test name, since numbers drifted within a day |
 | 2026-09-17 | No GitHub environment on the release workflow; npm's trusted-publisher environment field stays blank. `release.yml` gained a "tag is on `main`" guard instead | The environment's only value was a required-reviewer prompt, and the same person pushes the tag and clicks approve — a second click, not a second pair of eyes. The guard catches the failure the approval was actually standing in for: a tag on the wrong commit |
