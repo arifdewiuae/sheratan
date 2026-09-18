@@ -174,12 +174,29 @@ rather than a numbered list.
 | `index.ts` | own module files |
 | `app.ts` | everything (composition root) |
 
-Plus one exception for every module file: **`import type` from
-`services/*.contract.ts`** is always allowed. Contracts are the app's shared
-vocabulary (`Customer`, `Order`), type imports are erased at run time, and the
-alternatives — domain types in `lib/`, or a copy per module — either give `lib/`
-app knowledge or duplicate shapes that drift. A value import from `services/`
-is still `SHR-L001`.
+Plus two exceptions for every module file, both **`import type`** of
+something public:
+
+- **From `services/*.contract.ts`.** Contracts are the app's shared vocabulary
+  (`Customer`, `Order`), type imports are erased at run time, and the
+  alternatives — domain types in `lib/`, or a copy per module — either give
+  `lib/` app knowledge or duplicate shapes that drift. A value import from
+  `services/` is still `SHR-L001`.
+- **From another module's `index.ts`.** A module receives other modules as
+  parameters ("module instances received as parameters", and the factory in
+  "Wiring a module" below), and a parameter needs a type. The index is that
+  module's public surface, and the import is erased. A value import is still
+  `SHR-L001` everywhere but `*.effects.ts`, and reaching past the index is
+  still a deep import. Found by running the checker over the Week 0 host app,
+  whose `index.ts` files type their `notifications` parameter this way — the
+  matrix as first written had no legal way to do it.
+
+Three things the table does not show. A file inside a module folder that is
+none of its four — a component only that module uses — reads like the view it
+serves: `lib/`, `ui/`, and its own module's state, views and helpers. Test
+files (`*.test.ts`, `*.spec.ts`) and anything outside the layout above are not
+checked; a test reaches into what it tests. And a package import (`sheratan`,
+anything in `node_modules`) is not the matrix's business.
 
 Every cell of this matrix reports as **one code, `SHR-L001`**. The message names
 the cell and states the allowed set rather than citing a rule number: *"view

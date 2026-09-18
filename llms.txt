@@ -328,8 +328,9 @@ inside that module.
 | `app.ts` | everything |
 
 Any module file may also `import type` from `services/*.contract.ts` — that is
-where domain types like `Customer` live. A value import from `services/` in
-state, view or index is SHR-L001.
+where domain types like `Customer` live — and from another module's `index.ts`,
+to type a module it receives as a parameter. A value import from `services/`
+in state, view or index is SHR-L001. Test files are not checked.
 
 `sheratan` itself may be imported anywhere, but `watch` and `onDispose` belong in
 effects. Data flows one way: effects → state → view.
