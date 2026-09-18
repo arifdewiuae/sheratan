@@ -53,6 +53,7 @@ const SCENARIOS: Record<string, readonly string[]> = {
     'each',
     'flush',
     'html',
+    'mutation',
     'onDispose',
     'render',
     'resource',

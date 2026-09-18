@@ -22,6 +22,7 @@ const ORDER = [
   'watch',
   'batch',
   'resource',
+  'mutation',
   'stream',
   'onDispose',
   'flush',

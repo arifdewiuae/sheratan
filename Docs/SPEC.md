@@ -629,7 +629,36 @@ save.run(input);  save.status();  save.error();
 
 `optimistic` and `rollback` name transitions, never mutate — the L005 rule
 holds. Concurrent runs of the same mutation are serialized by default; opting
-out is explicit.
+out is explicit, and not built yet.
+
+The order is the contract:
+
+- `optimistic(input)` runs when `run(input)` is called, in the same commit that
+  sets `status()` to `'running'`. The request follows it — immediately if
+  nothing is in flight, otherwise when the runs ahead of it have settled. Every
+  queued run is optimistic at once; only one request is on the wire.
+- A failure calls `rollback(input)` and puts the error in `error()`. A
+  cancelled request calls `rollback` as well, because the write did not
+  happen, but is not an error (§5b rule 3).
+- A success calls `onSuccess(result, input)`. If *that* throws, the error is
+  reported and nothing is rolled back: the write already landed, and undoing
+  the screen would make it disagree with the server.
+- A failed run does not stop the queue behind it.
+
+`status()` is `'idle' | 'running' | 'done' | 'error'`. It is `'running'` while
+any run is in flight or queued; otherwise it is the outcome of the last run to
+settle, and `error()` describes that same run — so a failure followed by a
+success reads `'done'` with no error. `'idle'` means never run, or the last run
+was cancelled.
+
+`run()` returns a promise that resolves when *that* run has settled and never
+rejects, so an effect can sequence on it without a `try`: the outcome is in
+`status()` and `error()`, not in the promise.
+
+Unmounting aborts the request in flight and releases the queue unrun. No
+rollback, no `onSuccess` and no status change happens afterwards, and `run()`
+on a disposed mutation does nothing — §5b rule 1, enforced for this primitive
+because it owns the transitions it calls.
 
 ### `stream()` — subscriptions in the core
 
