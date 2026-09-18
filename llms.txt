@@ -318,7 +318,7 @@ inside that module.
 
 | From | May import |
 |---|---|
-| `lib/` | nothing |
+| `lib/` | `lib/`, never in a cycle |
 | `ui/` | `lib/`, `ui/` |
 | `services/` | `lib/`, `services/` |
 | `*.state.ts` | `lib/`, own module |
@@ -537,7 +537,7 @@ Apply the `fix`; the `message` names the allowed set.
 | SHR-L005 | effects write a signal directly instead of calling a transition |
 | SHR-L006 | module files don't match its declared `kind` |
 | SHR-L007 | Promise-returning contract method without an `AbortSignal` |
-| SHR-L008 | circular imports between modules |
+| SHR-L008 | circular imports between modules, or among `lib/` files |
 | SHR-L009 | module stylesheet not wrapped in its `@scope` |
 | SHR-L010 | a `*.state.ts` exposes a `Signal`; only accessors and transitions leave the file |
 | SHR-L011 | mutating a value read from a signal (`items().push(x)`) instead of `.set()` |

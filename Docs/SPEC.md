@@ -165,7 +165,7 @@ rather than a numbered list.
 
 | From | May import |
 |------|-----------|
-| `lib/` | nothing |
+| `lib/` | `lib/`, without a cycle (`SHR-L008`) |
 | `ui/` | `lib/`, `ui/` |
 | `services/` | `lib/`, `services/` |
 | `*.state.ts` | `lib/`, own module |
@@ -215,7 +215,7 @@ Constraints the matrix cannot express:
 | `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts`. Best-effort backstop to `SHR-L010` (§13) |
 | `SHR-L006` | Module file set matches its declared kind (below) |
 | `SHR-L007` | Every `Promise`-returning method in a `*.contract.ts` takes an `AbortSignal` (§5b) |
-| `SHR-L008` | The module import graph must be acyclic |
+| `SHR-L008` | The module import graph must be acyclic, and so must imports among `lib/` files |
 | `SHR-L009` | Module and `ui/` stylesheets are wrapped in one `@scope` with a lower boundary; `global.css` holds only `tokens` and `base` (§9a) |
 | `SHR-L010` | A `*.state.ts` public surface exposes only `Accessor` values and transitions; a `Signal` never leaves the file (below) |
 | `SHR-L011` | Statically visible mutation of a value read from a signal — `items().push(x)`, `order().status = 'shipped'` (§5 Immutability, ADR 0002 layer 3) |

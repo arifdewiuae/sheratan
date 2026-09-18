@@ -58,8 +58,8 @@ const SERVICE_ROW: Row = {
 const MATRIX: Readonly<Record<Layer, Row>> = {
   [Layer.Lib]: {
     name: 'lib/',
-    allowed: 'nothing — lib/ holds pure utilities',
-    anywhere: NONE,
+    allowed: 'lib, never back round to itself',
+    anywhere: [Layer.Lib],
     own: NONE,
     other: NONE,
   },

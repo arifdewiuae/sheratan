@@ -64,7 +64,7 @@ interface Cell {
 // `from` names a layer; each row gets its own file (and its own module), so a
 // finding can be traced back to exactly one row.
 const MATRIX: readonly Cell[] = [
-  { from: 'lib', to: 'lib', allowed: false },
+  { from: 'lib', to: 'lib', allowed: true },
   { from: 'lib', to: 'ui', allowed: false },
   { from: 'ui', to: 'lib', allowed: true },
   { from: 'ui', to: 'ui', allowed: true },
@@ -281,7 +281,8 @@ test("packages, unresolved imports and files outside the layout are not the matr
 test('the fix for each kind of mistake says what to do about that mistake', () => {
   const findings = check({
     ...TARGETS,
-    'lib/dates.ts': "import { money } from './format.ts';\n\nexport const probe = money;\n",
+    'lib/dates.ts':
+      "import { badge } from '../ui/badge/index.ts';\n\nexport const probe = badge;\n",
     'ui/card/index.ts':
       "import { kind } from '../../modules/orders/index.ts';\n\nexport const probe = kind;\n",
     'services/api.socket.ts':

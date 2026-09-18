@@ -9,6 +9,8 @@ import { DOCS_BASE_URL } from '../../core/src/codes.ts';
 export const RuleCode = {
   /** An import the matrix does not allow, including a deep import past another module's `index.ts`. */
   Boundary: 'SHR-L001',
+  /** An import cycle — so far, among `lib/` files. */
+  Cycle: 'SHR-L008',
   /** A `*.state.ts` public surface hands out a writable `Signal`. */
   StateSurface: 'SHR-L010',
 } as const;
