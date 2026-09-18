@@ -8,8 +8,8 @@ wrong or the rule gets amended in the same change, never silently ignored.
 
 Sheratan is a frontend framework with one legal way to structure an app,
 enforced by a checker with machine-readable fixes, plus async and live data in
-the core. It's pre-release: `packages/core` holds the runtime, and the checker
-and CLI aren't written yet.
+the core. It's pre-release: `packages/core` holds the runtime, `packages/check` the
+checker (SHR-L001 and SHR-L010 so far), and the CLI isn't written yet.
 
 **Source of truth, in order:**
 1. `Docs/SPEC.md`
@@ -59,6 +59,8 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `packages/core/src/` | Runtime. Graph (`graph`, `signal`, `computed`, `watch`, `scheduler`, `owner`), templates (`template`, `instantiate`, `each`, `lis`, `render`, `dom`), errors (`codes`, `messages`, `env`, `env.prod`, `errors`), entries (`index` public, `internal` test-only) |
 | `packages/core/test/` | `node:test` suites; DOM via happy-dom |
 | `packages/core/scripts/` | Build (`build-prod`), package checks (`verify-types`, `size`), docs (`llms`) |
+| `packages/check/src/` | The checker (`sheratan check`): `typescript` (the one adapter over `typescript/unstable/*`), `layout` (path → layer), `matrix` (SPEC §4's table as data), `rules/` (one file per code), `check` (`checkProject()`). A folder, not a package: it folds into the `sheratan` tarball |
+| `packages/check/test/` | Real TypeScript programs on disk: the whole import matrix as one project, a failing case per rule, and both apps in this repo checked clean |
 | `examples/hello/` | The reference app in the canonical module shape (SPEC §4): a live dashboard, its dev server, and the e2e specs |
 | `.oxlintrc.json`, `.oxfmtrc.json` | The one lint config and the one formatter config |
 | `Docs/` | SPEC, EVAL, EVAL-TASKS, TASKS, brand identity |
