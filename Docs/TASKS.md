@@ -21,7 +21,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | Pre-flight | Names, repo | 🟡 In progress | — |
 | 0 | Falsification | 🟡 In progress | Self-repair ✅ 60/60 · median iterations vs React not run |
 | 1 | Core | 🟡 In progress | No-build ✅ · reordering vs Solid not measured |
-| 2 | Async, ownership, trace | 🟡 In progress | Trace readable ✅ · leak-free not measured |
+| 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ |
 | 3 | Checker, CLI, template | ⬜ Not started | — |
 | 4 | Agent surface, reference app | ⬜ Not started | — |
 | 5 | Re-measure, package, launch | 🟡 In progress | — |
@@ -150,7 +150,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [x] Structured runtime errors — `SheratanError` carries a stable `code`, every message in `messages.ts` states what to write instead, and the production build swaps the table for `sheratan.dev/errors/<code>` (`src/errors.ts`, `src/env.prod.ts`). `fix` as a separate field is the checker's JSON shape (SPEC §8), not the runtime's
 - [ ] `declare()` legal-transition dev assertion (SPEC §5)
 
-- [ ] `[gate]` Correct and leak-free **first**: race tests pass, 1000 cycles leave zero live subscriptions → otherwise fix ownership before measuring anything
+- [x] `[gate]` Correct and leak-free **first**: race tests pass, 1000 cycles leave zero live subscriptions → otherwise fix ownership before measuring anything — **passed 2026-09-19.** `test/gate.test.ts` mounts one module holding every owner-scoped primitive at once — `resource` with a stale timer armed, `stream`, `mutation` with a write in flight, `watch`, `onDispose`, keyed and windowed `each` — 1000 times, and checks what a subscription count cannot see as well: every in-flight request and write aborted, every stream torn down, every cleanup run, no timer fires afterwards, no node left. Proven to fail three ways by breaking the runtime: a stale timer kept, a mutation not aborted, owner cleanups skipped. The race tests are the per-primitive suites (`resource`, `stream`, `mutation`)
 - [x] `[gate]` Trace is readable by eye (if trace not cut) — **passed.** `__sheratan.format()` renders the chain as an indented tree; checked against a real update and fixed three things it exposed (objects printed as `[object Object]`, a 90-character file URL, and an `each` row write opening a chain of its own instead of continuing one)
 
 ---
@@ -414,3 +414,4 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-19 | `mutation()` costs 412 B brotli (6548 → 6960 for `everything`, +6%; 83 B of it is keyed lanes) and the budget was re-recorded | SPEC §6 calls it the write half of `resource()`, and the reference app has forms. `Docs/COMPARISON.md`'s 6.9 kB is unchanged, because it matches `resource` against `useQuery` alone and neither side imports a mutation |
 | 2026-09-19 | `mutation()`'s I/O hook is `send`, not `run`; `optimistic`, `rollback` and `onSuccess` are documented passed by reference; concurrency is per `key` (`string \| number`) instead of a parallel flag | `run` named both the option and the method with different signatures. By-reference matches `SHR-V001`'s rule for intents, and works because transitions are plain functions (SPEC §4). A per-key queue is the only safe reading of "parallel": two records at once, never two writes to one record racing — which is what T04 asks for |
 | 2026-09-19 | An error's docs URL is the whole code — `sheratan.dev/errors/SHR-L001` — not the code without its prefix (SPEC §4, §8) | SPEC named the prefix-less form, but the runtime has shipped `DOCS_BASE_URL + code` since the prod build existed, so every bundle already contains the full form, and the URL cannot change once it is in other people's code. The full code also needs no translation: the URL segment is the string the error prints. `packages/eval` still generates the prefix-less form and is deliberately left alone — Week 5 re-runs that eval unchanged |
+| 2026-09-19 | Week 2's gate is passed on one combined test, not on the per-primitive leak tests | Four of the six ran 200 cycles, not the 1000 the gate names, and none mounted the primitives together — a leak that needs two of them sharing an owner would pass every one. A subscription count also cannot see an unaborted request or a live timer, so the gate test checks those directly, and was broken three ways to prove it fails |
