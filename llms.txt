@@ -521,7 +521,7 @@ module (SHR-T001 warns when missing). End-to-end tests live in `e2e/`.
   "range": { "line": 3, "column": 1 },
   "message": "view cannot import effects; allowed: lib, ui, own state.",
   "fix": "Move the call into todo.effects.ts and expose the result via todo.state.ts.",
-  "docs": "https://sheratan.dev/errors/L001"
+  "docs": "https://sheratan.dev/errors/SHR-L001"
 }
 ```
 

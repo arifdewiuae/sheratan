@@ -81,13 +81,16 @@ any of it makes an agent measurably better.
 
 | Path | What |
 |---|---|
-| `packages/core/` | The runtime: signals, templates, `each`, `render`. Zero runtime dependencies |
-| `examples/hello/` | A live dashboard in the canonical module shape: 500 rows, 2000 values a second, sorted on every batch |
-| `tooling/eslint-config/` | Shared lint config |
+| `packages/core/` | The runtime: signals, templates, keyed and windowed `each`, `render`, `resource`, `mutation`, `stream`, and the causal trace. Zero runtime dependencies |
+| `packages/eval/` | The Week 0 self-repair eval: host app, injected violations, raw logs |
+| `examples/hello/` | A live dashboard in the canonical module shape: 500 rows, 20,000 values a second, sorted on every batch |
 | `llms.txt` | The API as an agent should learn it |
 | `Docs/SPEC.md` | Technical specification. The source of truth for implementation |
 | `Docs/EVAL.md` | Performance and agent-authoring evaluation plan, with go/no-go gates |
 | `Docs/EVAL-RESULTS.md` | What the Week 0 falsification gate actually measured, and what it did not |
+| `Docs/COMPARISON.md` | Size and capability against Solid, Svelte, Vue, React and Angular, with the method in `Docs/comparison/` |
+| `Docs/adr/` | Decisions with a real trade-off, written up once |
+| `Docs/guides/` | Using a web-component library inside a Sheratan view |
 | `Docs/TASKS.md` | Progress tracker for the MVP |
 | `Docs/sheratan-identity.html` | Brand identity |
 | `site/` | Website: plain HTML, no build. Serve `site/` with any static file server |
@@ -102,10 +105,10 @@ pnpm install --frozen-lockfile
 pnpm check   # format, lint, typecheck, build, tests + coverage gate, package checks, audit
 ```
 
-The runtime is 5.3 KB brotli with zero dependencies, and every commit is
+The runtime is 6.8 KB brotli with zero dependencies, and every commit is
 measured against `packages/core/size-budget.json`.
 
-Run the example — 500 rows under a synthetic 2000 values/second feed, re-sorted
+Run the example — 500 rows under a synthetic 20,000 values/second feed, re-sorted
 on every batch:
 
 ```sh
