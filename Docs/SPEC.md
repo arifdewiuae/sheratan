@@ -1,8 +1,9 @@
 # SHERATAN — Technical Specification (draft v0.1)
 
 > Name: β Arietis — Arabic aš-šaraṭān, "the two signs"; with Mesarthim it
-> marked the vernal equinox, the reference point of the year. Free on npm as of
-> 2026-09-14, still free on 2026-09-17. **`sheratan.dev` is registered
+> marked the vernal equinox, the reference point of the year. **Reserved on
+> npm** as `sheratan@0.0.1` (2026-09-17, deprecated as a placeholder until
+> v0.1.0). **`sheratan.dev` is registered
 > (2026-09-17)** — it goes into checker error links and cannot be changed later,
 > so it is now a fixed constraint rather than an assumption. Still to verify:
 > the GitHub org handle.
@@ -219,8 +220,11 @@ Template rules, checked off the AST of `html` literals (§9, §13):
 templates, `T` tests; `R` is reserved for structured runtime errors. Numbers
 are stable — never renumbered, never reused; a retired code stays reserved.
 A violation caught at run time by a dev-build assertion reports under the same
-code as its static check (`SHR-L005`, §13). The docs URL is the code without
-the prefix: `sheratan.dev/errors/L001`.
+code as its static check (`SHR-L005`, §13). The docs URL is the whole code,
+exactly as the error prints it: `sheratan.dev/errors/SHR-L001`. Nothing has to
+translate between the two, and the runtime already ships it that way
+(`DOCS_BASE_URL + code` in `env.prod.ts`), so the prefix-less form this section
+first named is not what any bundle contains.
 
 `SHR-L008` exists because of shared modules specifically: without it,
 `session` and `orders` will import each other within a week.
@@ -798,7 +802,7 @@ Error format is fixed and stable:
   "range": { "line": 3, "column": 1 },
   "message": "view cannot import effects; allowed: lib, ui, own state.",
   "fix": "Move the call into todo.effects.ts and expose the result via todo.state.ts.",
-  "docs": "https://sheratan.dev/errors/L001"
+  "docs": "https://sheratan.dev/errors/SHR-L001"
 }
 ```
 
