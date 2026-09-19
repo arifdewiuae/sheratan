@@ -72,7 +72,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 ## Git and PRs
 
 - `develop` is the default branch. `main` receives releases only, and the site deploys from it.
-- **Every change goes through a PR into `develop`.** No direct commits to either branch.
+- **Every change goes through a PR into `develop`.** No direct commits to either branch. GitHub enforces it: the ruleset "protect develop and main" requires a PR and all three CI checks green, blocks force-pushes and deletion, and has no bypass, admins included.
 - Branch names: `feat/…`, `fix/…`, `refactor/…`, `chore/…`, `docs/…`. One concern per PR; stack PRs when a change splits into reviewable steps.
 - A PR is mergeable when CI is green and the description states what changed, why, and how it was verified.
 - Commit subjects are imperative and scoped, as in the existing history ("Core: …", "Spec: …").
@@ -189,10 +189,13 @@ any app built with Sheratan:
 | `index.ts` | the module's only public surface: `kind` plus a factory returning a view function | — |
 | `app.ts` | the one place a contract meets an adapter | contain feature logic |
 
-Until the checker exists (Week 3), `.oxlintrc.json` enforces this with
-`no-restricted-imports` and `no-restricted-globals`, keyed by filename. Each
-message names the allowed alternative rather than a rule number, the way the
-checker's will.
+The checker enforces this (`SHR-L001`, `SHR-L002`) and runs over
+`examples/hello` inside `pnpm check`. `.oxlintrc.json` repeats a subset with
+`no-restricted-imports` and `no-restricted-globals`, keyed by filename, for one
+reason: it shows in the editor as you type, and the checker does not yet. So
+**a change to the import matrix or the I/O globals updates `.oxlintrc.json` in
+the same PR**, or the two start giving different verdicts. The lint rules go
+once the checker has editor feedback (TASKS, Week 3 CLI).
 
 **Two things a new lint rule needs:**
 - **Break the code once to prove the rule fires.** A rule that matches nothing
@@ -257,6 +260,7 @@ A behaviour change updates the relevant SPEC section. A resolved gap gets ticked
 2. **A fresh read of every function you touched:** does it do one thing, and does it read top to bottom without a comment explaining the flow? Structural compliance (tests exist, constants exist) is not the same as clean code.
 3. Complexity bounds above still hold; new hot-path code states its bound in the PR.
 4. Docs obligations met. No TODOs without a TASKS entry.
+5. **Progress is current before the PR opens:** the TASKS items this change completes are ticked with where, and the **Status table** at the top of TASKS says where the week now stands — the row's status and its gate-result line ("Checker 4 of 16 codes"). The PR description says what moved.
 
 ## AI_Web_App_Checklist applicability
 
