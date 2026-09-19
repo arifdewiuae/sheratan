@@ -22,7 +22,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | 0 | Falsification | 🟡 In progress | Self-repair ✅ 60/60 · median iterations vs React not run |
 | 1 | Core | 🟡 In progress | No-build ✅ · reordering vs Solid not measured |
 | 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ |
-| 3 | Checker, CLI, template | 🟡 In progress | — |
+| 3 | Checker, CLI, template | 🟡 In progress | Checker 4 of 16 codes (L001, L002, L008, L010) · CLI and template not started |
 | 4 | Agent surface, reference app | ⬜ Not started | — |
 | 5 | Re-measure, package, launch | 🟡 In progress | — |
 | +8 wks | Outside production use | ⬜ Not started | — |
@@ -435,3 +435,4 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-19 | `SHR-L002` covers `*.state.ts` and a module's own helpers, not only `*.view.ts` (SPEC §4) | The layer table already forbade I/O in state, and the lint rule L002 replaces covered state too; a checker narrower than the lint it retires would be a regression. A module helper reads like the view it serves, as it does in the import matrix. `lib/` and `ui/` are left out for now: a debounce in `lib/` legitimately needs a timer, and that line wants a real case before it is drawn |
 | 2026-09-19 | A global is what the type checker resolves to a declaration file, not a name match | A name list flags `const document = …` and `page.fetch`, and misses nothing a resolver catches. The checker already has the program; resolving every reference in a file is one batched call |
 | 2026-09-19 | The `.oxlintrc.json` layer rules stay, though `SHR-L001` and `SHR-L002` catch everything they do | They are the only boundary feedback that shows while typing; the checker runs in `pnpm check` and CI. The cost is a second copy of the matrix that can drift, paid by updating both in one PR until the checker has editor feedback |
+| 2026-09-19 | `develop` and `main` are protected by a ruleset: PR required, all three CI checks required, no force-push or deletion, **no bypass** — zero approvals | Until now the PR-only rule was a habit: branch protection was off and the one ruleset was disabled and targeted no branch, so a red PR could merge. Zero approvals, because a single maintainer cannot approve their own PR; the checks are the reviewer. No admin bypass, or it is advice rather than a rule. Up-to-date-before-merge is off: stacked PRs already rebase often, and CI re-runs on `develop` after every merge |

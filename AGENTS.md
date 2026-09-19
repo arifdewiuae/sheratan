@@ -72,7 +72,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 ## Git and PRs
 
 - `develop` is the default branch. `main` receives releases only, and the site deploys from it.
-- **Every change goes through a PR into `develop`.** No direct commits to either branch.
+- **Every change goes through a PR into `develop`.** No direct commits to either branch. GitHub enforces it: the ruleset "protect develop and main" requires a PR and all three CI checks green, blocks force-pushes and deletion, and has no bypass, admins included.
 - Branch names: `feat/…`, `fix/…`, `refactor/…`, `chore/…`, `docs/…`. One concern per PR; stack PRs when a change splits into reviewable steps.
 - A PR is mergeable when CI is green and the description states what changed, why, and how it was verified.
 - Commit subjects are imperative and scoped, as in the existing history ("Core: …", "Spec: …").
