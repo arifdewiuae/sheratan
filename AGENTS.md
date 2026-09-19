@@ -260,6 +260,7 @@ A behaviour change updates the relevant SPEC section. A resolved gap gets ticked
 2. **A fresh read of every function you touched:** does it do one thing, and does it read top to bottom without a comment explaining the flow? Structural compliance (tests exist, constants exist) is not the same as clean code.
 3. Complexity bounds above still hold; new hot-path code states its bound in the PR.
 4. Docs obligations met. No TODOs without a TASKS entry.
+5. **Progress is current before the PR opens:** the TASKS items this change completes are ticked with where, and the **Status table** at the top of TASKS says where the week now stands — the row's status and its gate-result line ("Checker 4 of 16 codes"). The PR description says what moved.
 
 ## AI_Web_App_Checklist applicability
 
