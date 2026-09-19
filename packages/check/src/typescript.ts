@@ -7,6 +7,7 @@
 import {
   SyntaxKind,
   type ExportDeclaration,
+  type Identifier,
   type ImportDeclaration,
   type Node,
   type SourceFile,
@@ -14,9 +15,13 @@ import {
 } from 'typescript/unstable/ast';
 import {
   isExportDeclaration,
+  isIdentifier,
   isImportDeclaration,
   isNamedExports,
   isNamedImports,
+  isPropertyAccessExpression,
+  isShorthandPropertyAssignment,
+  isTypeQueryNode,
 } from 'typescript/unstable/ast/is';
 import { skipTrivia } from 'typescript/unstable/ast/scanner';
 import {
@@ -55,6 +60,12 @@ export interface SurfaceMember {
   readonly at: Position;
 }
 
+/** A use of a global the platform declares, such as `fetch` or `document`. */
+export interface GlobalUse {
+  readonly name: string;
+  readonly at: Position;
+}
+
 /** A type-checked program, queried in the terms the rules think in. */
 export interface Program extends Disposable {
   /** Every source file of the project: no libraries, no declaration files. */
@@ -67,6 +78,13 @@ export interface Program extends Disposable {
    * surface is (SPEC §4).
    */
   surfaceOf(file: string): readonly SurfaceMember[];
+  /**
+   * Every value reference to a global declared only in a declaration file —
+   * the DOM, the language, `@types/*` — that no local name shadows, in
+   * source order. A member name (`window.fetch`'s `fetch`) is not a reference
+   * to the global of that name, and neither is a type query (`typeof window`).
+   */
+  globalsOf(file: string): readonly GlobalUse[];
 }
 
 const DECLARATION_FILE = '.d.ts';
@@ -119,6 +137,36 @@ function exportIsTypeOnly(node: ExportDeclaration): boolean {
     clause.elements.length > 0 &&
     clause.elements.every((element) => element.isTypeOnly)
   );
+}
+
+/** An identifier that reads a value by its own name, rather than naming a member or a type. */
+function isValueReference(node: Identifier): boolean {
+  const { parent } = node;
+
+  return !(isPropertyAccessExpression(parent) && parent.name === node) && !isTypeQueryNode(parent);
+}
+
+function referencesIn(source: SourceFile): Identifier[] {
+  const found: Identifier[] = [];
+
+  const visit = (node: Node): void => {
+    if (isIdentifier(node) && isValueReference(node)) found.push(node);
+
+    node.forEachChild(visit);
+  };
+
+  source.forEachChild(visit);
+
+  return found;
+}
+
+/**
+ * Declared by the platform rather than the project: only in declaration files.
+ * An import is declared in the file that imports it, so a package's `fetch`
+ * is not the global one; `globalThis` has no declaration at all.
+ */
+function isAmbientGlobal(symbol: TsSymbol): boolean {
+  return symbol.declarations.every((declaration) => declaration.path.endsWith(DECLARATION_FILE));
 }
 
 function isWritable(checker: Checker, type: Type): boolean {
@@ -197,6 +245,20 @@ class TypeScriptProgram implements Program {
       });
   }
 
+  globalsOf(file: string): readonly GlobalUse[] {
+    const source = this.sourceFile(file);
+    const references = referencesIn(source);
+    const symbols = this.project.checker.getSymbolAtLocation(references);
+
+    return references.flatMap((reference, index) => {
+      const symbol = this.valueSymbol(reference, symbols[index]);
+
+      return symbol !== undefined && isAmbientGlobal(symbol)
+        ? [{ name: reference.text, at: positionIn(source, reference) }]
+        : [];
+    });
+  }
+
   [Symbol.dispose](): void {
     this.api.close();
   }
@@ -204,6 +266,13 @@ class TypeScriptProgram implements Program {
   /** Every name this is called with came from this program, so the file is there. */
   private sourceFile(file: string): SourceFile {
     return this.project.program.getSourceFile(file) as SourceFile;
+  }
+
+  /** What an identifier reads: for `{ document }`, the variable, not the new property. */
+  private valueSymbol(reference: Identifier, symbol: TsSymbol | undefined): TsSymbol | undefined {
+    return isShorthandPropertyAssignment(reference.parent)
+      ? this.project.checker.getShorthandAssignmentValueSymbol(reference.parent)
+      : symbol;
   }
 
   private edge(specifier: Node, typeOnly: boolean, at: Position): ImportEdge {
