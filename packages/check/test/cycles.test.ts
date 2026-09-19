@@ -1,6 +1,6 @@
-// SHR-L008 over lib/ (SPEC §4): a utility may use another, but not in a
-// circle. A cycle has no first file to load, and no file in it can be
-// understood — or moved — without the others.
+// SHR-L008 (SPEC §4): a utility may use another, and a module may use another,
+// but never in a circle. A cycle has no first node to load, and nothing in it
+// can be understood — or moved — without the rest.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -85,5 +85,72 @@ test('a type-only import still counts: the dependency is real even if erased', (
   assert.deepEqual(
     findings.map((finding) => finding.code),
     [RuleCode.Cycle],
+  );
+});
+
+/** A module whose effects use each of `others` through its index. */
+const module = (name: string, ...others: readonly string[]): Record<string, string> => ({
+  [`modules/${name}/index.ts`]: `export const kind = 'full';\n\nexport const ${name} = 1;\n`,
+  [`modules/${name}/${name}.effects.ts`]: others
+    .map((other) => `import { ${other} } from '../${other}/index.ts';\n`)
+    .concat(`\nexport const uses = [${others.join(', ')}];\n`)
+    .join(''),
+});
+
+test('a module may use another when nothing comes back round', () => {
+  assert.deepEqual(check({ ...module('orders', 'session'), ...module('session') }), []);
+});
+
+test('two modules using each other are one cycle, reported at the first import', () => {
+  const findings = check({ ...module('orders', 'session'), ...module('session', 'orders') });
+
+  assert.deepEqual(findings, [
+    {
+      code: 'SHR-L008',
+      severity: 'error',
+      file: 'modules/orders/orders.effects.ts',
+      range: { line: 1, column: 1 },
+      message:
+        'modules/orders/orders.effects.ts is part of an import cycle: modules/orders → modules/session → modules/orders; allowed: a module may use another, never one that leads back to itself.',
+      fix: 'Decide which module depends on the other and remove the import going the opposite way: move what both need into services/ if it does I/O or lib/ if it is pure, and import it from each.',
+      docs: 'https://sheratan.dev/errors/SHR-L008',
+    },
+  ]);
+});
+
+test('a cycle through three modules names each module once, in order', () => {
+  const [finding, ...rest] = check({
+    ...module('a', 'b'),
+    ...module('b', 'c'),
+    ...module('c', 'a'),
+  });
+
+  assert.deepEqual(rest, []);
+  assert.match(finding?.message ?? '', /: modules\/a → modules\/b → modules\/c → modules\/a;/);
+});
+
+test("a module's own files importing each other are not a cycle between modules", () => {
+  assert.deepEqual(
+    check({
+      'modules/todo/index.ts':
+        "import { createTodoEffects } from './todo.effects.ts';\n\nexport const kind = 'full';\n\nexport const create = createTodoEffects;\n",
+      'modules/todo/todo.state.ts': 'export const createTodoState = (): number => 1;\n',
+      'modules/todo/todo.effects.ts':
+        "import { createTodoState } from './todo.state.ts';\n\nexport const createTodoEffects = createTodoState;\n",
+    }),
+    [],
+  );
+});
+
+test('a type-only import closes a module cycle too', () => {
+  const findings = check({
+    ...module('orders', 'session'),
+    'modules/session/index.ts':
+      "import type { orders } from '../orders/index.ts';\n\nexport const kind = 'full';\n\nexport const session = (o: typeof orders): number => o;\n",
+  });
+
+  assert.deepEqual(
+    findings.map((finding) => [finding.code, finding.file]),
+    [[RuleCode.Cycle, 'modules/orders/orders.effects.ts']],
   );
 });
