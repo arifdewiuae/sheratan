@@ -189,10 +189,13 @@ any app built with Sheratan:
 | `index.ts` | the module's only public surface: `kind` plus a factory returning a view function | — |
 | `app.ts` | the one place a contract meets an adapter | contain feature logic |
 
-Until the checker exists (Week 3), `.oxlintrc.json` enforces this with
-`no-restricted-imports` and `no-restricted-globals`, keyed by filename. Each
-message names the allowed alternative rather than a rule number, the way the
-checker's will.
+The checker enforces this (`SHR-L001`, `SHR-L002`) and runs over
+`examples/hello` inside `pnpm check`. `.oxlintrc.json` repeats a subset with
+`no-restricted-imports` and `no-restricted-globals`, keyed by filename, for one
+reason: it shows in the editor as you type, and the checker does not yet. So
+**a change to the import matrix or the I/O globals updates `.oxlintrc.json` in
+the same PR**, or the two start giving different verdicts. The lint rules go
+once the checker has editor feedback (TASKS, Week 3 CLI).
 
 **Two things a new lint rule needs:**
 - **Break the code once to prove the rule fires.** A rule that matches nothing
