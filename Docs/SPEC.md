@@ -209,7 +209,7 @@ Constraints the matrix cannot express:
 
 | Code | Rule |
 |------|------|
-| `SHR-L002` | `*.view.ts` must not call an I/O global (`fetch`, `localStorage`, `document`, timers) |
+| `SHR-L002` | `*.view.ts`, `*.state.ts` and a module's other own files use no I/O global: network (`fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`), storage (`localStorage`, `sessionStorage`, `indexedDB`, `caches`), timers (`setTimeout`, `setInterval`, `requestAnimationFrame`, `requestIdleCallback`) or the page (`document`, `window`, `globalThis`, `self`, `navigator`, `location`, `history`, `alert`, `confirm`, `prompt`). A global is what the type checker resolves to the platform's declaration, so a local named `document` is not one |
 | `SHR-L003` | Project layout: no `shared/` directory; `ui/` nests at most one level (below) |
 | `SHR-L004` | Effects-only APIs — `resource()`, `mutation()`, `stream()`, `onDispose()`, `navigate()` — are called only inside `*.effects.ts` |
 | `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts`. Best-effort backstop to `SHR-L010` (§13) |

@@ -6,6 +6,7 @@ import { dirname } from 'node:path';
 import type { Finding } from './finding.ts';
 import { boundary } from './rules/boundary.ts';
 import { cycles } from './rules/cycles.ts';
+import { io } from './rules/io.ts';
 import { surface } from './rules/surface.ts';
 import { openProgram } from './typescript.ts';
 
@@ -39,7 +40,7 @@ export function checkProject(options: CheckOptions): readonly Finding[] {
 
   using program = openProgram(options.tsconfig);
 
-  return [...boundary(program, root), ...cycles(program, root), ...surface(program, root)].toSorted(
-    byLocation,
-  );
+  return [boundary, io, cycles, surface]
+    .flatMap((rule) => rule(program, root))
+    .toSorted(byLocation);
 }

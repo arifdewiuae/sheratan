@@ -531,7 +531,7 @@ Apply the `fix`; the `message` names the allowed set.
 | Code | Rule |
 |---|---|
 | SHR-L001 | import not allowed by the matrix, including deep imports past another module's `index.ts` |
-| SHR-L002 | I/O global (`fetch`, `localStorage`, `document`, timers) in a view |
+| SHR-L002 | I/O global (`fetch`, `localStorage`, `document`, timers) in a view or state |
 | SHR-L003 | `shared/` folder, or `ui/` nested more than one level |
 | SHR-L004 | `watch`, `onDispose`, `resource`, `mutation`, `stream` (and later `navigate`) outside effects |
 | SHR-L005 | effects write a signal directly instead of calling a transition |
