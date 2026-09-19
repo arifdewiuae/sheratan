@@ -244,7 +244,11 @@ translate between the two, and the runtime already ships it that way
 first named is not what any bundle contains.
 
 `SHR-L008` exists because of shared modules specifically: without it,
-`session` and `orders` will import each other within a week.
+`session` and `orders` will import each other within a week. Among modules a
+node is the whole module, so imports between one module's own files are its
+structure, not a cycle; among `lib/` files a node is a file. `import type`
+counts in both: the dependency is real even when the import is erased, and a
+type loop is what the next value import turns into a load-order bug.
 
 Data flows in exactly one direction: `effects → state → view`. Views emit
 intents; they never act.
