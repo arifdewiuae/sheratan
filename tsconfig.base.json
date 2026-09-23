@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "target": "es2022",
-    "lib": ["es2023", "esnext.disposable", "dom", "dom.iterable"],
+    "target": "esnext",
+    "lib": ["es2025", "esnext.disposable", "dom", "dom.iterable"],
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "types": [],
