@@ -7,6 +7,7 @@ import type { Finding } from './finding.ts';
 import { boundary } from './rules/boundary.ts';
 import { cancellable } from './rules/cancellable.ts';
 import { cycles } from './rules/cycles.ts';
+import { effectsOnly } from './rules/effects-only.ts';
 import { io } from './rules/io.ts';
 import { shape } from './rules/shape.ts';
 import { structure } from './rules/structure.ts';
@@ -44,7 +45,7 @@ export function checkProject(options: CheckOptions): readonly Finding[] {
 
   using program = openProgram(options.tsconfig);
 
-  return [boundary, io, structure, shape, cancellable, cycles, surface, tested]
+  return [boundary, io, structure, effectsOnly, shape, cancellable, cycles, surface, tested]
     .flatMap((rule) => rule(program, root))
     .toSorted(byLocation);
 }

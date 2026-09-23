@@ -14,6 +14,7 @@ import {
   type StringLiteral,
 } from 'typescript/unstable/ast';
 import {
+  isCallExpression,
   isExportDeclaration,
   isIdentifier,
   isImportDeclaration,
@@ -83,6 +84,15 @@ export interface GlobalUse {
   readonly at: Position;
 }
 
+/** A call to a value the file imported, named as the module it came from names it. */
+export interface CallUse {
+  /** The exported name, not the local alias: `import { stream as s }` reports `stream`. */
+  readonly name: string;
+  /** The specifier it was imported from, exactly as written. */
+  readonly from: string;
+  readonly at: Position;
+}
+
 /** A type-checked program, queried in the terms the rules think in. */
 export interface Program extends Disposable {
   /** Every source file of the project: no libraries, no declaration files. */
@@ -107,6 +117,12 @@ export interface Program extends Disposable {
    * alias, and the call signatures its members have.
    */
   methodsOf(file: string): readonly ContractMethod[];
+  /**
+   * Every call to something the file imported, in source order. A local of the
+   * same name shadowing the import is not one of these, and neither is a call
+   * to a local function that happens to share a name with an export.
+   */
+  callsOf(file: string): readonly CallUse[];
 }
 
 const DECLARATION_FILE = '.d.ts';
@@ -173,6 +189,53 @@ function referencesIn(source: SourceFile): Identifier[] {
 
   const visit = (node: Node): void => {
     if (isIdentifier(node) && isValueReference(node)) found.push(node);
+
+    node.forEachChild(visit);
+  };
+
+  source.forEachChild(visit);
+
+  return found;
+}
+
+/** What a local name was imported as, and from where. */
+interface Imported {
+  readonly name: string;
+  readonly from: string;
+}
+
+/** The value bindings one import statement introduces, local name first. */
+function bindingsOf(statement: ImportDeclaration): [string, Imported][] {
+  const bindings = statement.importClause?.namedBindings;
+
+  if (bindings === undefined || !isNamedImports(bindings)) return [];
+
+  // The grammar allows nothing but a string literal here.
+  const from = (statement.moduleSpecifier as StringLiteral).text;
+
+  return bindings.elements
+    .filter((element) => !element.isTypeOnly)
+    .map((element) => [
+      element.name.text,
+      { name: (element.propertyName ?? element.name).text, from },
+    ]);
+}
+
+/** Local name to the export it names, for every value import in the file. */
+function valueImportsIn(source: SourceFile): Map<string, Imported> {
+  return new Map(
+    source.statements.flatMap((statement) =>
+      isImportDeclaration(statement) && !importIsTypeOnly(statement) ? bindingsOf(statement) : [],
+    ),
+  );
+}
+
+/** Every identifier in callee position, which is the only place a call names. */
+function calleesIn(source: SourceFile): Identifier[] {
+  const found: Identifier[] = [];
+
+  const visit = (node: Node): void => {
+    if (isCallExpression(node) && isIdentifier(node.expression)) found.push(node.expression);
 
     node.forEachChild(visit);
   };
@@ -321,6 +384,33 @@ class TypeScriptProgram implements Program {
       .map((exported) => this.declaration(exported))
       .filter((exported) => isDeclaredType(exported))
       .flatMap((exported) => this.methodsOfType(exported, fallback));
+  }
+
+  callsOf(file: string): readonly CallUse[] {
+    const source = this.sourceFile(file);
+    const imported = valueImportsIn(source);
+
+    if (imported.size === 0) return [];
+
+    // One pass: a callee is interesting only if its name was imported, and the
+    // import it came from is what names it.
+    const calls = calleesIn(source).flatMap((callee) => {
+      const origin = imported.get(callee.text);
+
+      return origin === undefined ? [] : [{ callee, origin }];
+    });
+
+    const symbols = this.project.checker.getSymbolAtLocation(calls.map((call) => call.callee));
+
+    return calls.flatMap(({ callee, origin }, index) => {
+      // An import binding is an alias symbol; a local declared over it is not,
+      // so a shadowed name reads as the local it actually calls.
+      const aliased = symbols[index]?.flags;
+
+      return aliased !== undefined && (aliased & SymbolFlags.Alias) !== 0
+        ? [{ name: origin.name, from: origin.from, at: positionIn(source, callee) }]
+        : [];
+    });
   }
 
   [Symbol.dispose](): void {
