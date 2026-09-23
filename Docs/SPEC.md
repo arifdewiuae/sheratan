@@ -1344,11 +1344,29 @@ The honest formulation, and the only one to use in the README:
   serves ESM — no bundling, no transform of the templates, no plugin
   configuration. Under Bun or Deno, which run TypeScript natively, even that
   disappears.
-- Production is ESM served as-is: `sheratan build` strips types from `src/`
-  into a directory of plain ESM and copies everything else, so what ships is
-  what a static host serves. No bundler is involved, and `dev` and `build`
-  differ only in where the stripped output goes. Bundling afterwards is
-  optional and the user's choice.
+- Production is ESM served as-is: `sheratan build [directory] [--out dist]`
+  strips types into a directory of plain ESM and copies everything else, so
+  what ships is what a static host serves. No bundler is involved, and `dev`
+  and `build` differ only in where the stripped output goes. Bundling
+  afterwards is optional and the user's choice.
+
+  Four things the shipped command's shape follows from:
+  - **The stripper is Node's own** (`node:module`), so `build` needs nothing
+    installed — not even the `typescript` the checker asks for. It erases and
+    never compiles, which is the promise made honest: an `enum`, a `namespace`
+    or a parameter property is refused **by name**, with the one-line
+    alternative, because there is nothing to strip it to. This is why the
+    template's `tsconfig.json` carries `erasableSyntaxOnly`.
+  - **The tree is copied, not traced** — everything but `node_modules`, `e2e/`,
+    dot-entries, test files and the project's own configs. There is no module
+    graph to walk because there is no bundler, so what a page does not load
+    costs a file rather than a runtime error.
+  - **The runtime is vendored** into `<out>/sheratan/`, with the page's import
+    map pointed at it, for the pages that name it. A browser cannot resolve a
+    bare specifier, so output that kept one would not run — and "what ships is
+    what the host serves" would be false.
+  - **A `.ts` in a relative import becomes `.js`**, because the file it names
+    did.
 - Both commands are served by Sheratan's own minimal server rather than a
   third-party dev server: a framework that promises no plugin pipeline should
   not require one to run (ADR pending; prototyped in `examples/hello/serve.ts`).

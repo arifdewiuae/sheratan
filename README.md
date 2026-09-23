@@ -143,6 +143,16 @@ The checker reads your code with the TypeScript compiler, so `typescript` is an
 optional peer dependency: an app that only renders installs nothing extra, and
 `sheratan check` tells you to add it if it is not there.
 
+Ship it with the same command — types off, nothing else changed:
+
+```sh
+npx sheratan build .          # plain ESM in dist/, for any static file server
+```
+
+No bundler, no config, no plugin pipeline. `build` strips with Node's own
+stripper, so it needs nothing installed at all, and it vendors the runtime into
+the output so the browser can resolve `sheratan` without a resolver.
+
 All changes go through pull requests into `develop`; `main` is for releases.
 Read [AGENTS.md](AGENTS.md) before opening one.
 

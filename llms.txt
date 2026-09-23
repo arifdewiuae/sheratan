@@ -525,6 +525,24 @@ module (SHR-T001 warns when missing). End-to-end tests live in `e2e/`.
 | `items().push(x)` | `items.set([...items(), x])` | L011 |
 | `watch`/`onDispose` in a view | move to effects | L004 |
 
+## 9b. Running and shipping an app
+
+```sh
+npx sheratan check [directory] [--json]      # the architecture rules
+npx sheratan build [directory] [--out dist]  # plain ESM for a static host
+```
+
+`build` strips types and writes ESM any static file server can serve: no
+bundler, no config, no plugin pipeline. It copies the tree — minus
+`node_modules`, `e2e/`, dot-entries, tests and configs — rewrites relative
+`./x.ts` imports to `./x.js`, and vendors the runtime into `<out>/sheratan/`
+with the page's import map pointed at it.
+
+It strips with Node's own stripper, so it needs nothing installed. That also
+means it can only erase: an `enum`, a `namespace` or a parameter property is
+refused by name. Write a const object with `as const`, a module, and plain
+assignments — the same rule the framework holds itself to.
+
 ## 10. Checker output
 
 `npx sheratan check [directory] [--json]` checks the project whose
