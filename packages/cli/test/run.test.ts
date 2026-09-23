@@ -13,20 +13,20 @@ const FETCHING = "export const load = (): Promise<Response> => fetch('/todos');\
 
 const CLEAN = { 'lib/format.ts': 'export const pad = (n: number): string => String(n);\n' };
 
-test('a clean project says so and exits 0', () => {
+test('a clean project says so and exits 0', async () => {
   using made = project(CLEAN);
   const { terminal, out, err } = recorder();
 
-  assert.equal(run(['check', made.root], terminal), Exit.Clean);
+  assert.equal(await run(['check', made.root], terminal), Exit.Clean);
   assert.deepEqual(out, ['No violations.']);
   assert.deepEqual(err, []);
 });
 
-test('a violation prints where, what, the fix and the page, then exits 1', () => {
+test('a violation prints where, what, the fix and the page, then exits 1', async () => {
   using made = project({ [VIEW]: FETCHING });
   const { terminal, out } = recorder();
 
-  assert.equal(run(['check', made.root], terminal), Exit.Violations);
+  assert.equal(await run(['check', made.root], terminal), Exit.Violations);
 
   assert.equal(
     out.join(''),
@@ -41,11 +41,11 @@ test('a violation prints where, what, the fix and the page, then exits 1', () =>
   );
 });
 
-test('--json prints one versioned object, whatever the order of the arguments', () => {
+test('--json prints one versioned object, whatever the order of the arguments', async () => {
   using made = project({ [VIEW]: FETCHING });
   const { terminal, out } = recorder();
 
-  assert.equal(run(['check', '--json', made.root], terminal), Exit.Violations);
+  assert.equal(await run(['check', '--json', made.root], terminal), Exit.Violations);
 
   const printed: unknown = JSON.parse(out.join(''));
 
@@ -65,23 +65,23 @@ test('--json prints one versioned object, whatever the order of the arguments', 
   });
 });
 
-test('a clean project in JSON is an empty list, not an empty output', () => {
+test('a clean project in JSON is an empty list, not an empty output', async () => {
   using made = project(CLEAN);
   const { terminal, out } = recorder();
 
-  assert.equal(run(['check', '--json', made.root], terminal), Exit.Clean);
+  assert.equal(await run(['check', '--json', made.root], terminal), Exit.Clean);
   assert.deepEqual(JSON.parse(out.join('')), { version: 1, findings: [] });
 });
 
-test('a project that will not open fails with the reason, not as a clean result', () => {
+test('a project that will not open fails with the reason, not as a clean result', async () => {
   const { terminal, out, err } = recorder();
 
-  assert.equal(run(['check', 'no/such/project'], terminal), Exit.Usage);
+  assert.equal(await run(['check', 'no/such/project'], terminal), Exit.Usage);
   assert.deepEqual(out, []);
   assert.match(err.join(''), /could not open/);
 });
 
-test('the checked directory defaults to the one the command runs in', () => {
+test('the checked directory defaults to the one the command runs in', async () => {
   using made = project(CLEAN);
   const { terminal } = recorder();
   const cwd = process.cwd();
@@ -89,7 +89,7 @@ test('the checked directory defaults to the one the command runs in', () => {
   process.chdir(made.root);
 
   try {
-    assert.equal(run(['check'], terminal), Exit.Clean);
+    assert.equal(await run(['check'], terminal), Exit.Clean);
   } finally {
     process.chdir(cwd);
   }

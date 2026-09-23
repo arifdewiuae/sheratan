@@ -2,7 +2,7 @@
 // The process boundary, and the only file in this folder that owns one: it
 // hands `run()` the real streams and takes back an exit code.
 
-import { run } from '../src/index.ts';
+import { run } from '../src/run.ts';
 
 /** `argv` starts with the runtime and this file; the command's own words follow. */
 const ARGUMENTS_START = 2;
@@ -22,4 +22,4 @@ const terminal = {
   colour: process.stdout.isTTY && process.env['NO_COLOR'] === undefined,
 };
 
-process.exitCode = run(process.argv.slice(ARGUMENTS_START), terminal);
+process.exitCode = await run(process.argv.slice(ARGUMENTS_START), terminal);
