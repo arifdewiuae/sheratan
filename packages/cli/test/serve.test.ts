@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 
 import { project, type Files } from '../../check/test/project.ts';
@@ -62,6 +62,27 @@ test('a deep link into a route is answered with the page, not a 404', async () =
 
     assert.equal(response.status, 200);
     assert.match(await response.text(), /<main id="app">/);
+  });
+});
+
+/** A request with no `Accept` at all, which `fetch` will not send. */
+async function askWithoutAccept(base: string, path: string): Promise<number> {
+  const { promise, resolve, reject } = Promise.withResolvers<number>();
+  const call = httpRequest(`${base}${path}`, { headers: {} }, (response) => {
+    response.resume();
+    // A status is always set by the time the response head arrives.
+    resolve(response.statusCode as number);
+  });
+
+  call.on('error', reject);
+  call.end();
+
+  return promise;
+}
+
+test('a client that states no Accept is not assumed to be navigating', async () => {
+  await serving(SITE, async (base) => {
+    assert.equal(await askWithoutAccept(base, '/orders/42'), 404);
   });
 });
 
