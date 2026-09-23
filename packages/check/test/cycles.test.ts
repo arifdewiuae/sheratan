@@ -5,7 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { RuleCode } from '../src/index.ts';
-import { check } from './project.ts';
+import { only } from './project.ts';
+
+/** SHR-L008's own findings: these fixtures are loops, not whole modules. */
+const check = only(RuleCode.Cycle);
 
 const uses = (path: string, name: string): string =>
   `import { ${name} } from '${path}';\n\nexport const probe = ${name};\n`;

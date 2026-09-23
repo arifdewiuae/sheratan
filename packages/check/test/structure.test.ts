@@ -5,7 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { RuleCode } from '../src/index.ts';
-import { check } from './project.ts';
+import { only } from './project.ts';
+
+/** SHR-L003's own findings: a path here is a path, not always a whole module. */
+const check = only(RuleCode.Structure);
 
 /** A file with no imports and nothing to say, so only its path is under test. */
 const FILE = 'export const nothing = 0;\n';

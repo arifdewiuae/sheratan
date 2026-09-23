@@ -40,7 +40,8 @@ const TEST_FILE = /\.(?:test|spec)\.ts$/;
 
 const APP_FILE = 'app.ts';
 
-const INDEX_FILE = 'index.ts';
+/** A module's only public surface, and where its kind is declared (SPEC §4). */
+export const INDEX_FILE = 'index.ts';
 
 const CONTRACT_SUFFIX = '.contract.ts';
 
@@ -57,17 +58,21 @@ const FOLDERS = new Map<string, Layer>([
   ['ui', Layer.Ui],
 ]);
 
-/** A module file's layer, from its suffix. */
-const SUFFIXES: readonly (readonly [string, Layer])[] = [
-  ['.state.ts', Layer.State],
-  ['.effects.ts', Layer.Effects],
-  ['.view.ts', Layer.View],
-];
+/** What a module's own file is called, by the layer it holds (SPEC §4). */
+export const SUFFIXES: ReadonlyMap<Layer, string> = new Map([
+  [Layer.State, '.state.ts'],
+  [Layer.Effects, '.effects.ts'],
+  [Layer.View, '.view.ts'],
+]);
 
 function moduleLayer(segments: readonly string[], name: string): Layer {
   if (segments.length === MODULE_FILE_DEPTH && name === INDEX_FILE) return Layer.Index;
 
-  return SUFFIXES.find(([suffix]) => name.endsWith(suffix))?.[1] ?? Layer.ModuleFile;
+  for (const [layer, suffix] of SUFFIXES) {
+    if (name.endsWith(suffix)) return layer;
+  }
+
+  return Layer.ModuleFile;
 }
 
 /** A file's layer by the folder it is in, for a path already known to be inside the root. */

@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
-import { checkProject, type Finding } from '../src/index.ts';
+import { checkProject, type Finding, type RuleCode } from '../src/index.ts';
 
 /** The runtime's own source, so a fixture's `Signal` is the real one. */
 const CORE = resolve(import.meta.dirname, '../../core/src/index.ts');
@@ -62,4 +62,14 @@ export function check(files: Files): readonly Finding[] {
   using made = project(files);
 
   return checkProject({ tsconfig: join(made.root, 'tsconfig.json') });
+}
+
+/**
+ * A rule's own findings, for a suite whose fixtures are deliberately partial —
+ * a view with no module around it, a module with no index. Those are legal
+ * inputs to the rule under test and violations of another, and a suite that
+ * asserted both would be a suite about two rules.
+ */
+export function only(code: RuleCode): (files: Files) => readonly Finding[] {
+  return (files) => check(files).filter((finding) => finding.code === code);
 }
