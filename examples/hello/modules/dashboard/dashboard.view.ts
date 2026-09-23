@@ -120,7 +120,7 @@ function intro(): Template {
         <b>One shape for every feature</b> — state, effects, view, contract — enforced by a checker,
         not by review.
       </li>
-      <li><b>Zero runtime dependencies</b>, about 5.3&nbsp;KB over the wire.</li>
+      <li><b>Zero runtime dependencies</b>, about 5.2&nbsp;KB over the wire.</li>
     </ul>`;
 }
 

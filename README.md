@@ -59,7 +59,7 @@ bundled and gzipped the same way ([method](Docs/comparison/README.md)):
 
 | Stack | Packages | gzip |
 |---|---|---|
-| **Sheratan** | **1** | **6.9 kB** |
+| **Sheratan** | **1** | **7.0 kB** |
 | Solid 1.9 | 3 | 25.6 kB |
 | Svelte 5 | 3 | 37.0 kB |
 | Vue 3 | 3 | 41.8 kB |
@@ -81,11 +81,11 @@ any of it makes an agent measurably better.
 
 | Path | What |
 |---|---|
-| `packages/core/` | The runtime: signals, templates, keyed and windowed `each`, `render`, `resource`, `mutation`, `stream`, and the causal trace. Zero runtime dependencies |
-| `packages/check/` | The checker behind `sheratan check`: the import matrix, the I/O globals, cycles and the state surface, as machine-readable findings |
-| `packages/cli/` | The `sheratan` command (SPEC §10). Today it runs the checker; the rest of the commands are specified and not built |
+| `packages/core/` | The runtime: signals, templates, keyed and windowed `each`, `mount` for composing modules, `render`, `resource`, `mutation`, `stream`, and the causal trace. Zero runtime dependencies |
+| `packages/check/` | The checker behind `sheratan check`: the import matrix, the I/O globals, the project layout, each module's file set, cancellable contracts, cycles, the state surface and missing tests, as machine-readable findings |
+| `packages/cli/` | The `sheratan` command (SPEC §10): `check`, `dev` and `build`. `create`, `generate`, `explain` and `trace` are specified and not built |
 | `packages/eval/` | The Week 0 self-repair eval: host app, injected violations, raw logs |
-| `examples/hello/` | A live dashboard in the canonical module shape: 500 rows, 20,000 values a second, sorted on every batch |
+| `examples/hello/` | A live dashboard in the canonical module shape: 500 rows, 20,000 values a second, sorted on every batch. It runs on `sheratan dev`, the shipped command |
 | `llms.txt` | The API as an agent should learn it |
 | `Docs/SPEC.md` | Technical specification. The source of truth for implementation |
 | `Docs/EVAL.md` | Performance and agent-authoring evaluation plan, with go/no-go gates |
@@ -107,7 +107,7 @@ pnpm install --frozen-lockfile
 pnpm check   # format, lint, typecheck, build, tests + coverage gate, package checks, audit
 ```
 
-The runtime is 6.8 KB brotli with zero dependencies, and every commit is
+The runtime is 6.9 KB brotli with zero dependencies, and every commit is
 measured against `packages/core/size-budget.json`.
 
 Run the example — 500 rows under a synthetic 20,000 values/second feed, re-sorted
