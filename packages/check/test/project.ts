@@ -29,23 +29,37 @@ const TSCONFIG = {
 /** Source text by path relative to the app root. */
 export type Files = Readonly<Record<string, string>>;
 
-/** Writes `files` as a project, checks it, and removes it again. */
-export function check(files: Files): readonly Finding[] {
+/** A project on disk, removed when the block that made it ends. */
+export interface Project extends Disposable {
+  /** The app root, which is also where its `tsconfig.json` sits. */
+  readonly root: string;
+}
+
+/** Writes `files` as a project a real TypeScript program can open. */
+export function project(files: Files): Project {
   // realpath: the system temp folder is a symlink on macOS, and TypeScript
   // reports real paths.
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'sheratan-check-')));
 
-  try {
-    writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'module' }));
-    writeFileSync(join(root, 'tsconfig.json'), JSON.stringify(TSCONFIG));
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'module' }));
+  writeFileSync(join(root, 'tsconfig.json'), JSON.stringify(TSCONFIG));
 
-    for (const [path, text] of Object.entries(files)) {
-      mkdirSync(dirname(join(root, path)), { recursive: true });
-      writeFileSync(join(root, path), text);
-    }
-
-    return checkProject({ tsconfig: join(root, 'tsconfig.json') });
-  } finally {
-    rmSync(root, { recursive: true, force: true });
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
   }
+
+  return {
+    root,
+    [Symbol.dispose]: (): void => {
+      rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
+
+/** Writes `files` as a project, checks it, and removes it again. */
+export function check(files: Files): readonly Finding[] {
+  using made = project(files);
+
+  return checkProject({ tsconfig: join(made.root, 'tsconfig.json') });
 }

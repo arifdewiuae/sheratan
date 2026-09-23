@@ -1,0 +1,16 @@
+{
+  "name": "@sheratan/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The `sheratan` command (SPEC §10). A folder, not a package: it folds into the one `sheratan` tarball.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "24.13.4",
+    "typescript": "7.0.2"
+  }
+}
