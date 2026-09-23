@@ -22,7 +22,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | 0 | Falsification | 🟡 In progress | Self-repair ✅ 60/60 · median iterations vs React not run |
 | 1 | Core | 🟡 In progress | No-build ✅ · reordering vs Solid not measured |
 | 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ |
-| 3 | Checker, CLI, template | 🟡 In progress | Checker 5 of 16 codes (L001, L002, L003, L008, L010) · CLI and template not started |
+| 3 | Checker, CLI, template | 🟡 In progress | Checker 5 of 16 codes (L001, L002, L003, L008, L010) · CLI: `check` ships, 7 commands to go · template not started |
 | 4 | Agent surface, reference app | ⬜ Not started | — |
 | 5 | Re-measure, package, launch | 🟡 In progress | — |
 | +8 wks | Outside production use | ⬜ Not started | — |
@@ -180,14 +180,14 @@ publishes, and it is `sheratan`. See the spec gap on package count below.
 - [ ] `SHR-V004` malformed template errors in the same JSON shape (SPEC §13)
 
 **CLI** (SPEC §10)
-- [ ] `[must]` `sheratan check` — human formatter + `--json` (versioned, documented schema)
+- [x] `[must]` `sheratan check` — human formatter + `--json` (versioned, documented schema) — `packages/cli`: `sheratan check [directory] [--json]`. The terminal format is four lines per finding (`file:line:column` + severity and code, message, fix, docs URL), coloured only for a TTY without `NO_COLOR`; `--json` is one object, `{ "version": 1, "findings": […] }`, so a tool parses one value. Exit 0 clean, 1 violations, 2 could not run — with the reason on stderr, so stdout stays parseable. SPEC §8 amended to the shipped shape; `test/bin.test.ts` runs the real command against `examples/hello`
 - [ ] `[must]` `sheratan generate module <name>` (scaffolds both test files and the scoped `<name>.css` wrapper)
 - [ ] `[must]` `sheratan generate resource <name> --in <module>`
 - [ ] `sheratan generate stream <name> --in <module>`
 - [ ] `sheratan create <app>`
 - [ ] `[must]` `sheratan dev` — type stripping only, on Sheratan's own minimal server (prototyped in `examples/hello/serve.ts`) (SPEC §10c)
 - [ ] `[must]` `sheratan build` — strips types into a deployable directory of plain ESM; no bundler (SPEC §10c)
-- [ ] Logic as plain functions (`checkProject()`, `scaffoldModule()`…); CLI is a thin wrapper
+- [ ] Logic as plain functions (`checkProject()`, `scaffoldModule()`…); CLI is a thin wrapper — holds for `check`: `run(argv, terminal)` takes its streams and returns an exit code, and nothing under `src/` touches `process`. Ticked when `generate` and `create` follow the same shape
 - [ ] Retire the layer rules in `.oxlintrc.json` (`no-restricted-imports` / `no-restricted-globals` for view, state and effects) **once the checker gives feedback while editing** — `sheratan check --watch`, checking on save in `sheratan dev`, or the VS Code extension. Proven redundant on 2026-09-19: each of the 24 violations they catch, injected into `examples/hello`, is reported by `SHR-L001` or `SHR-L002`. Until then a matrix change updates them in the same PR (AGENTS.md "Layers")
 - [ ] **Incremental checking** for `sheratan check --watch`, `sheratan dev` and the editor plugin. A full check is already linear (every rule O(files + imports) or better, and cycles cannot be found in less), so the target is an edit, not the project: cache findings per file by content hash and re-run only the changed file's per-file rules (L001, L002, L004, L010, V-rules); re-run cycles only when a file's set of imports changed; let TypeScript's `updateSnapshot` re-check the program. **Measure first**, on `examples/dashboard`: loading the program is expected to dominate the rules, and if it does, the cache is the wrong optimisation
 - [ ] Bun and Deno in the CI matrix alongside Node — they make `dev`/`build`'s type-stripping step a no-op, which is the case worth testing (SPEC §10c)
@@ -437,3 +437,4 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-19 | The `.oxlintrc.json` layer rules stay, though `SHR-L001` and `SHR-L002` catch everything they do | They are the only boundary feedback that shows while typing; the checker runs in `pnpm check` and CI. The cost is a second copy of the matrix that can drift, paid by updating both in one PR until the checker has editor feedback |
 | 2026-09-19 | `develop` and `main` are protected by a ruleset: PR required, all three CI checks required, no force-push or deletion, **no bypass** — zero approvals | Until now the PR-only rule was a habit: branch protection was off and the one ruleset was disabled and targeted no branch, so a red PR could merge. Zero approvals, because a single maintainer cannot approve their own PR; the checks are the reviewer. No admin bypass, or it is advice rather than a rule. Up-to-date-before-merge is off: stacked PRs already rebase often, and CI re-runs on `develop` after every merge |
 | 2026-09-23 | `SHR-L003` also reports a file loose in `ui/`, a barrel `ui/index.ts` included, and SPEC §4 now says so | SPEC already read "`ui/` components are folders, not files", but the checker row named only the nesting half, so half a stated rule went unenforced. One shape — `ui/<component>/<file>` — covers both mistakes and needs no type checker. A barrel is not an exception: each component's own `index.ts` is its surface, and a top-level one would re-export past it |
+| 2026-09-23 | `sheratan check --json` prints one envelope, `{ "version": 1, "findings": […] }`, not a finding per line; failures go to stderr with exit 2 | An agent parses one value instead of splitting a stream, and the version has somewhere to live — SPEC §8 called the shape versioned without saying where the number goes. The finding object inside is unchanged, so the documented shape still holds. Keeping errors off stdout means `--json` output is always parseable or empty, which is what lets a tool trust the exit code |

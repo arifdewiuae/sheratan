@@ -831,6 +831,28 @@ Error format is fixed and stable:
 Human formatter for the terminal, `--json` for machines. The JSON shape is a
 public API and is versioned.
 
+```sh
+sheratan check [directory] [--json]
+```
+
+The directory holds the project's `tsconfig.json`, and defaults to the current
+one. `--json` prints a single object, so a tool parses one value rather than a
+stream:
+
+```json
+{ "version": 1, "findings": [ … ] }
+```
+
+`version` goes up when a field changes meaning, never when a rule is added — an
+agent that knows version 1 keeps working as codes arrive. The terminal format
+prints four lines per finding: `file:line:column`, severity and code; the
+message; the fix; the docs URL. A reason the command could not run at all — a
+project that will not open, an argument it does not know — goes to stderr, so
+`--json` on stdout is always parseable or empty.
+
+**Exit codes:** `0` nothing to fix, `1` at least one `error` finding, `2` the
+command could not run. Warnings do not fail a check.
+
 ## 9. Templates and rendering
 
 Tagged template literals — works with no build step:
@@ -1185,7 +1207,7 @@ sheratan create <app>
 sheratan generate module <name>
 sheratan generate resource <name> --in <module>
 sheratan generate stream <name> --in <module>
-sheratan check [--json]
+sheratan check [directory] [--json]
 sheratan explain <error-code> [--json]
 sheratan trace [--json]        # pulls the causal trace from the dev server
 sheratan dev
