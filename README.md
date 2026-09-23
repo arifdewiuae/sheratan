@@ -82,6 +82,8 @@ any of it makes an agent measurably better.
 | Path | What |
 |---|---|
 | `packages/core/` | The runtime: signals, templates, keyed and windowed `each`, `render`, `resource`, `mutation`, `stream`, and the causal trace. Zero runtime dependencies |
+| `packages/check/` | The checker behind `sheratan check`: the import matrix, the I/O globals, cycles and the state surface, as machine-readable findings |
+| `packages/cli/` | The `sheratan` command (SPEC §10). Today it runs the checker; the rest of the commands are specified and not built |
 | `packages/eval/` | The Week 0 self-repair eval: host app, injected violations, raw logs |
 | `examples/hello/` | A live dashboard in the canonical module shape: 500 rows, 20,000 values a second, sorted on every batch |
 | `llms.txt` | The API as an agent should learn it |
@@ -120,6 +122,14 @@ pnpm --filter example-hello e2e    # the same flows in a real browser
 No bundler is involved: the dev server strips TypeScript and serves ESM. For
 the version with no build step at all, serve the repository with any static
 file server and open `examples/hello/public/no-build.html`.
+
+Check an app against the architecture rules — the same findings an editor and
+an agent read:
+
+```sh
+pnpm sheratan check examples/hello          # a line per violation, with the fix
+pnpm sheratan check examples/hello --json   # one versioned object, for a tool
+```
 
 All changes go through pull requests into `develop`; `main` is for releases.
 Read [AGENTS.md](AGENTS.md) before opening one.
