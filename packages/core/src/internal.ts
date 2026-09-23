@@ -6,3 +6,7 @@ export { root, getOwner } from './owner.ts';
 export { watchFrame } from './watch.ts';
 
 export { liveSubscriptions } from './graph.ts';
+
+export { forgetLocation } from './location.ts';
+
+export { forgetRoutes } from './routes.ts';

@@ -25,7 +25,7 @@ hole gets the computed.
 ## 2. API
 
 ```ts
-import { signal, computed, watch, batch, resource, mutation, stream, onDispose, flush, html, each, render } from 'sheratan';
+import { signal, computed, watch, batch, resource, mutation, stream, onDispose, flush, html, each, mount, render, location, routes, navigate } from 'sheratan';
 ```
 
 <!-- generated from TSDoc by packages/core/scripts/llms.ts -->
@@ -45,6 +45,9 @@ import { signal, computed, watch, batch, resource, mutation, stream, onDispose, 
 | `each<T>(list: Accessor<readonly T[]> \| readonly T[], row: (item: Accessor<T>) => Template, window?: Accessor<EachWindow>): Each` | A keyed list. Objects key by `id`, primitives by value; the row function runs once per key. A `window` makes it positional instead: a fixed pool of rows, rewritten in place as the window moves, with spacers holding the rest open. |
 | `mount<P>(view: ModuleView<P>, props: P): Mounted` | Renders another module inside this one, with props. Props carry accessors rather than values, so the child's own holes update and nothing re-renders; the argument is omitted when the module's view takes none. Its lifetime is bound to the parent's: when the parent unmounts, the child is disposed. |
 | `render(view: () => Template, host: Element): Disposer` | Mounts `view` into `host`. It owns only the nodes it inserts, so it can live inside an app built with something else, and the disposer removes exactly those nodes. |
+| `location(): Location` | The current URL, as a signal. Reading it in a view is how a link marks itself active; changing it is what `navigate()` is for. |
+| `routes<T>(table: RouteTable<T>): Accessor<T \| undefined>` | Matches the URL against a flat table and returns the screen it names, or `undefined` when nothing matches — give the table a `'*'` row to say what happens then. |
+| `navigate(to: string, options?: NavigateOptions): void` | Goes to `to`. Legal in `*.effects.ts` only (`SHR-L004`): a view emits the intent and effects carries it out. |
 
 <!-- end generated -->
 
@@ -579,7 +582,7 @@ stays parseable.
 | SHR-L001 | import not allowed by the matrix, including deep imports past another module's `index.ts` |
 | SHR-L002 | I/O global (`fetch`, `localStorage`, `document`, timers) in a view or state |
 | SHR-L003 | `shared/` folder at any depth, or a file under `ui/` outside a component folder (loose in `ui/`, or nested below the component) |
-| SHR-L004 | `resource`, `mutation`, `stream`, `onDispose` (and later `navigate`) called outside `*.effects.ts` |
+| SHR-L004 | `resource`, `mutation`, `stream`, `onDispose`, `navigate` called outside `*.effects.ts` |
 | SHR-L005 | effects write a signal directly instead of calling a transition |
 | SHR-L006 | module files don't match the `kind` its `index.ts` declares — missing `index.ts` or `kind`, a `full` module missing a file, a `view` module with state or effects, or a layer suffix under another name |
 | SHR-L007 | Promise-returning contract method without an `AbortSignal` — as its own parameter or inside an options object; anything you can `await` counts |
@@ -595,4 +598,6 @@ stays parseable.
 
 ## Not in v0
 
-`unsafeHTML` and routing are specified but not shipped.
+`unsafeHTML` is specified but not shipped. Routing ships flat tables and nested
+tables; what is still out is guards and a match tree with its own resolution
+order, which stay post-MVP (SPEC §9b).

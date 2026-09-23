@@ -16,7 +16,10 @@ import {
   type ModuleView,
   type Mounted,
   type MutationOptions,
+  type NavigateOptions,
   type ResourceOptions,
+  type RouteParams,
+  type RouteTable,
   type StreamOptions,
   StreamStatus,
 } from '../src/index.ts';
@@ -33,11 +36,14 @@ test('the package exports exactly its documented names', () => {
     'each',
     'flush',
     'html',
+    'location',
     'mount',
     'mutation',
+    'navigate',
     'onDispose',
     'render',
     'resource',
+    'routes',
     'signal',
     'stream',
     'watch',
@@ -121,6 +127,29 @@ test('the stream options type is exported in the shape callers write', () => {
   assert.deepEqual(Object.keys(feed).toSorted(), ['initial', 'key', 'reduce', 'subscribe']);
 
   assert.deepEqual(Object.values(StreamStatus).toSorted(), ['closed', 'connecting', 'open']);
+});
+
+// And routing: the table an app writes, and the options a navigation takes.
+// It stops compiling if a handler stops receiving its params as an accessor.
+const screens: RouteTable<string> = {
+  '/': () => 'home',
+  '/orders/:id': (params: Accessor<RouteParams>) => {
+    const { id } = params();
+
+    return `order ${id ?? ''}`;
+  },
+};
+
+const away: NavigateOptions = { replace: true, state: { from: 'list' } };
+
+test('a route table is exported in the shape an app writes', () => {
+  assert.deepEqual(Object.keys(screens).toSorted(), ['/', '/orders/:id']);
+  assert.deepEqual(Object.keys(away).toSorted(), ['replace', 'state']);
+
+  assert.equal(
+    screens['/orders/:id']?.(() => ({ id: '7' })),
+    'order 7',
+  );
 });
 
 // And composition: what a parent writes to render a child module. It stops

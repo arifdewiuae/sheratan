@@ -42,11 +42,12 @@ test('a resource created in state is reported where the call is', () => {
 test('each API says what it starts and where it belongs', () => {
   const files = {
     'modules/todo/index.ts': INDEX,
-    'modules/todo/todo.view.ts': `import { onDispose, stream } from 'sheratan';
+    'modules/todo/todo.view.ts': `import { navigate, onDispose, stream } from 'sheratan';
 
 export function todoView(): string {
   onDispose(() => {});
   stream({ key: () => [1] as const, open: () => () => {} });
+  navigate('/todo');
 
   return 'todo';
 }
@@ -63,6 +64,7 @@ export const save = (): unknown => mutation({ run: async () => {} });
       'lib/save.ts calls `mutation()`, which writes through a service; only the effects file of a module may call it.',
       'modules/todo/todo.view.ts calls `onDispose()`, which registers teardown the runtime cannot see; only todo.effects.ts may call it.',
       'modules/todo/todo.view.ts calls `stream()`, which subscribes to a source; only todo.effects.ts may call it.',
+      'modules/todo/todo.view.ts calls `navigate()`, which changes the URL; only todo.effects.ts may call it.',
     ],
   );
 });
@@ -70,13 +72,14 @@ export const save = (): unknown => mutation({ run: async () => {} });
 test('the effects file itself may call every one of them', () => {
   const files = {
     'modules/todo/index.ts': INDEX,
-    'modules/todo/todo.effects.ts': `import { mutation, onDispose, resource, stream } from 'sheratan';
+    'modules/todo/todo.effects.ts': `import { mutation, navigate, onDispose, resource, stream } from 'sheratan';
 
 export function createTodoEffects(): { readonly start: () => void } {
   resource({ key: () => [1] as const, fetch: async () => 1 });
   mutation({ run: async () => {} });
   stream({ key: () => [1] as const, open: () => () => {} });
   onDispose(() => {});
+  navigate('/todo');
 
   return { start: () => {} };
 }

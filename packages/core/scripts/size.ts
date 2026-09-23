@@ -53,10 +53,14 @@ const SCENARIOS: Record<string, readonly string[]> = {
     'each',
     'flush',
     'html',
+    'location',
+    'mount',
     'mutation',
+    'navigate',
     'onDispose',
     'render',
     'resource',
+    'routes',
     'signal',
     'stream',
     'watch',
@@ -66,6 +70,16 @@ const SCENARIOS: Record<string, readonly string[]> = {
   'widget with lists': ['signal', 'computed', 'html', 'render', 'each'],
   'widget with async': ['signal', 'computed', 'html', 'render', 'resource', 'onDispose'],
   'widget with live data': ['signal', 'computed', 'html', 'render', 'each', 'stream', 'onDispose'],
+  'multi-screen app': [
+    'signal',
+    'computed',
+    'html',
+    'render',
+    'mount',
+    'routes',
+    'location',
+    'navigate',
+  ],
 };
 
 const measured = await Promise.all(
