@@ -20,6 +20,8 @@ export const ErrorCode = {
   EachDuplicateKey: 'SHR-R007',
   /** An array reached a hole, which renders many and needs `each()`. */
   ArrayInHole: 'SHR-R008',
+  /** One `mount()` was put in two holes, and a module instance lives in one. */
+  MountedTwice: 'SHR-R009',
 } as const;
 
 /** One of the runtime error codes. */

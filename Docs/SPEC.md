@@ -1151,6 +1151,29 @@ effects, so purity holds. Composition lives in the wiring, not in the view.
 Child lifetime is bound to the parent: when the parent unmounts, the child is
 disposed.
 
+Shipped as two signatures, so the props argument exists only where the module
+declares props:
+
+```ts
+mount(view: ModuleView): Mounted;
+mount<P>(view: ModuleView<P>, props: P): Mounted;
+type ModuleView<P = void> = (props: P) => Template;
+```
+
+**Props carry accessors, not values** (`{ customerId: s.id }`, never
+`{ customerId: s.id() }`): the child's own holes read them, so a change rewrites
+the nodes that depend on it and the child view runs exactly once. Passing the
+read value instead is the reactivity trap of §9 at a module boundary.
+
+A `mount()` is a placement, not a handle: it belongs to one hole, and the same
+one placed in two is `SHR-R009`. Mounting the same *instance* twice is fine and
+gives two independent children, because the state a module owns is created by
+its view, once per mount.
+
+In a reactive hole — `${() => route() === 'orders' ? mount(orders) : mount(customers)}`
+— the watcher's reset disposes the child it replaces before the next one arrives,
+which is how one screen is swapped for another.
+
 Importing another module directly from a view remains a checker error.
 
 ## 9b. Routing

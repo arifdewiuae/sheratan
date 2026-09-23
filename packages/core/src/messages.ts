@@ -14,6 +14,7 @@ export interface MessageArgs {
   [ErrorCode.EachItemWithoutId]: [];
   [ErrorCode.EachDuplicateKey]: [key: string];
   [ErrorCode.ArrayInHole]: [length: number];
+  [ErrorCode.MountedTwice]: [];
 }
 
 type Messages = { [C in ErrorCode]: (...args: MessageArgs[C]) => string };
@@ -50,4 +51,8 @@ export const MESSAGES: Messages = {
   [ErrorCode.ArrayInHole]: (length) =>
     `A hole received an array of ${String(length)} values. Rendering many is what each() is for: ` +
     'each(items, (item) => html`…`), which keys rows and updates them in place.',
+
+  [ErrorCode.MountedTwice]: () =>
+    'The same mount() was placed in two holes, and a module instance belongs to one. ' +
+    'Call mount() once per hole: two calls give the child two lifetimes of its own.',
 };

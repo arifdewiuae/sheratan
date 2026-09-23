@@ -5,6 +5,7 @@ export { ErrorCode } from './codes.ts';
 export { computed } from './computed.ts';
 export { each } from './each.ts';
 export { SheratanError } from './errors.ts';
+export { mount } from './mount.ts';
 export { mutation, MutationStatus } from './mutation.ts';
 export { render } from './render.ts';
 export { resource, ResourceStatus } from './resource.ts';
@@ -17,6 +18,7 @@ export { watch } from './watch.ts';
 
 export type { Disposer } from './disposer.ts';
 export type { Each, EachWindow, Key } from './each.ts';
+export type { ModuleView, Mounted } from './mount.ts';
 export type { Mutation, MutationContext, MutationOptions } from './mutation.ts';
 export type { FetchContext, Resource, ResourceOptions } from './resource.ts';
 export type { Stream, StreamContext, StreamOptions, Teardown } from './stream.ts';
