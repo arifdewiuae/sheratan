@@ -1196,6 +1196,20 @@ ordinary functions (`checkProject()`, `scaffoldModule()`, `explainError()`);
 the CLI is a thin wrapper that parses arguments and prints. `--json` on every
 command is the machine surface.
 
+**It ships inside the one package.** `sheratan` declares a `bin`, so installing
+the framework is what puts the command on `PATH` — `npx sheratan check`, with
+nothing else to install and no version matrix between a runtime and a tool.
+The command is one bundle of the CLI and the checker in plain JavaScript; the
+`exports` map never points at it, so no application bundle can follow an import
+into the compiler.
+
+**The compiler is an optional peer dependency.** The checker reads programs
+with TypeScript and the runtime never touches it, so `typescript` is declared
+optional: an app that only renders installs nothing extra, and a project that
+runs `sheratan check` without one is told which package to add rather than
+shown a resolver's stack trace. Only `check` loads it — `sheratan --help`
+answers on a machine that has no compiler at all.
+
 No MCP server. An agent can already run commands, and `sheratan check --json`
 delivers exactly what a tool call would — without a server to install, a
 protocol to version, or a second place where behaviour drifts. This is axiom
@@ -1335,8 +1349,10 @@ widget mode, since the host app owns routing).
 packages/
   core/        signals, resource, html, render, trace   (zero runtime deps)
                src/ TypeScript → dist/ ESM + .d.ts, published
+               dist/cli/ the bundled command, pointed at by `bin`
   check/       TS-API based rule checker                (dev only)
   cli/         create / generate / check / dev
+               folders, not packages: both fold into the one `sheratan` tarball
   router/      post-MVP, optional — path matching, layouts, guards
 examples/
   dashboard/   reference app: real-time dashboard over heavy data —

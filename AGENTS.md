@@ -42,7 +42,7 @@ pnpm test                        # node:test
 pnpm coverage                    # tests + coverage gate (fails below threshold)
 pnpm verify                      # consumer types, publint, attw, size budget, llms.txt freshness
 pnpm security                    # pnpm audit + registry signature verification
-pnpm sheratan check <dir>        # the CLI on an app; --json for the machine shape
+pnpm sheratan check <dir>        # the CLI on an app, from source; --json for the machine shape
 ```
 
 Example app: `pnpm --filter example-hello dev` (http://localhost:5173), and
@@ -60,7 +60,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 |---|---|
 | `packages/core/src/` | Runtime. Graph (`graph`, `signal`, `computed`, `watch`, `scheduler`, `owner`), templates (`template`, `instantiate`, `each`, `lis`, `render`, `dom`), errors (`codes`, `messages`, `env`, `env.prod`, `errors`), entries (`index` public, `internal` test-only) |
 | `packages/core/test/` | `node:test` suites; DOM via happy-dom |
-| `packages/core/scripts/` | Build (`build-prod`), package checks (`verify-types`, `size`), docs (`llms`) |
+| `packages/core/scripts/` | Build (`build-prod`, `build-cli`), package checks (`verify-types`, `verify-cli`, `size`), docs (`llms`) |
 | `packages/check/src/` | The checker (`sheratan check`): `typescript` (the one adapter over `typescript/unstable/*`), `layout` (path → layer), `matrix` (SPEC §4's table as data), `rules/` (one file per code), `check` (`checkProject()`). A folder, not a package: it folds into the `sheratan` tarball |
 | `packages/check/test/` | Real TypeScript programs on disk: the whole import matrix as one project, a failing case per rule, and both apps in this repo checked clean |
 | `packages/cli/src/` | The `sheratan` command (SPEC §10): `run()` returns an exit code and writes through an injected `Terminal`, `report` holds both output formats. A folder, not a package: it folds into the same tarball |
@@ -123,7 +123,7 @@ a mismatch that does not name the cause.
   - `minimumReleaseAge` is 3 days
   - `trustPolicy: no-downgrade`
   - `blockExoticSubdeps`
-- **Builds:** `dist/dev` is `tsc` output — readable, with source maps and declaration maps into the TypeScript, which is why `src/` ships too. `dist/prod` is one minified esbuild bundle where `env.ts` is swapped for `env.prod.ts`, so error messages fall away and errors carry a code plus a docs URL. The `exports` map picks between them with the `development` condition.
+- **Builds:** `dist/dev` is `tsc` output — readable, with source maps and declaration maps into the TypeScript, which is why `src/` ships too. `dist/prod` is one minified esbuild bundle where `env.ts` is swapped for `env.prod.ts`, so error messages fall away and errors carry a code plus a docs URL. The `exports` map picks between them with the `development` condition. `dist/cli` is a third output: one esbuild bundle of `packages/cli` and `packages/check` with a hashbang, which `bin` points at, built by `scripts/build-cli.ts` and proven by `scripts/verify-cli.ts` — that script runs the **built** command, because `bin` ships the bundle and the package's tests do not touch it. `typescript` stays external to it: it is an optional peer dependency, resolved from the project being checked.
 - **Size budget:** `size-budget.json` holds brotli sizes per scenario; the build fails above them plus 2%. Re-record only for an intended change, and say why in the PR.
 - **Pin exact versions** (`--save-exact`). Adding a dependency to `packages/core` `dependencies` is forbidden (SPEC A4). Dev dependencies need a reason in the PR.
 - **GitHub Actions are pinned to full commit SHAs** with a `# vX.Y.Z` comment. Dependabot updates them. Never use a tag or branch ref, and never set `continue-on-error`.
