@@ -6,7 +6,7 @@
 // resolvable, `check` answers with an install line rather than a resolver's
 // stack trace, and `--help` still answers at all.
 
-import { cp, mkdtemp, stat } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,4 +76,33 @@ expect(
   `a missing compiler must say what to install: ${unchecked.stderr}`,
 );
 
-process.stdout.write('the built command checks, helps and asks for the compiler it needs\n');
+// `build` is the other half of the optional peer dependency: it strips types
+// with Node's own stripper, so it has to work in the same bare copy where
+// `check` cannot run at all.
+const site = resolve(bare, 'site');
+
+const ENTRY =
+  "import { kind } from './modules/todo/index.ts';\n\nexport const started: string = kind;\n";
+
+const MODULE = "export const kind: string = 'view';\n";
+
+await mkdir(resolve(site, 'modules/todo'), { recursive: true });
+
+await writeFile(resolve(site, 'app.ts'), ENTRY);
+await writeFile(resolve(site, 'modules/todo/index.ts'), MODULE);
+
+const stripped = sheratan(alone, ['build', site], bare);
+
+expect(
+  stripped.status === CLEAN,
+  `build needs no compiler, but exited ${String(stripped.status)}: ${stripped.stderr}`,
+);
+
+const emitted = await readFile(resolve(site, 'dist/app.js'), 'utf8');
+
+expect(emitted.includes("'./modules/todo/index.js'"), `build left a .ts import: ${emitted}`);
+expect(!emitted.includes(': string'), `build left a type annotation behind: ${emitted}`);
+
+process.stdout.write(
+  'the built command checks, builds, helps and asks for the compiler it needs\n',
+);

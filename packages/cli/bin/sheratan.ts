@@ -4,6 +4,18 @@
 
 import { run } from '../src/run.ts';
 
+// Node's type stripper is flagged experimental and says so on every run. The
+// command uses it deliberately (SPEC §10c), and a warning about our own choice
+// is noise in the user's terminal, so this one is swallowed and every other
+// warning still prints.
+const EXPERIMENTAL = 'ExperimentalWarning';
+
+process.removeAllListeners('warning');
+
+process.on('warning', (warning: Error): void => {
+  if (warning.name !== EXPERIMENTAL) process.emitWarning(warning);
+});
+
 /** `argv` starts with the runtime and this file; the command's own words follow. */
 const ARGUMENTS_START = 2;
 
