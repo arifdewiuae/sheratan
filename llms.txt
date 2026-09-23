@@ -532,7 +532,7 @@ Apply the `fix`; the `message` names the allowed set.
 |---|---|
 | SHR-L001 | import not allowed by the matrix, including deep imports past another module's `index.ts` |
 | SHR-L002 | I/O global (`fetch`, `localStorage`, `document`, timers) in a view or state |
-| SHR-L003 | `shared/` folder, or `ui/` nested more than one level |
+| SHR-L003 | `shared/` folder at any depth, or a file under `ui/` outside a component folder (loose in `ui/`, or nested below the component) |
 | SHR-L004 | `watch`, `onDispose`, `resource`, `mutation`, `stream` (and later `navigate`) outside effects |
 | SHR-L005 | effects write a signal directly instead of calling a transition |
 | SHR-L006 | module files don't match its declared `kind` |
