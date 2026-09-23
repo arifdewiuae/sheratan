@@ -9,7 +9,7 @@ wrong or the rule gets amended in the same change, never silently ignored.
 Sheratan is a frontend framework with one legal way to structure an app,
 enforced by a checker with machine-readable fixes, plus async and live data in
 the core. It's pre-release: `packages/core` holds the runtime, `packages/check` the
-checker (SHR-L001, SHR-L002, SHR-L003, SHR-L006, SHR-L008 and SHR-L010 so far) and
+checker (SHR-L001, SHR-L002, SHR-L003, SHR-L006, SHR-L007, SHR-L008 and SHR-L010 so far) and
 `packages/cli` the `sheratan` command, which runs the checker and nothing else yet.
 
 **Source of truth, in order:**

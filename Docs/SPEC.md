@@ -221,7 +221,7 @@ Constraints the matrix cannot express:
 | `SHR-L004` | Effects-only APIs — `resource()`, `mutation()`, `stream()`, `onDispose()`, `navigate()` — are called only inside `*.effects.ts` |
 | `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts`. Best-effort backstop to `SHR-L010` (§13) |
 | `SHR-L006` | Module file set matches its declared kind: `index.ts` exists and declares `kind` as the literal `'view'` or `'full'`, the kind's files are present, none that the kind excludes are, and a layer suffix is used only under the module's own name (below) |
-| `SHR-L007` | Every `Promise`-returning method in a `*.contract.ts` takes an `AbortSignal` (§5b) |
+| `SHR-L007` | Every `Promise`-returning method in a `*.contract.ts` takes an `AbortSignal` (§5b). "Promise-returning" is structural — a return type with a callable `then` — and the signal counts wherever it sits: a parameter of its own, or a member of an options object |
 | `SHR-L008` | The module import graph must be acyclic, and so must imports among `lib/` files |
 | `SHR-L009` | Module and `ui/` stylesheets are wrapped in one `@scope` with a lower boundary; `global.css` holds only `tokens` and `base` (§9a) |
 | `SHR-L010` | A `*.state.ts` public surface exposes only `Accessor` values and transitions; a `Signal` never leaves the file (below) |

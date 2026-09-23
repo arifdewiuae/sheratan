@@ -5,6 +5,7 @@ import { dirname } from 'node:path';
 
 import type { Finding } from './finding.ts';
 import { boundary } from './rules/boundary.ts';
+import { cancellable } from './rules/cancellable.ts';
 import { cycles } from './rules/cycles.ts';
 import { io } from './rules/io.ts';
 import { shape } from './rules/shape.ts';
@@ -42,7 +43,7 @@ export function checkProject(options: CheckOptions): readonly Finding[] {
 
   using program = openProgram(options.tsconfig);
 
-  return [boundary, io, structure, shape, cycles, surface]
+  return [boundary, io, structure, shape, cancellable, cycles, surface]
     .flatMap((rule) => rule(program, root))
     .toSorted(byLocation);
 }
