@@ -333,21 +333,23 @@ class Dev implements DevServer {
 
 /** One attempt at one port, resolving with the port the server actually took. */
 async function bind(server: Server, port: number): Promise<number> {
-  return new Promise<number>((taken, refuse) => {
-    const failed = (error: Error): void => {
-      refuse(error);
-    };
+  const { promise, resolve, reject } = Promise.withResolvers<number>();
 
-    server.once('error', failed);
+  const failed = (error: Error): void => {
+    reject(error);
+  };
 
-    server.listen(port, () => {
-      server.removeListener('error', failed);
+  server.once('error', failed);
 
-      // A listening TCP server always reports an address; the union in the
-      // types is for the pipe and socket forms this server never takes.
-      taken((server.address() as AddressInfo).port);
-    });
+  server.listen(port, () => {
+    server.removeListener('error', failed);
+
+    // A listening TCP server always reports an address; the union in the
+    // types is for the pipe and socket forms this server never takes.
+    resolve((server.address() as AddressInfo).port);
   });
+
+  return promise;
 }
 
 /** Takes the next free port rather than dying on a server you forgot to stop. */

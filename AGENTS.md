@@ -134,6 +134,17 @@ a mismatch that does not name the cause.
 
 ## TypeScript
 
+- **The language floor is the platform we actually run on:** `target: esnext`,
+  `lib: ["es2025", "esnext.disposable", "dom", "dom.iterable"]`. Node comes from
+  `.nvmrc` and the browser floor is Baseline, so `Promise.withResolvers`,
+  `AbortSignal.any`, `Object.groupBy`, the iterator helpers and the `Set`
+  methods are all available — prefer them to a hand-rolled equivalent, except
+  in `packages/core/src`, where the size budget decides: `Promise.withResolvers`
+  in `mutation.ts` read better and cost 26 B brotli, so it did not land.
+  **`lib: ["esnext"]` is deliberately not used:** it promises `Temporal`, which
+  is not Baseline, so code would typecheck and then throw in a browser. A
+  stage-3 lib is added one at a time, by name, once the platform has it —
+  `esnext.disposable` is the only one so far.
 - `strict` plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` and `isolatedDeclarations`. Exported functions declare their types explicitly; the generated `.d.ts` is the public contract.
 - **Erasable syntax only** (`erasableSyntaxOnly`), so Node runs tests on `.ts` directly. That means:
   - no `enum`
