@@ -1419,7 +1419,11 @@ The honest formulation, and the only one to use in the README:
   the production build. A save reloads open pages, and a save that will not
   strip paints the failure over them instead of waiting for the next request
   (A2). `--no-reload` turns that off, because a reload landing mid-assertion is
-  how a dev server makes an e2e suite flaky. `dev` takes an `AbortSignal` —
+  how a dev server makes an e2e suite flaky. A **deep link into a route** — a
+  navigation to a path with no file behind it — is answered with the page, so
+  `/orders/42` works typed into the address bar and not only clicked. A missing
+  *asset* keeps its 404: an HTML body where a `.js` was expected sends you
+  hunting for the wrong bug. `dev` takes an `AbortSignal` —
   the rule `SHR-L007` puts on everyone else, applied to the one command that
   keeps running after it has answered.
 - Production is ESM served as-is: `sheratan build [directory] [--out dist]`
@@ -1427,6 +1431,12 @@ The honest formulation, and the only one to use in the README:
   what ships is what a static host serves. No bundler is involved, and `dev`
   and `build` differ only in where the stripped output goes. Bundling
   afterwards is optional and the user's choice.
+
+  A project with a page of its own also gets **`404.html`**, byte for byte the
+  same page. GitHub Pages, Netlify and Cloudflare Pages all serve that file for
+  a path they have no file for, which is what makes a deep link into a route
+  work on a fresh deploy with nothing to configure — the same answer `dev`
+  gives, in the only form a static host accepts.
 
   Four things the shipped command's shape follows from:
   - **The stripper is Node's own** (`node:module`), so `build` needs nothing

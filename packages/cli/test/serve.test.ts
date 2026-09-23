@@ -53,6 +53,51 @@ async function serving(
   await visit(`http://localhost:${String(server.port)}`, made.root, server);
 }
 
+/** What a browser sends when it is navigating rather than fetching. */
+const NAVIGATING = { accept: 'text/html,application/xhtml+xml' };
+
+test('a deep link into a route is answered with the page, not a 404', async () => {
+  await serving(SITE, async (base) => {
+    const response = await fetch(`${base}/orders/42`, { headers: NAVIGATING });
+
+    assert.equal(response.status, 200);
+    assert.match(await response.text(), /<main id="app">/);
+  });
+});
+
+test('a missing asset keeps its 404, so a wrong path is not a silent page', async () => {
+  await serving(SITE, async (base) => {
+    const missing = await fetch(`${base}/lib/gone.js`, { headers: NAVIGATING });
+
+    assert.equal(missing.status, 404);
+    assert.equal(await missing.text(), 'not found: /lib/gone.js');
+
+    // The runtime path answers for itself; a deep link may not stand in for it.
+    const runtime = await fetch(`${base}/sheratan/nope`, { headers: NAVIGATING });
+
+    assert.equal(runtime.status, 404);
+  });
+});
+
+test('a fetch that is not a navigation gets a 404 even with no extension', async () => {
+  await serving(SITE, async (base) => {
+    const response = await fetch(`${base}/api/orders`, { headers: { accept: 'application/json' } });
+
+    assert.equal(response.status, 404);
+    assert.equal(await response.text(), 'not found: /api/orders');
+  });
+});
+
+test('a project with no page at all still 404s a deep link, with the reason', async () => {
+  const bare: Files = { 'app.ts': 'export const started = 1;\n' };
+
+  await serving(bare, async (base) => {
+    const response = await fetch(`${base}/orders/42`, { headers: NAVIGATING });
+
+    assert.equal(response.status, 404);
+  });
+});
+
 test('a page is served with the reload client in it', async () => {
   await serving(SITE, async (base) => {
     const response = await fetch(`${base}/`);
