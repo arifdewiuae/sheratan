@@ -45,7 +45,7 @@ pnpm coverage                    # tests + coverage gate (fails below threshold)
 pnpm verify                      # consumer types, publint, attw, size budget, llms.txt freshness
 pnpm security                    # pnpm audit + registry signature verification
 pnpm sheratan check <dir>        # the CLI on an app, from source; --json for the machine shape
-pnpm sheratan build <dir>        # strip types into <dir>/dist; --out picks another directory
+pnpm sheratan build <dir>        # strip types into <dir>/dist, with a 404.html deep-link fallback; --out picks another directory
 pnpm sheratan dev <dir>          # serve it with types stripped; --port, --no-reload
 ```
 

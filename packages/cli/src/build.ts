@@ -7,12 +7,14 @@
 // cannot resolve a bare specifier on its own: what ships is what the host
 // serves, and it has to run without a resolver.
 
-import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 import {
   ENCODING,
+  FALLBACK_FILE,
+  INDEX_FILE,
   PAGE_FILE,
   RUNTIME,
   RUNTIME_DIRECTORY,
@@ -39,6 +41,8 @@ export interface Built {
   readonly copied: number;
   /** Whether the runtime was vendored beside the pages that name it. */
   readonly runtime: boolean;
+  /** Whether a deep-link fallback was written beside the page. */
+  readonly fallback: boolean;
 }
 
 /** Tooling and dependencies: present in the project, never part of the page. */
@@ -188,6 +192,20 @@ async function namesRuntime(root: string, pages: readonly string[]): Promise<boo
 }
 
 /**
+ * The page again, under the name a static host serves for a path it has no
+ * file for. A routed app is one file and many URLs, and without this a deep
+ * link into `/orders/42` is a 404 on every host that has not been told
+ * otherwise. A project with no page of its own gets none.
+ */
+async function fallbackPage(out: string, files: readonly string[]): Promise<boolean> {
+  if (!files.includes(INDEX_FILE)) return false;
+
+  await copyFile(join(out, INDEX_FILE), join(out, FALLBACK_FILE));
+
+  return true;
+}
+
+/**
  * Strips the app into `out` and returns what it wrote. The output is plain
  * ESM: no bundler ran, and nothing needs one to serve it.
  *
@@ -215,7 +233,8 @@ export async function buildProject(options: BuildOptions): Promise<Built> {
 
   if (runtime) await vendor(root, out);
 
+  const fallback = await fallbackPage(out, files);
   const count = stripped.filter(Boolean).length;
 
-  return { out, stripped: count, copied: files.length - count, runtime };
+  return { out, stripped: count, copied: files.length - count, runtime, fallback };
 }

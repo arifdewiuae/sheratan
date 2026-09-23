@@ -11,6 +11,7 @@ import { parseArgs } from 'node:util';
 // TypeScript compiler with it and that is an optional peer dependency.
 import { Severity } from '../../check/src/finding.ts';
 import { buildProject } from './build.ts';
+import { FALLBACK_FILE } from './project.ts';
 import { INSTALL_TYPESCRIPT, isMissingTypescript, MISSING_TYPESCRIPT } from './peer.ts';
 import { report, reportJson } from './report.ts';
 import { serve } from './serve.ts';
@@ -92,9 +93,13 @@ async function build(terminal: Terminal, directory: string, out: string): Promis
   const built = await buildProject({ root, out: resolve(root, out) });
   const runtime = built.runtime ? ', and the runtime beside them' : '';
 
+  const deep = built.fallback
+    ? ` A route falls back to ${FALLBACK_FILE}, which a static host serves for a path it has no file for.`
+    : '';
+
   terminal.out(
     `${String(built.stripped)} files stripped, ${String(built.copied)} copied${runtime}.\n` +
-      `Serve ${built.out} with any static file server.`,
+      `Serve ${built.out} with any static file server.${deep}`,
   );
 
   return Exit.Clean;

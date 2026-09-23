@@ -109,6 +109,7 @@ test('tooling, dependencies and tests are in the project and not in the build', 
     const shipped = await readdir(out, { recursive: true });
 
     assert.deepEqual(shipped.filter((path) => !path.startsWith('sheratan')).toSorted(), [
+      '404.html',
       'app.js',
       'index.html',
       'modules',
@@ -148,6 +149,29 @@ test('the output is emptied first, so a file that left the project leaves the bu
   assert.ok(twice.includes('app.js'), 'and this one rebuilt what belongs');
 });
 
+test('a build with no page and no runtime says so by leaving both out', async () => {
+  using made = project({ 'lib/format.ts': 'export const pad = (n: number): string => `${n}`;\n' });
+  const { terminal, out, err } = recorder();
+
+  assert.equal(await run(['build', made.root], terminal), Exit.Clean);
+  assert.deepEqual(err, []);
+
+  const said = out.join('');
+
+  assert.match(said, /^1 files stripped, 0 copied\./);
+  assert.doesNotMatch(said, /runtime beside them/);
+  assert.doesNotMatch(said, /404\.html/);
+});
+
+test('a deep link into a route falls back to the page, under the name hosts serve', async () => {
+  await built(SITE, async (out) => {
+    // Byte for byte the page: a route is not another document, it is this one
+    // reached by a URL the host has no file for. The project with no page of
+    // its own is covered above, where the whole output is just `lib`.
+    assert.equal(await read(out, '404.html'), await read(out, 'index.html'));
+  });
+});
+
 test('an output directory holding the project is refused', async () => {
   using made = project(SITE);
 
@@ -172,5 +196,6 @@ test('the command reports what it wrote and exits 0', async () => {
   assert.deepEqual(err, []);
   assert.match(out.join(''), /^2 files stripped, 2 copied, and the runtime beside them\./);
   assert.match(out.join(''), /Serve .*public with any static file server\./);
+  assert.match(out.join(''), /A route falls back to 404\.html/);
   assert.match(await read(join(made.root, 'public'), 'app.js'), /render\(createTodo\(\), host\)/);
 });

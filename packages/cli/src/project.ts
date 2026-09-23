@@ -26,3 +26,14 @@ export const RUNTIME_SPECIFIER: RegExp = /("sheratan"\s*:\s*")[^"]*(")/;
 
 /** Where the runtime sits beside a page, in the output and on the server. */
 export const RUNTIME_DIRECTORY: string = RUNTIME;
+
+/** The page a project serves at its root, and what a deep link falls back to. */
+export const INDEX_FILE = 'index.html';
+
+/**
+ * The name a static host serves for a path it has no file for. GitHub Pages,
+ * Netlify and Cloudflare Pages all honour it, so writing the page under this
+ * name is what makes a deep link into a route work on a fresh deploy without
+ * asking anyone to configure a rewrite.
+ */
+export const FALLBACK_FILE = '404.html';

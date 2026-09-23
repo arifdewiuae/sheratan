@@ -13,7 +13,7 @@ import type { AddressInfo } from 'node:net';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, relative } from 'node:path';
 
-import { ENCODING, PAGE_FILE, RUNTIME, SOURCE_FILE } from './project.ts';
+import { ENCODING, INDEX_FILE, PAGE_FILE, RUNTIME, SOURCE_FILE } from './project.ts';
 import { stripTypes } from './strip.ts';
 
 /** Which app to serve, and how. */
@@ -99,6 +99,17 @@ const IGNORED = ['node_modules', 'test-results', 'playwright-report', 'dist'];
 /** The runtime is served from the package the project installed, under one path. */
 const RUNTIME_PATH = '/sheratan/';
 
+/** One request, once its path and build mode have been worked out. */
+interface Asked {
+  readonly request: IncomingMessage;
+  readonly path: string;
+  readonly file: string;
+  readonly production: boolean;
+}
+
+/** What a browser asks for when it is navigating rather than fetching. */
+const PAGE_TYPE = 'text/html';
+
 /** `?build=prod` swaps the import map over, so both builds run the same page. */
 const BUILD = 'build';
 
@@ -156,6 +167,19 @@ function page(markup: string, production: boolean, reload: boolean): string {
   return reload ? built.replace('</body>', `${RELOAD_CLIENT}</body>`) : built;
 }
 
+/**
+ * A deep link: the browser navigating to a path the app routes itself, rather
+ * than fetching a file. A missing asset keeps its 404 — an HTML body where a
+ * `.js` was expected sends you hunting for the wrong bug.
+ */
+function isNavigation(request: IncomingMessage, pathname: string): boolean {
+  return (
+    extname(pathname) === '' &&
+    !pathname.startsWith(RUNTIME_PATH) &&
+    (request.headers.accept ?? '').includes(PAGE_TYPE)
+  );
+}
+
 function isMissing(error: unknown): boolean {
   return (error as NodeJS.ErrnoException).code === NO_SUCH_FILE;
 }
@@ -204,13 +228,45 @@ class Dev implements DevServer {
       return;
     }
 
-    try {
-      const content = await this.body(target.file, url.searchParams.get(BUILD) === PRODUCTION);
-      const headers = { [CONTENT_TYPE]: contentType(target.file), 'cache-control': 'no-store' };
+    const asked: Asked = {
+      request,
+      path: url.pathname,
+      file: target.file,
+      production: url.searchParams.get(BUILD) === PRODUCTION,
+    };
 
-      response.writeHead(OK, headers).end(content);
+    try {
+      await this.send(response, target.file, asked.production);
     } catch (error: unknown) {
-      this.refuse(response, target.file, error, url.pathname);
+      await this.orRoute(response, asked, error);
+    }
+  }
+
+  private async send(response: ServerResponse, file: string, production: boolean): Promise<void> {
+    const content = await this.body(file, production);
+    const headers = { [CONTENT_TYPE]: contentType(file), 'cache-control': 'no-store' };
+
+    response.writeHead(OK, headers).end(content);
+  }
+
+  /**
+   * A path with no file behind it is either a route the app resolves itself or
+   * a mistake, and only the first gets the page. A static host is told the
+   * same thing by `build`, which writes it as `404.html`.
+   */
+  private async orRoute(response: ServerResponse, asked: Asked, error: unknown): Promise<void> {
+    if (!isMissing(error) || !isNavigation(asked.request, asked.path)) {
+      this.refuse(response, asked.file, error, asked.path);
+
+      return;
+    }
+
+    const index = join(this.options.root, INDEX_FILE);
+
+    try {
+      await this.send(response, index, asked.production);
+    } catch (missing: unknown) {
+      this.refuse(response, index, missing, asked.path);
     }
   }
 
@@ -247,7 +303,7 @@ class Dev implements DevServer {
 
   /** The app root, plus the runtime under one path of its own. */
   private locate(pathname: string): Resolved | undefined {
-    const clean = pathname === '/' ? '/index.html' : pathname;
+    const clean = pathname === '/' ? `/${INDEX_FILE}` : pathname;
     const { root } = this.options;
 
     if (!clean.startsWith(RUNTIME_PATH)) return { file: join(root, clean) };
