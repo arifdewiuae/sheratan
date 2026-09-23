@@ -143,9 +143,10 @@ The checker reads your code with the TypeScript compiler, so `typescript` is an
 optional peer dependency: an app that only renders installs nothing extra, and
 `sheratan check` tells you to add it if it is not there.
 
-Ship it with the same command — types off, nothing else changed:
+Run it and ship it with the same command — types off, nothing else changed:
 
 ```sh
+npx sheratan dev .            # http://localhost:5173, reloads on save
 npx sheratan build .          # plain ESM in dist/, for any static file server
 ```
 

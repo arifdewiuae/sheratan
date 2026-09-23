@@ -45,6 +45,7 @@ pnpm verify                      # consumer types, publint, attw, size budget, l
 pnpm security                    # pnpm audit + registry signature verification
 pnpm sheratan check <dir>        # the CLI on an app, from source; --json for the machine shape
 pnpm sheratan build <dir>        # strip types into <dir>/dist; --out picks another directory
+pnpm sheratan dev <dir>          # serve it with types stripped; --port, --no-reload
 ```
 
 Example app: `pnpm --filter example-hello dev` (http://localhost:5173), and
@@ -65,9 +66,9 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `packages/core/scripts/` | Build (`build-prod`, `build-cli`), package checks (`verify-types`, `verify-cli`, `size`), docs (`llms`) |
 | `packages/check/src/` | The checker (`sheratan check`): `typescript` (the one adapter over `typescript/unstable/*`), `layout` (path → layer), `matrix` (SPEC §4's table as data), `rules/` (one file per code), `check` (`checkProject()`). A folder, not a package: it folds into the `sheratan` tarball |
 | `packages/check/test/` | Real TypeScript programs on disk: the whole import matrix as one project, a failing case per rule, and both apps in this repo checked clean |
-| `packages/cli/src/` | The `sheratan` command (SPEC §10): `run()` returns an exit code and writes through an injected `Terminal`, `report` holds both output formats, `strip` and `build` turn a project into plain ESM a static host serves. A folder, not a package: it folds into the same tarball |
+| `packages/cli/src/` | The `sheratan` command (SPEC §10): `run()` returns an exit code and writes through an injected `Terminal`, `report` holds both output formats, `strip`, `build` and `serve` turn a project into plain ESM, written to a directory or served. A folder, not a package: it folds into the same tarball |
 | `packages/cli/bin/` | The one file that owns a process: it hands `run()` the real streams and sets `process.exitCode` |
-| `examples/hello/` | The reference app in the canonical module shape (SPEC §4): a live dashboard, its dev server, and the e2e specs |
+| `examples/hello/` | The reference app in the canonical module shape (SPEC §4): a live dashboard and its e2e specs. It runs on `sheratan dev`, the shipped command, so the example and the product cannot drift |
 | `.oxlintrc.json`, `.oxfmtrc.json` | The one lint config and the one formatter config |
 | `Docs/` | SPEC, EVAL, EVAL-TASKS, TASKS, brand identity |
 | `Docs/adr/` | Decisions with a real trade-off, written up once instead of re-argued |

@@ -529,8 +529,15 @@ module (SHR-T001 warns when missing). End-to-end tests live in `e2e/`.
 
 ```sh
 npx sheratan check [directory] [--json]      # the architecture rules
-npx sheratan build [directory] [--out dist]  # plain ESM for a static host
+npx sheratan dev   [directory] [--port 5173] # serve it, types stripped on the way out
+npx sheratan build [directory] [--out dist]  # the same thing, written to a directory
 ```
+
+`dev` serves the project and reloads open pages on a save; a save that will not
+strip is painted over the page instead of waiting for the next request. It
+serves the runtime under `/sheratan/`, so `?build=prod` reads the same page
+against the production build, and `--no-reload` keeps a reload from landing in
+the middle of an e2e assertion.
 
 `build` strips types and writes ESM any static file server can serve: no
 bundler, no config, no plugin pipeline. It copies the tree — minus

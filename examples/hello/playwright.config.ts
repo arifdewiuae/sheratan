@@ -19,10 +19,12 @@ export default defineConfig({
     baseURL: `http://localhost:${String(PORT)}`,
     trace: 'retain-on-failure',
   },
+  // The command a user runs, from source so the workspace needs no build first.
+  // `--no-reload` is not a convenience: a reload landing mid-assertion is how a
+  // dev server turns a suite flaky.
   webServer: {
-    command: 'node serve.ts',
+    command: `node ../../packages/cli/bin/sheratan.ts dev . --port ${String(PORT)} --no-reload`,
     url: `http://localhost:${String(PORT)}/`,
-    env: { PORT: String(PORT), SHERATAN_RELOAD: 'off' },
     reuseExistingServer: !isCI,
     timeout: SERVER_TIMEOUT_MS,
   },

@@ -1340,10 +1340,22 @@ The honest formulation, and the only one to use in the README:
   file server** (`python3 -m http.server`, `npx serve`). Not from `file://`:
   browsers refuse ES module scripts from an opaque origin, and a `file://`
   build would be a second way to load core. The zero-build demo is JavaScript.
-- **TypeScript projects need type stripping.** `sheratan dev` strips types and
-  serves ESM — no bundling, no transform of the templates, no plugin
-  configuration. Under Bun or Deno, which run TypeScript natively, even that
-  disappears.
+- **TypeScript projects need type stripping.** `sheratan dev [directory]
+  [--port 5173] [--no-reload]` strips types and serves ESM — no bundling, no
+  transform of the templates, no plugin configuration. Under Bun or Deno, which
+  run TypeScript natively, even that disappears.
+
+  It strips with the same function `build` does, and differs in one thing
+  beyond where the output goes: **`dev` leaves a relative `./x.ts` specifier
+  alone**, because each source is served at the path it was written with and
+  nothing is renamed. It also serves the runtime under `/sheratan/`, from the
+  package the project installed, so `?build=prod` reads the same page against
+  the production build. A save reloads open pages, and a save that will not
+  strip paints the failure over them instead of waiting for the next request
+  (A2). `--no-reload` turns that off, because a reload landing mid-assertion is
+  how a dev server makes an e2e suite flaky. `dev` takes an `AbortSignal` —
+  the rule `SHR-L007` puts on everyone else, applied to the one command that
+  keeps running after it has answered.
 - Production is ESM served as-is: `sheratan build [directory] [--out dist]`
   strips types into a directory of plain ESM and copies everything else, so
   what ships is what a static host serves. No bundler is involved, and `dev`
