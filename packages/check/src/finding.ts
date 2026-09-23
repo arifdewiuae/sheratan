@@ -15,6 +15,8 @@ export const RuleCode = {
   Structure: 'SHR-L003',
   /** A module's files do not match the kind its `index.ts` declares. */
   Shape: 'SHR-L006',
+  /** A promise-returning method on a service contract takes no `AbortSignal`. */
+  Cancellable: 'SHR-L007',
   /** An import cycle between modules, or among `lib/` files. */
   Cycle: 'SHR-L008',
   /** A `*.state.ts` public surface hands out a writable `Signal`. */

@@ -30,12 +30,29 @@ import {
   SymbolFlags,
   type Checker,
   type NodeHandle,
+  type Signature,
   type Project,
   type Symbol as TsSymbol,
   type Type,
 } from 'typescript/unstable/sync';
 
 import type { Position } from './finding.ts';
+
+/** One method a service contract declares (SPEC §5b). */
+export interface ContractMethod {
+  /** The type that declares it, as a message names it: `FeedApi`. */
+  readonly owner: string;
+  readonly name: string;
+  /** Where it is declared, which is not always the contract that exports it. */
+  readonly file: string;
+  readonly at: Position;
+  /** The return type, printed, so a message can quote it. */
+  readonly returns: string;
+  /** Whether the caller awaits it: the return type has a callable `then`. */
+  readonly awaited: boolean;
+  /** Each parameter's type, printed, followed by the types of its own members. */
+  readonly takes: readonly string[];
+}
 
 /** One import or re-export, resolved. */
 export interface ImportEdge {
@@ -85,6 +102,11 @@ export interface Program extends Disposable {
    * to the global of that name, and neither is a type query (`typeof window`).
    */
   globalsOf(file: string): readonly GlobalUse[];
+  /**
+   * The methods of every type a file exports: each declared interface and type
+   * alias, and the call signatures its members have.
+   */
+  methodsOf(file: string): readonly ContractMethod[];
 }
 
 const DECLARATION_FILE = '.d.ts';
@@ -181,6 +203,32 @@ function isWritable(checker: Checker, type: Type): boolean {
   );
 }
 
+/** What a method needs to know about the type that declares it. */
+interface MethodContext {
+  readonly owner: string;
+  /** Where to report a member with no declaration of its own. */
+  readonly fallback: Location;
+}
+
+/** What a value you can await has, and nothing else does. */
+const THEN = 'then';
+
+/** A type the caller awaits: a promise, or anything shaped like one. */
+function isThenable(checker: Checker, type: Type): boolean {
+  const then = checker.getPropertyOfType(type, THEN);
+
+  if (then === undefined) return false;
+
+  const declared = checker.getTypeOfSymbol(then) as Type;
+
+  return checker.getSignaturesOfType(declared, SignatureKind.Call).length > 0;
+}
+
+/** A symbol that declares a type — an interface or a type alias — rather than a value. */
+function isDeclaredType(symbol: TsSymbol): boolean {
+  return (symbol.flags & (SymbolFlags.Interface | SymbolFlags.TypeAlias)) !== 0;
+}
+
 class TypeScriptProgram implements Program {
   readonly files: readonly string[];
 
@@ -259,6 +307,22 @@ class TypeScriptProgram implements Program {
     });
   }
 
+  methodsOf(file: string): readonly ContractMethod[] {
+    const { checker } = this.project;
+    const source = this.sourceFile(file);
+    const moduleSymbol = checker.getSymbolAtLocation(source);
+
+    if (moduleSymbol === undefined) return [];
+
+    const fallback: Location = { file: source.fileName, at: FILE_START };
+
+    return checker
+      .getExportsOfModule(moduleSymbol)
+      .map((exported) => this.declaration(exported))
+      .filter((exported) => isDeclaredType(exported))
+      .flatMap((exported) => this.methodsOfType(exported, fallback));
+  }
+
   [Symbol.dispose](): void {
     this.api.close();
   }
@@ -331,6 +395,66 @@ class TypeScriptProgram implements Program {
       file: source.fileName,
       at: positionIn(source, declaration.resolve(this.project) as Node),
     };
+  }
+
+  /** What an export declares, following `export … from` to the type itself. */
+  private declaration(exported: TsSymbol): TsSymbol {
+    const { checker } = this.project;
+
+    return (exported.flags & SymbolFlags.Alias) === 0
+      ? exported
+      : checker.getAliasedSymbol(exported);
+  }
+
+  /** Every method the type `exported` declares, one entry per call signature. */
+  private methodsOfType(exported: TsSymbol, fallback: Location): ContractMethod[] {
+    const { checker } = this.project;
+    const declared = checker.getDeclaredTypeOfSymbol(exported);
+
+    return checker
+      .getPropertiesOfType(declared)
+      .flatMap((property) =>
+        checker
+          .getSignaturesOfType(this.typeOf(property), SignatureKind.Call)
+          .map((signature) => this.method(property, signature, { owner: exported.name, fallback })),
+      );
+  }
+
+  private method(property: TsSymbol, signature: Signature, context: MethodContext): ContractMethod {
+    const { checker } = this.project;
+    const returned = checker.getReturnTypeOfSignature(signature) as Type;
+    const { file, at } = this.locate(property.valueDeclaration) ?? context.fallback;
+
+    return {
+      owner: context.owner,
+      name: property.name,
+      file,
+      at,
+      returns: checker.typeToString(returned),
+      awaited: isThenable(checker, returned),
+      takes: this.parameterTypes(signature),
+    };
+  }
+
+  /**
+   * Each parameter's type and the types of its own members, so an options
+   * object shows what it carries without the caller walking types.
+   */
+  private parameterTypes(signature: Signature): string[] {
+    const { checker } = this.project;
+    const types: string[] = [];
+
+    for (let index = 0; index < signature.parameters.length; index += 1) {
+      const parameter = checker.getParameterType(signature, index) as Type;
+
+      types.push(checker.typeToString(parameter));
+
+      for (const member of checker.getPropertiesOfType(parameter)) {
+        types.push(checker.typeToString(this.typeOf(member)));
+      }
+    }
+
+    return types;
   }
 
   /** Every value symbol has a type; only a symbol that is not a value can lack one. */
