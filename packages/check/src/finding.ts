@@ -11,6 +11,8 @@ export const RuleCode = {
   Boundary: 'SHR-L001',
   /** A view or a state file does I/O, reads the page or schedules work. */
   Io: 'SHR-L002',
+  /** A file the layout has no place for: a `shared/` directory, or a folder inside a `ui/` component. */
+  Structure: 'SHR-L003',
   /** An import cycle between modules, or among `lib/` files. */
   Cycle: 'SHR-L008',
   /** A `*.state.ts` public surface hands out a writable `Signal`. */
