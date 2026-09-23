@@ -10,22 +10,27 @@
 
 import { stripTypeScriptTypes } from 'node:module';
 
+import { STRIPPED_FILE } from './project.ts';
+
 /**
  * `from './x.ts'` and `import('./x.ts')`: a relative specifier keeps the
  * extension it was written with, and the file it names is now `.js`.
  */
 const RELATIVE_IMPORT = /(\b(?:from|import)\s*\(?\s*)(['"])(\.[^'"]*)\.ts\2/g;
 
-/** What a `.ts` file is called once its types are gone. */
-export const STRIPPED_EXTENSION = '.js';
-
 /**
- * `source` with its types removed and its relative `.ts` imports pointed at
- * the files they will be. Throws what Node throws for syntax that cannot be
- * erased; the caller says which file it was.
+ * `source` with its types removed and nothing else touched. Throws what Node
+ * throws for syntax that cannot be erased; the caller says which file it was.
  */
 export function stripTypes(source: string): string {
-  const stripped = stripTypeScriptTypes(source, { mode: 'strip' });
+  return stripTypeScriptTypes(source, { mode: 'strip' });
+}
 
-  return stripped.replaceAll(RELATIVE_IMPORT, '$1$2$3.js$2');
+/**
+ * `source` with its relative `.ts` imports pointed at the files they will be.
+ * Only a build needs this: `dev` serves each source at the path it was written
+ * with, so the specifier a file already carries is the one that resolves.
+ */
+export function rewriteExtensions(source: string): string {
+  return source.replaceAll(RELATIVE_IMPORT, `$1$2$3${STRIPPED_FILE}$2`);
 }

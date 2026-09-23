@@ -11,7 +11,16 @@ import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
-import { stripTypes, STRIPPED_EXTENSION } from './strip.ts';
+import {
+  ENCODING,
+  PAGE_FILE,
+  RUNTIME,
+  RUNTIME_DIRECTORY,
+  RUNTIME_SPECIFIER,
+  SOURCE_FILE,
+  STRIPPED_FILE,
+} from './project.ts';
+import { rewriteExtensions, stripTypes } from './strip.ts';
 
 /** Which app to build, and where to put it. */
 export interface BuildOptions {
@@ -41,18 +50,11 @@ const TEST_FILE = /\.(?:test|spec)\.ts$/;
 
 const CONFIG_FILE = /\.config\.ts$/;
 
-const SOURCE_FILE = '.ts';
-
-const PAGE_FILE = '.html';
-
 /** `<script type="module" src="/app.ts">` names a file that is now `.js`. */
 const SCRIPT_SOURCE = /(<script[^>]*\ssrc=")([^"]+)\.ts(")/g;
 
-/** The one bare specifier this framework owns, as an import map writes it. */
-const RUNTIME_SPECIFIER = /("sheratan"\s*:\s*")[^"]*(")/;
-
-/** Where the runtime lands, and what the import map is pointed at. */
-const RUNTIME_DIRECTORY = 'sheratan';
+/** A file inside the app to resolve the runtime from; it need not exist. */
+const RESOLVE_FROM = 'sheratan.build';
 
 const RUNTIME_HREF = './sheratan/index.js';
 
@@ -112,7 +114,7 @@ function refuse(path: string, error: unknown): never {
 }
 
 function page(html: string, runtime: boolean): string {
-  const scripts = html.replaceAll(SCRIPT_SOURCE, `$1$2${STRIPPED_EXTENSION}$3`);
+  const scripts = html.replaceAll(SCRIPT_SOURCE, `$1$2${STRIPPED_FILE}$3`);
 
   return runtime ? scripts.replace(RUNTIME_SPECIFIER, `$1${RUNTIME_HREF}$2`) : scripts;
 }
@@ -120,7 +122,7 @@ function page(html: string, runtime: boolean): string {
 /** Where a file lands in the output: a source arrives without its types. */
 function targetOf(path: string): string {
   return path.endsWith(SOURCE_FILE)
-    ? `${path.slice(0, -SOURCE_FILE.length)}${STRIPPED_EXTENSION}`
+    ? `${path.slice(0, -SOURCE_FILE.length)}${STRIPPED_FILE}`
     : path;
 }
 
@@ -133,10 +135,10 @@ async function emit(root: string, out: string, path: string, runtime: boolean): 
   await mkdir(dirname(to), { recursive: true });
 
   if (source) {
-    const text = await readFile(from, 'utf8');
+    const text = await readFile(from, ENCODING);
 
     try {
-      await writeFile(to, stripTypes(text));
+      await writeFile(to, rewriteExtensions(stripTypes(text)));
     } catch (error) {
       refuse(path, error);
     }
@@ -145,7 +147,7 @@ async function emit(root: string, out: string, path: string, runtime: boolean): 
   }
 
   if (path.endsWith(PAGE_FILE)) {
-    await writeFile(to, page(await readFile(from, 'utf8'), runtime));
+    await writeFile(to, page(await readFile(from, ENCODING), runtime));
 
     return false;
   }
@@ -157,8 +159,8 @@ async function emit(root: string, out: string, path: string, runtime: boolean): 
 
 /** Where the runtime this project installed keeps its production build. */
 function runtimeIn(root: string): string {
-  const require = createRequire(join(root, 'sheratan.build'));
-  const entry = require.resolve('sheratan');
+  const require = createRequire(join(root, RESOLVE_FROM));
+  const entry = require.resolve(RUNTIME);
 
   return join(dirname(dirname(entry)), PRODUCTION_BUILD);
 }
@@ -178,7 +180,9 @@ async function vendor(root: string, out: string): Promise<void> {
 
 /** Whether any page names the runtime, which is what makes it worth copying. */
 async function namesRuntime(root: string, pages: readonly string[]): Promise<boolean> {
-  const sources = await Promise.all(pages.map(async (path) => readFile(join(root, path), 'utf8')));
+  const sources = await Promise.all(
+    pages.map(async (path) => readFile(join(root, path), ENCODING)),
+  );
 
   return sources.some((html) => RUNTIME_SPECIFIER.test(html));
 }
