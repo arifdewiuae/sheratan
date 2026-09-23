@@ -68,6 +68,7 @@ test('a deep link into a route is answered with the page, not a 404', async () =
 /** A request with no `Accept` at all, which `fetch` will not send. */
 async function askWithoutAccept(base: string, path: string): Promise<number> {
   const { promise, resolve, reject } = Promise.withResolvers<number>();
+
   const call = httpRequest(`${base}${path}`, { headers: {} }, (response) => {
     response.resume();
     // A status is always set by the time the response head arrives.
