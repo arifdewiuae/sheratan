@@ -541,7 +541,7 @@ stays parseable.
 | SHR-L003 | `shared/` folder at any depth, or a file under `ui/` outside a component folder (loose in `ui/`, or nested below the component) |
 | SHR-L004 | `watch`, `onDispose`, `resource`, `mutation`, `stream` (and later `navigate`) outside effects |
 | SHR-L005 | effects write a signal directly instead of calling a transition |
-| SHR-L006 | module files don't match its declared `kind` |
+| SHR-L006 | module files don't match the `kind` its `index.ts` declares — missing `index.ts` or `kind`, a `full` module missing a file, a `view` module with state or effects, or a layer suffix under another name |
 | SHR-L007 | Promise-returning contract method without an `AbortSignal` |
 | SHR-L008 | circular imports between modules, or among `lib/` files |
 | SHR-L009 | module stylesheet not wrapped in its `@scope` |

@@ -4,7 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { RuleCode } from '../src/index.ts';
-import { check } from './project.ts';
+import { only } from './project.ts';
+
+/** SHR-L002's own findings: a view here stands alone, without the module around it. */
+const check = only(RuleCode.Io);
 
 /** Every global L002 knows, as SPEC §4 lists them by what they do. */
 const IO_GLOBALS = [

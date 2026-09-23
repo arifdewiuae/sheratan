@@ -13,6 +13,8 @@ export const RuleCode = {
   Io: 'SHR-L002',
   /** A file the layout has no place for: a `shared/` directory, or a folder inside a `ui/` component. */
   Structure: 'SHR-L003',
+  /** A module's files do not match the kind its `index.ts` declares. */
+  Shape: 'SHR-L006',
   /** An import cycle between modules, or among `lib/` files. */
   Cycle: 'SHR-L008',
   /** A `*.state.ts` public surface hands out a writable `Signal`. */
@@ -50,6 +52,9 @@ export interface Finding {
   readonly fix: string;
   readonly docs: string;
 }
+
+/** A finding about a whole file rather than a place in it points at its first character. */
+export const FILE_START: Position = { line: 1, column: 1 };
 
 /** The page for a code: the whole code, exactly as the finding prints it (SPEC §4). */
 export function docsFor(code: RuleCode): string {

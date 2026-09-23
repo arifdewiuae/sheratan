@@ -106,8 +106,14 @@ satisfy the checker.
 | `view` | `<name>.view.ts`, `index.ts` | presentational modules with no state of their own |
 | `full` | `<name>.state.ts`, `<name>.effects.ts`, `<name>.view.ts`, `index.ts` | everything else |
 
-The kind is declared in `index.ts` and checked. A `full` module with an empty
-`effects.ts` is a `view` module that has not been declared honestly.
+The kind is declared in `index.ts` as a literal — `export const kind = 'full'`,
+with no type annotation, so the compiler reads it as the word itself — and
+checked (`SHR-L006`). A `full` module with an empty `effects.ts` is a `view`
+module that has not been declared honestly.
+
+The suffixes belong to the module's own files: `<name>.state.ts` and no other
+`*.state.ts`. A component only this module uses is an ordinary file beside
+them, with no layer suffix — it is not a second view.
 
 Either kind may add one `<name>.css`. It is optional, does not change the kind,
 and must follow the scoping rule in §9a (`SHR-L009`).
@@ -214,7 +220,7 @@ Constraints the matrix cannot express:
 | `SHR-L003` | Project layout: no `shared/` directory at any depth; every file under `ui/` sits in exactly one component folder (below) |
 | `SHR-L004` | Effects-only APIs — `resource()`, `mutation()`, `stream()`, `onDispose()`, `navigate()` — are called only inside `*.effects.ts` |
 | `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts`. Best-effort backstop to `SHR-L010` (§13) |
-| `SHR-L006` | Module file set matches its declared kind (below) |
+| `SHR-L006` | Module file set matches its declared kind: `index.ts` exists and declares `kind` as the literal `'view'` or `'full'`, the kind's files are present, none that the kind excludes are, and a layer suffix is used only under the module's own name (below) |
 | `SHR-L007` | Every `Promise`-returning method in a `*.contract.ts` takes an `AbortSignal` (§5b) |
 | `SHR-L008` | The module import graph must be acyclic, and so must imports among `lib/` files |
 | `SHR-L009` | Module and `ui/` stylesheets are wrapped in one `@scope` with a lower boundary; `global.css` holds only `tokens` and `base` (§9a) |

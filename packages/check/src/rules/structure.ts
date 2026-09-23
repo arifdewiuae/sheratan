@@ -5,12 +5,9 @@
 // folder inside a `ui/` component is the same move one directory down: it
 // rebuilds a hierarchy where the component's own folder was the whole surface.
 
-import { docsFor, RuleCode, Severity, type Finding, type Position } from '../finding.ts';
+import { docsFor, FILE_START, RuleCode, Severity, type Finding } from '../finding.ts';
 import { pathOf } from '../layout.ts';
 import type { Program } from '../typescript.ts';
-
-/** A layout finding is about a whole file, so it points at its first character. */
-const FILE_START: Position = { line: 1, column: 1 };
 
 const SHARED = 'shared';
 

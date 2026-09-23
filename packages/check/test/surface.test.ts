@@ -4,7 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { RuleCode } from '../src/index.ts';
-import { check } from './project.ts';
+import { only } from './project.ts';
+
+/** SHR-L010's own findings: a state file here stands alone, without its module. */
+const check = only(RuleCode.StateSurface);
 
 const COMPLIANT = `import { computed, signal, type Accessor } from 'sheratan';
 

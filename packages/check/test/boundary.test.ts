@@ -5,7 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { RuleCode } from '../src/index.ts';
-import { check, type Files } from './project.ts';
+import { only, type Files } from './project.ts';
+
+/** SHR-L001's own findings: the matrix is about imports, not about file sets. */
+const check = only(RuleCode.Boundary);
 
 /** Files every case can import from: one of each kind of target. */
 const TARGETS: Files = {

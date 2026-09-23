@@ -11,6 +11,12 @@ const VIEW = 'modules/todo/todo.view.ts';
 
 const FETCHING = "export const load = (): Promise<Response> => fetch('/todos');\n";
 
+/** A whole module around the view, so the one finding is the one under test. */
+const MODULE = {
+  'modules/todo/index.ts': "export const kind = 'view';\n",
+  [VIEW]: FETCHING,
+};
+
 const CLEAN = { 'lib/format.ts': 'export const pad = (n: number): string => String(n);\n' };
 
 test('a clean project says so and exits 0', async () => {
@@ -23,7 +29,7 @@ test('a clean project says so and exits 0', async () => {
 });
 
 test('a violation prints where, what, the fix and the page, then exits 1', async () => {
-  using made = project({ [VIEW]: FETCHING });
+  using made = project(MODULE);
   const { terminal, out } = recorder();
 
   assert.equal(await run(['check', made.root], terminal), Exit.Violations);
@@ -42,7 +48,7 @@ test('a violation prints where, what, the fix and the page, then exits 1', async
 });
 
 test('--json prints one versioned object, whatever the order of the arguments', async () => {
-  using made = project({ [VIEW]: FETCHING });
+  using made = project(MODULE);
   const { terminal, out } = recorder();
 
   assert.equal(await run(['check', '--json', made.root], terminal), Exit.Violations);
