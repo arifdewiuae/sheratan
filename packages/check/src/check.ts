@@ -11,6 +11,7 @@ import { io } from './rules/io.ts';
 import { shape } from './rules/shape.ts';
 import { structure } from './rules/structure.ts';
 import { surface } from './rules/surface.ts';
+import { tested } from './rules/tested.ts';
 import { openProgram } from './typescript.ts';
 
 /** Which project to check. */
@@ -43,7 +44,7 @@ export function checkProject(options: CheckOptions): readonly Finding[] {
 
   using program = openProgram(options.tsconfig);
 
-  return [boundary, io, structure, shape, cancellable, cycles, surface]
+  return [boundary, io, structure, shape, cancellable, cycles, surface, tested]
     .flatMap((rule) => rule(program, root))
     .toSorted(byLocation);
 }

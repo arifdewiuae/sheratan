@@ -238,7 +238,7 @@ Template rules, checked off the AST of `html` literals (§9, §13):
 
 | Code | Severity | Rule |
 |------|----------|------|
-| `SHR-T001` | warning | Module has no `*.state.test.ts` / `*.effects.test.ts` |
+| `SHR-T001` | warning | A module's `*.state.ts` or `*.effects.ts` has no test beside it, under that file's own name (below) |
 
 **Code scheme.** The letter is the family: `L` structure and layers, `V` view
 templates, `T` tests; `R` is reserved for structured runtime errors. Numbers
@@ -365,6 +365,15 @@ desynchronization that follows. If it can be computed, it is not state.
 Tests are not a fifth mandatory file — a mandatory test file produces an empty
 test file. `sheratan generate module` scaffolds `<name>.state.test.ts` and
 `<name>.effects.test.ts`, and `SHR-T001` reports their absence as a warning.
+
+The warning is per file, not per module: a `view` module has no state and no
+effects and is never asked, and a view is a snapshot of state rather than a
+unit under test. The test sits **beside the file it covers**, under that file's
+name plus `.test.ts` — one legal name, so `dashboard.state.spec.ts` and a
+top-level `test/` folder are both reported. This is the one rule that reads the
+directory rather than the program: a project that keeps its tests out of
+`tsconfig.json` still has them, and a checker that called those modules
+untested would be reporting the build configuration.
 
 The architecture is what makes this cheap: `*.state.ts` is a pure function and
 needs no mocks; `*.view.ts` is a snapshot of state; `*.effects.ts` is the only

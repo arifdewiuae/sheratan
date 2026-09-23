@@ -21,6 +21,8 @@ export const RuleCode = {
   Cycle: 'SHR-L008',
   /** A `*.state.ts` public surface hands out a writable `Signal`. */
   StateSurface: 'SHR-L010',
+  /** A module's state or effects has no test file beside it. The one warning so far. */
+  Tested: 'SHR-T001',
 } as const;
 
 /** One of the rule codes this checker reports. */
