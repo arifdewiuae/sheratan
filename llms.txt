@@ -43,6 +43,7 @@ import { signal, computed, watch, batch, resource, mutation, stream, onDispose, 
 | `flush(): void` | Applies pending DOM updates now, for tests and for code that must read layout immediately after a write. |
 | `html(strings: TemplateStringsArray, ...values: unknown[]): Template` | Markup with holes. A hole is reactive only when it receives the signal itself: `${total}` updates, `${total()}` is read once (SPEC §9, SHR-V003). |
 | `each<T>(list: Accessor<readonly T[]> \| readonly T[], row: (item: Accessor<T>) => Template, window?: Accessor<EachWindow>): Each` | A keyed list. Objects key by `id`, primitives by value; the row function runs once per key. A `window` makes it positional instead: a fixed pool of rows, rewritten in place as the window moves, with spacers holding the rest open. |
+| `mount<P>(view: ModuleView<P>, props: P): Mounted` | Renders another module inside this one, with props. Props carry accessors rather than values, so the child's own holes update and nothing re-renders; the argument is omitted when the module's view takes none. Its lifetime is bound to the parent's: when the parent unmounts, the child is disposed. |
 | `render(view: () => Template, host: Element): Disposer` | Mounts `view` into `host`. It owns only the nodes it inserts, so it can live inside an app built with something else, and the disposer removes exactly those nodes. |
 
 <!-- end generated -->
@@ -335,6 +336,20 @@ in state, view or index is SHR-L001. Test files are not checked.
 `sheratan` itself may be imported anywhere, but `watch` and `onDispose` belong in
 effects. Data flows one way: effects → state → view.
 
+**Composing modules.** A view renders a child module with `mount()`, and never
+imports it. The instance is built where its dependencies already exist — `app.ts`,
+or the parent's effects — and passed in as a value:
+
+```ts
+// app.ts, or the parent's effects
+const ordersTable = createOrdersTable(api);
+// parent.view.ts — props carry accessors, so the child updates in place
+html`<section>${mount(ordersTable, { customerId: s.id })}</section>`
+```
+
+The child's lifetime is the parent's: unmounting the parent disposes it. One
+`mount()` belongs to one hole (SHR-R009).
+
 **Transitions.** A transition is a plain function exported from the state
 factory. It is the only thing that writes signals. One that writes several
 signals wraps them in `batch()`. An effect that gathers several results calls
@@ -555,4 +570,4 @@ stays parseable.
 
 ## Not in v0
 
-`mount()`, `unsafeHTML` and routing are specified but not shipped.
+`unsafeHTML` and routing are specified but not shipped.

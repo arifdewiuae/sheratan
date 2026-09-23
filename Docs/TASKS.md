@@ -21,7 +21,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | Pre-flight | Names, repo | 🟡 In progress | — |
 | 0 | Falsification | 🟡 In progress | Self-repair ✅ 60/60 · median iterations vs React not run |
 | 1 | Core | 🟡 In progress | No-build ✅ · reordering vs Solid not measured |
-| 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ |
+| 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ · modules compose with `mount()` ✅ |
 | 3 | Checker, CLI, template | 🟡 In progress | Checker 8 of 16 codes (L001, L002, L003, L006, L007, L008, L010, T001) · CLI: `npx sheratan check` ships in the tarball, 7 commands to go · template not started |
 | 4 | Agent surface, reference app | ⬜ Not started | — |
 | 5 | Re-measure, package, launch | 🟡 In progress | — |
@@ -135,6 +135,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 
 **Ownership & lifecycle** (SPEC §5b)
 - [x] `[must]` Owner tree; children from `mount()` disposed recursively — `OwnerNode` in `packages/core/src/owner.ts`, an intrusive linked list with O(1) add and remove
+- [x] `[must]` `mount()`: a view renders another module without importing it (SPEC §9a) — `packages/core/src/mount.ts`, two overloads so the props argument exists only where the module declares props. The child gets a scope of its own with tracking off, so its lifetime is the parent's and what it reads while mounting is not the parent's dependency — without that, one write rebuilds the whole child. Props carry accessors, so the child's view runs once. `SHR-R009` when one placement is put in two holes. `commit()` now handles anything that mounts itself, so a module (or a list) can live in a **reactive** hole and be swapped for another, which is how a screen changes. `test/mount.test.ts`; proven to fail four ways
 - [x] `[must]` `onDispose()` — `packages/core/src/owner.ts`; `SHR-R001` when there is no owner
 - [x] `[must]` Disposal order: watchers → subscriptions → nodes — `OwnerNode.dispose()` runs `teardown()` (a watcher drops its sources) before `reset()` (children, then owned subscribers, then cleanups last-registered-first)
 - [ ] `[must]` Post-disposal async is a no-op (owner flag on transitions) — **blocked:** nothing marks a transition at run time (see the spec gap below). `examples/hello` checks `signal.aborted` by hand instead, which is the pattern but not the enforcement
