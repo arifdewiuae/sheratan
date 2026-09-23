@@ -16,12 +16,12 @@ in the matrix below. Nothing imports a package's whole surface, including ours.
 
 | Stack | Packages | gzip | vs Sheratan |
 |---|---|---|---|
-| **Sheratan** | **1** — `sheratan` | **6.9 kB** | — |
+| **Sheratan** | **1** — `sheratan` | **7.0 kB** | — |
 | Solid 1.9 | 3 — `solid-js`, `@tanstack/solid-query`, `@tanstack/solid-virtual` | 25.6 kB | 3.7× |
-| Svelte 5 | 3 — `svelte`, `@tanstack/svelte-query`, `@tanstack/svelte-virtual` | 37.0 kB | 5.4× |
-| Vue 3 | 3 — `vue`, `@tanstack/vue-query`, `@tanstack/vue-virtual` | 41.8 kB | 6.1× |
-| React 19 | 4 — `react`, `react-dom`, `@tanstack/react-query`, `@tanstack/react-virtual` | 84.1 kB | 12.2× |
-| Angular 19 | 5 — `@angular/core`, `@angular/common`, `@angular/platform-browser`, `@angular/cdk`, `rxjs` | 145.5 kB | 21.1× |
+| Svelte 5 | 3 — `svelte`, `@tanstack/svelte-query`, `@tanstack/svelte-virtual` | 37.0 kB | 5.3× |
+| Vue 3 | 3 — `vue`, `@tanstack/vue-query`, `@tanstack/vue-virtual` | 41.8 kB | 6.0× |
+| React 19 | 4 — `react`, `react-dom`, `@tanstack/react-query`, `@tanstack/react-virtual` | 84.1 kB | 12.0× |
+| Angular 19 | 5 — `@angular/core`, `@angular/common`, `@angular/platform-browser`, `@angular/cdk`, `rxjs` | 145.5 kB | 20.8× |
 
 The headline is not the multiple. It is that **the whole of Sheratan is smaller
 than the smallest single piece of any of the others**, and that reaching parity

@@ -11,7 +11,8 @@ enforced by a checker with machine-readable fixes, plus async and live data in
 the core. It's pre-release: `packages/core` holds the runtime, `packages/check` the
 checker (SHR-L001, SHR-L002, SHR-L003, SHR-L006, SHR-L007, SHR-L008, SHR-L010 and the
 one warning, SHR-T001, so far) and
-`packages/cli` the `sheratan` command, which runs the checker and nothing else yet.
+`packages/cli` the `sheratan` command: `check`, `build` and `dev` so far, with
+`create`, `generate`, `explain` and `trace` specified and not built.
 
 **Source of truth, in order:**
 1. `Docs/SPEC.md`
