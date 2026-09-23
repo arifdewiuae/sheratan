@@ -22,3 +22,11 @@ export function percent(share: number): string {
 export function signed(delta: number): string {
   return delta > 0 ? `+${String(delta)}` : String(delta);
 }
+
+/** Cents, for a value shown as money: 10.5 → "10.50". */
+const CENTS = 2;
+
+/** An order's value, fixed to cents so a column of them lines up. */
+export function money(value: number): string {
+  return value.toFixed(CENTS);
+}

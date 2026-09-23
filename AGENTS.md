@@ -69,7 +69,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `packages/check/test/` | Real TypeScript programs on disk: the whole import matrix as one project, a failing case per rule, and both apps in this repo checked clean |
 | `packages/cli/src/` | The `sheratan` command (SPEC §10): `run()` returns an exit code and writes through an injected `Terminal`, `report` holds both output formats, `strip`, `build` and `serve` turn a project into plain ESM, written to a directory or served. A folder, not a package: it folds into the same tarball |
 | `packages/cli/bin/` | The one file that owns a process: it hands `run()` the real streams and sets `process.exitCode` |
-| `examples/hello/` | The reference app in the canonical module shape (SPEC §4): a live dashboard and its e2e specs. It runs on `sheratan dev`, the shipped command, so the example and the product cannot drift |
+| `examples/hello/` | The reference app in the canonical module shape (SPEC §4): a live dashboard, a routed `/orders` layout with two screens inside it, and their e2e specs. It runs on `sheratan dev`, the shipped command, so the example and the product cannot drift |
 | `.oxlintrc.json`, `.oxfmtrc.json` | The one lint config and the one formatter config |
 | `Docs/` | SPEC, EVAL, EVAL-TASKS, TASKS, brand identity |
 | `Docs/adr/` | Decisions with a real trade-off, written up once instead of re-argued |
