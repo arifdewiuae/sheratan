@@ -28,6 +28,7 @@ const ORDER = [
   'flush',
   'html',
   'each',
+  'mount',
   'render',
 ];
 

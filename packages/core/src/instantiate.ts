@@ -198,6 +198,18 @@ function commit(marker: Comment, old: ChildNode[], value: unknown): ChildNode[] 
     return EMPTY;
   }
 
+  // Something that mounts itself — a list, a child module — owns its nodes and
+  // registers its own teardown, so the hole hands over the marker and keeps
+  // none. In a reactive hole that teardown belongs to the watcher, which
+  // resets before it re-runs: the old child goes before the new one arrives.
+  if (typeof value === 'object' && isMountable(value)) {
+    removeAll(old);
+
+    value[MOUNT](marker);
+
+    return EMPTY;
+  }
+
   if (value instanceof Template) {
     removeAll(old);
 
@@ -220,12 +232,6 @@ function commit(marker: Comment, old: ChildNode[], value: unknown): ChildNode[] 
 }
 
 function bindChild(marker: Comment, value: unknown): void {
-  if (typeof value === 'object' && value !== null && isMountable(value)) {
-    value[MOUNT](marker);
-
-    return;
-  }
-
   if (typeof value !== 'function') {
     commit(marker, EMPTY, value);
 

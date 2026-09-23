@@ -6,10 +6,15 @@ import assert from 'node:assert/strict';
 import * as api from '../src/index.ts';
 import {
   ErrorCode,
+  html,
+  mount,
   MutationStatus,
   ResourceStatus,
   SheratanError,
+  type Accessor,
   type EachWindow,
+  type ModuleView,
+  type Mounted,
   type MutationOptions,
   type ResourceOptions,
   type StreamOptions,
@@ -28,6 +33,7 @@ test('the package exports exactly its documented names', () => {
     'each',
     'flush',
     'html',
+    'mount',
     'mutation',
     'onDispose',
     'render',
@@ -115,6 +121,18 @@ test('the stream options type is exported in the shape callers write', () => {
   assert.deepEqual(Object.keys(feed).toSorted(), ['initial', 'key', 'reduce', 'subscribe']);
 
   assert.deepEqual(Object.values(StreamStatus).toSorted(), ['closed', 'connecting', 'open']);
+});
+
+// And composition: what a parent writes to render a child module. It stops
+// compiling if `ModuleView` loses its props or `mount` stops passing them.
+const ordersTable: ModuleView<{ customerId: Accessor<string> }> = (props) =>
+  html`<table data-for=${props.customerId}></table>`;
+
+test('a module view is exported in the shape a parent writes', () => {
+  const placed: Mounted = mount(ordersTable, { customerId: () => 'c1' });
+
+  assert.equal(typeof placed, 'object');
+  assert.equal(typeof mount(() => html`<p></p>`), 'object');
 });
 
 test('every runtime error code is distinct and shaped SHR-Rnnn', () => {
