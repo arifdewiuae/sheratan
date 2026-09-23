@@ -512,8 +512,10 @@ module (SHR-T001 warns when missing). End-to-end tests live in `e2e/`.
 
 ## 10. Checker output
 
-`sheratan check [directory] [--json]` checks the project whose `tsconfig.json`
-sits in `directory` (default: the current one). With `--json` it prints one
+`npx sheratan check [directory] [--json]` checks the project whose
+`tsconfig.json` sits in `directory` (default: the current one). The command
+comes with the `sheratan` package — there is nothing else to install, though the
+checker needs `typescript` in the project, which it asks for by name if missing. With `--json` it prints one
 object, `{ "version": 1, "findings": [ … ] }`, where each finding is:
 
 ```json

@@ -6,7 +6,11 @@
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { checkProject, Severity } from '../../check/src/index.ts';
+// `finding.ts` is the shape and the severities and costs nothing to load;
+// `checkProject` arrives through an `await import` below, because it brings the
+// TypeScript compiler with it and that is an optional peer dependency.
+import { Severity } from '../../check/src/finding.ts';
+import { INSTALL_TYPESCRIPT, isMissingTypescript, MISSING_TYPESCRIPT } from './peer.ts';
 import { report, reportJson } from './report.ts';
 import { Exit, paint, Style, type Terminal } from './terminal.ts';
 
@@ -34,13 +38,25 @@ export function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Why the command could not run. The compiler missing is not a fault in the
+ * project and does not read like one: it is the optional peer dependency, and
+ * the answer is an install line.
+ */
+export function reasonFor(error: unknown): string {
+  return isMissingTypescript(error)
+    ? `${MISSING_TYPESCRIPT}\n\n${INSTALL_TYPESCRIPT}`
+    : messageOf(error);
+}
+
 function fail(terminal: Terminal, problem: string): Exit {
   terminal.err(`${paint(terminal, Style.Error, 'error')} ${problem}\n\n${USAGE}`);
 
   return Exit.Usage;
 }
 
-function check(terminal: Terminal, directory: string, json: boolean): Exit {
+async function check(terminal: Terminal, directory: string, json: boolean): Promise<Exit> {
+  const { checkProject } = await import('../../check/src/check.ts');
   const findings = checkProject({ tsconfig: resolve(directory, TSCONFIG) });
 
   terminal.out(json ? reportJson(findings) : report(terminal, findings));
@@ -50,7 +66,7 @@ function check(terminal: Terminal, directory: string, json: boolean): Exit {
     : Exit.Clean;
 }
 
-function dispatch(argv: readonly string[], terminal: Terminal): Exit {
+async function dispatch(argv: readonly string[], terminal: Terminal): Promise<Exit> {
   const { values, positionals } = parseArgs({
     args: [...argv],
     options: {
@@ -87,12 +103,12 @@ function dispatch(argv: readonly string[], terminal: Terminal): Exit {
  * touches `process`, so the caller owns the streams and the exit.
  *
  * @example
- * const code = run(['check', '--json'], terminal);
+ * const code = await run(['check', '--json'], terminal);
  */
-export function run(argv: readonly string[], terminal: Terminal): Exit {
+export async function run(argv: readonly string[], terminal: Terminal): Promise<Exit> {
   try {
-    return dispatch(argv, terminal);
+    return await dispatch(argv, terminal);
   } catch (error) {
-    return fail(terminal, messageOf(error));
+    return fail(terminal, reasonFor(error));
   }
 }

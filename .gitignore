@@ -37,3 +37,6 @@ pnpm-debug.log*
 # Personal planning notes (timeline, go/kill criteria) — kept local
 Docs/PLAN.md
 Docs/how-it-works.html
+
+# `npm pack`, run by hand to inspect what publishes
+*.tgz

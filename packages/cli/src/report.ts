@@ -2,8 +2,9 @@
 // four lines an editor can click, and `--json` is the versioned machine
 // surface (SPEC §8) that an agent parses in one call.
 
-import type { Finding } from '../../check/src/index.ts';
-import { Severity } from '../../check/src/index.ts';
+// Deep into the checker on purpose: `finding.ts` is the shape and the
+// severities, and nothing in it reaches the compiler. The index would.
+import { Severity, type Finding } from '../../check/src/finding.ts';
 import { paint, Style, type Terminal } from './terminal.ts';
 
 /**

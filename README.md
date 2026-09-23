@@ -131,6 +131,18 @@ pnpm sheratan check examples/hello          # a line per violation, with the fix
 pnpm sheratan check examples/hello --json   # one versioned object, for a tool
 ```
 
+In an app that installed the framework, the same command comes with it —
+`sheratan` ships a `bin`, so there is nothing else to install:
+
+```sh
+npx sheratan check .          # exit 0 clean, 1 violations, 2 could not run
+npx sheratan check . --json   # { "version": 1, "findings": [ … ] }
+```
+
+The checker reads your code with the TypeScript compiler, so `typescript` is an
+optional peer dependency: an app that only renders installs nothing extra, and
+`sheratan check` tells you to add it if it is not there.
+
 All changes go through pull requests into `develop`; `main` is for releases.
 Read [AGENTS.md](AGENTS.md) before opening one.
 
