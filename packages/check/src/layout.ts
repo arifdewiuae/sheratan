@@ -90,11 +90,21 @@ function layerOf(path: string): Omit<Place, 'path'> | undefined {
   return { layer: moduleLayer(segments, basename(path)), module: segments[1] ?? NO_MODULE };
 }
 
-/** Where `file` sits under `root`, or nothing when it is outside the layout. */
-export function placeOf(root: string, file: string): Place | undefined {
+/**
+ * `file` as the project prints it — relative to the app root, forward slashes —
+ * or nothing when it is outside the root entirely.
+ */
+export function pathOf(root: string, file: string): string | undefined {
   const path = relative(root, file).split(sep).join('/');
 
-  if (path.startsWith('..') || isAbsolute(path) || TEST_FILE.test(path)) return undefined;
+  return path.startsWith('..') || isAbsolute(path) ? undefined : path;
+}
+
+/** Where `file` sits under `root`, or nothing when it is outside the layout. */
+export function placeOf(root: string, file: string): Place | undefined {
+  const path = pathOf(root, file);
+
+  if (path === undefined || TEST_FILE.test(path)) return undefined;
 
   const place = layerOf(path);
 

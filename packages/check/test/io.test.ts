@@ -100,7 +100,7 @@ test('effects, services, app.ts and the rest of the layout may do I/O', () => {
       'services/http.ts': io,
       'app.ts': io,
       'lib/clock.ts': io,
-      'ui/button.ts': io,
+      'ui/button/button.view.ts': io,
       'modules/todo/todo.view.test.ts': io,
     }),
     [],

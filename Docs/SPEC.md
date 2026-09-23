@@ -134,9 +134,9 @@ app.ts              composition root
 e2e/                end-to-end tests
 ```
 
-`shared/` is a banned directory name (`SHR-L003`). It groups by ownership ("used in more
-than one place") rather than by purpose, and becomes a second application
-without rules. Everything that would go there belongs to one of the categories
+`shared/` is a banned directory name at any depth (`SHR-L003`). It groups by ownership
+("used in more than one place") rather than by purpose, and becomes a second
+application without rules. Everything that would go there belongs to one of the categories
 above.
 
 - **Shared state is an ordinary module.** Current user, feature flags, theme →
@@ -144,9 +144,10 @@ above.
   dangerous code in an app and must live under the same rules, not beside them.
 - **`ui/` components are folders, not files:** `ui/button/button.view.ts`,
   `button.css`, `button.test.ts`, `index.ts`. They have no state and no
-  effects, so they are not modules. Nesting inside `ui/` is at most one level —
-  the component itself (`SHR-L003`). Namespacing is by prefix (`ui/form-input/`,
-  `ui/data-table/`), never by subdirectory.
+  effects, so they are not modules. Every file under `ui/` therefore sits in
+  exactly one component folder (`SHR-L003`): nothing loose in `ui/`, including a
+  barrel `index.ts`, and nothing below the component. Namespacing is by prefix
+  (`ui/form-input/`, `ui/data-table/`), never by subdirectory.
 - A component used by exactly one module lives **inside that module**, not in
   `ui/`. Most "hundreds of components" are local things parked in a shared
   folder just in case.
@@ -210,7 +211,7 @@ Constraints the matrix cannot express:
 | Code | Rule |
 |------|------|
 | `SHR-L002` | `*.view.ts`, `*.state.ts` and a module's other own files use no I/O global: network (`fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`), storage (`localStorage`, `sessionStorage`, `indexedDB`, `caches`), timers (`setTimeout`, `setInterval`, `requestAnimationFrame`, `requestIdleCallback`) or the page (`document`, `window`, `globalThis`, `self`, `navigator`, `location`, `history`, `alert`, `confirm`, `prompt`). A global is what the type checker resolves to the platform's declaration, so a local named `document` is not one |
-| `SHR-L003` | Project layout: no `shared/` directory; `ui/` nests at most one level (below) |
+| `SHR-L003` | Project layout: no `shared/` directory at any depth; every file under `ui/` sits in exactly one component folder (below) |
 | `SHR-L004` | Effects-only APIs — `resource()`, `mutation()`, `stream()`, `onDispose()`, `navigate()` — are called only inside `*.effects.ts` |
 | `SHR-L005` | `*.effects.ts` must not mutate state directly; it may only invoke transitions exported by `*.state.ts`. Best-effort backstop to `SHR-L010` (§13) |
 | `SHR-L006` | Module file set matches its declared kind (below) |

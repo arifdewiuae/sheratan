@@ -22,7 +22,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | 0 | Falsification | 🟡 In progress | Self-repair ✅ 60/60 · median iterations vs React not run |
 | 1 | Core | 🟡 In progress | No-build ✅ · reordering vs Solid not measured |
 | 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ |
-| 3 | Checker, CLI, template | 🟡 In progress | Checker 4 of 16 codes (L001, L002, L008, L010) · CLI and template not started |
+| 3 | Checker, CLI, template | 🟡 In progress | Checker 5 of 16 codes (L001, L002, L003, L008, L010) · CLI and template not started |
 | 4 | Agent surface, reference app | ⬜ Not started | — |
 | 5 | Re-measure, package, launch | 🟡 In progress | — |
 | +8 wks | Outside production use | ⬜ Not started | — |
@@ -172,7 +172,7 @@ publishes, and it is `sheratan`. See the spec gap on package count below.
 - [ ] `SHR-L011` statically visible mutation of a value read from a signal — `items().push(x)`, `order().status = 'shipped'` — `fix` names the replacement write (SPEC §4, ADR 0002 layer 3)
 - [ ] `SHR-L009` style scoping over `.css`: single `@scope` with lower boundary, root matches module name, `global.css` only `tokens`/`base`, no `:root` tokens in module sheets, no `!important` outside `base` — failing-case test per violation (SPEC §9a)
 - [ ] `SHR-T001` missing state/effects tests — **warning only**
-- [ ] `SHR-L003` banned `shared/` directory; `ui/` nesting max one level
+- [x] `SHR-L003` banned `shared/` directory; `ui/` nesting max one level — `packages/check/src/rules/structure.ts`: paths only, no type checker. A `shared/` segment at any depth is reported per file with the "move it by what it is" fix, and every file under `ui/` must sit in exactly one component folder — loose in `ui/` (including a barrel `index.ts`) and nested below the component each get their own message. `test/structure.test.ts`; proven to fail three ways
 - [ ] `SHR-L004` `resource` / `mutation` / `stream` / `onDispose` / `navigate` outside `*.effects.ts`
 - [ ] `SHR-V001` inline arrow function in template → error; `SHR-V002` `unsafeHTML` with non-literal argument → warning
 - [ ] `SHR-L007` contract method returning a Promise without `AbortSignal` → error (SPEC §5b)
@@ -436,3 +436,4 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-19 | A global is what the type checker resolves to a declaration file, not a name match | A name list flags `const document = …` and `page.fetch`, and misses nothing a resolver catches. The checker already has the program; resolving every reference in a file is one batched call |
 | 2026-09-19 | The `.oxlintrc.json` layer rules stay, though `SHR-L001` and `SHR-L002` catch everything they do | They are the only boundary feedback that shows while typing; the checker runs in `pnpm check` and CI. The cost is a second copy of the matrix that can drift, paid by updating both in one PR until the checker has editor feedback |
 | 2026-09-19 | `develop` and `main` are protected by a ruleset: PR required, all three CI checks required, no force-push or deletion, **no bypass** — zero approvals | Until now the PR-only rule was a habit: branch protection was off and the one ruleset was disabled and targeted no branch, so a red PR could merge. Zero approvals, because a single maintainer cannot approve their own PR; the checks are the reviewer. No admin bypass, or it is advice rather than a rule. Up-to-date-before-merge is off: stacked PRs already rebase often, and CI re-runs on `develop` after every merge |
+| 2026-09-23 | `SHR-L003` also reports a file loose in `ui/`, a barrel `ui/index.ts` included, and SPEC §4 now says so | SPEC already read "`ui/` components are folders, not files", but the checker row named only the nesting half, so half a stated rule went unenforced. One shape — `ui/<component>/<file>` — covers both mistakes and needs no type checker. A barrel is not an exception: each component's own `index.ts` is its surface, and a top-level one would re-export past it |
