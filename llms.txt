@@ -551,7 +551,7 @@ stays parseable.
 | SHR-V002 | `unsafeHTML` with a non-literal argument (warning) |
 | SHR-V003 | signal called inside a hole (warning) |
 | SHR-V004 | malformed template (error) |
-| SHR-T001 | module has no state/effects tests (warning) |
+| SHR-T001 | a module's `*.state.ts` or `*.effects.ts` has no `*.test.ts` beside it (warning) |
 
 ## Not in v0
 
