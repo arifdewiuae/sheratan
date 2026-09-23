@@ -23,7 +23,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | 1 | Core | 🟡 In progress | No-build ✅ · reordering vs Solid not measured |
 | 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ · modules compose with `mount()` ✅ |
 | 3 | Checker, CLI, template | 🟡 In progress | Checker 9 of 16 codes (L001, L002, L003, L004, L006, L007, L008, L010, T001) · CLI: `check`, `build` and `dev` ship in the tarball, 5 commands to go · template not started |
-| 4 | Agent surface, reference app | ⬜ Not started | — |
+| 4 | Agent surface, reference app | 🟡 In progress | Routing in core ✅ — `location`, `routes()` with nested layouts, `navigate()`, on the Navigation API; 558 B brotli |
 | 5 | Re-measure, package, launch | 🟡 In progress | — |
 | +8 wks | Outside production use | ⬜ Not started | — |
 
@@ -216,11 +216,13 @@ publishes, and it is `sheratan`. See the spec gap on package count below.
 - [ ] Final `llms.txt` ≤ ~8k tokens
 
 **Routing in core** (SPEC §9b)
-- [ ] `location` signal
-- [ ] Delegated `<a>` click interception (same origin, primary button, no modifiers/`target`/`download`) — opt-in in widget mode
-- [ ] `navigate()` (effects only)
-- [ ] Flat `match()` over `URLPattern`
-- [ ] Scroll and focus restoration on back/forward
+- [x] `location` signal — `packages/core/src/location.ts`. Strings only, built on first read rather than at module scope, so nothing touches the page while the runtime is being constructed (SPEC §13)
+- [x] ~~Delegated `<a>` click interception~~ — **not written**: the Navigation API's one `navigate` event covers every link, form and traversal, so there is no click handler, no origin/modifier/`target`/`download` test, and nothing to get wrong. Widget mode is honoured by intercepting only when a registered route matches, so a widget with no routes never touches its host's links (SPEC §10d)
+- [x] `navigate()` (effects only) — `packages/core/src/location.ts`, and enforced: it is in `SHR-L004`'s map
+- [x] Flat `match()` over `URLPattern` — `packages/core/src/match.ts` (internal) and `routes.ts` (the public table). A bare `match()` could not own the listener or know its patterns, which widget mode requires; SPEC §9b amended
+- [x] Scroll and focus restoration on back/forward — **not written**: `intercept()`'s `scroll` and `focusReset` defaults do it, and the handler commits in the same frame so restoration lands on the screen that just arrived
+- [x] **Nested layouts**, which SPEC §9b had deferred to an optional package — a layout is a screen holding its own table, registered while mounted. Two of the three objections (resolution order, partial matches) are answered by declaring them; the third, behaviour while a parent loads, does not arise without loaders. Guards stay post-MVP. SPEC §11 and §14 amended
+- [x] Below the browser floor: no listener, no interception, `navigate()` is a document load — the app is multi-page and every screen still works
 
 **Reference app** (SPEC §11, §12)
 - [ ] `[must]` `examples/dashboard`: modules/ + services/ + `app.ts` + `e2e/`
@@ -449,3 +451,7 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-23 | `SHR-L007` decides "returns a promise" structurally — a return type with a callable `then` — rather than by the name `Promise` | A type alias prints as its own name, so a name test would let `type Rows = Promise<Metric[]>` through, and what matters to a caller is whether they await it. The adapter reports the fact; the rule decides it is a violation, which keeps policy out of the one file that touches `typescript/unstable/*` (ADR 0005) |
 | 2026-09-23 | Language floor raised to `target: esnext`, `lib: ["es2025", "esnext.disposable", "dom", "dom.iterable"]`; esbuild's browser target to `es2024`. **`lib: ["esnext"]` deliberately refused** | Node is pinned by `.nvmrc` and the browser floor is Baseline, so the platform already has `Promise.withResolvers`, `AbortSignal.any`, `Object.groupBy` and the iterator helpers; hand-rolling them is the only thing `es2023` was buying. `esnext` as a *lib* would additionally promise `Temporal`, which is not Baseline — code would typecheck and then throw in a browser — so stage-3 libs are added one at a time by name. Neither change moved a single byte of `dist/prod`: the runtime writes no syntax `es2022` was downlevelling |
 | 2026-09-23 | `SHR-L004` resolves an effects-only API through the **import binding**, and reports the name the exporting module uses rather than the local one | A rule that matched on the identifier `stream` would report a local helper of that name and miss `import { stream as subscribe }`. The adapter hands out the exported name, the specifier and the position; the rule decides, which keeps policy out of the one file that touches `typescript/unstable/*` (ADR 0005). Shadowing is settled by the callee's symbol being an alias — a local declared over the import is not one — the same test `io.ts` uses to tell a local `document` from the page |
+| 2026-09-23 | Routing is built on the **Navigation API**, not `pushState` + `popstate`; SPEC §9b amended | It became Baseline in January 2026, and it deletes the two pieces §9b was going to hand-write: delegated `<a>` interception (one event covers every link, form and traversal) and scroll/focus restoration (`intercept()`'s `scroll` and `focusReset` defaults). Below the floor core installs no listener at all, so a link is an ordinary document load and every screen still works — multi-page instead of single-page, with no second implementation to keep alive |
+| 2026-09-23 | `routes(table)` replaces SPEC §9b's bare `match(location(), table)` | A pure `match()` cannot own the one `navigate` listener or know which patterns exist, so interception would have to cover every same-origin navigation — which §10d forbids, because in widget mode the host app owns routing. A table that knows its own patterns intercepts only what it matches, so a widget that registers no routes needs no opt-in flag |
+| 2026-09-23 | A screen is rebuilt when its **matched pattern** changes, not when the URL changes; handlers take params as an accessor | Without it a shell matched by `/app/:rest*` would be destroyed on every navigation inside it, which is what made nested layouts expensive. With it, nested layouts are a screen holding its own table and need no match tree. It also fixes the flat case: `/orders/1` to `/orders/2` keeps the module. The accessor is the rule `mount()` props already follow (SPEC §9a) |
+| 2026-09-23 | Nested layouts move **into** core, against §9b's original deferral | §9b held them out for resolution order, partial matches, and behaviour while a parent is still loading. The first two are answered by declaring them — first match in table order wins, every table carries its own `'*'`. The third is a loader-lifecycle problem and there are no loaders: §9b already says loading races are free because `resource()` aborts on key change. Guards and a cross-table match tree stay post-MVP, so the boundary moved rather than disappeared |

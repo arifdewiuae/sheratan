@@ -1181,49 +1181,115 @@ Importing another module directly from a view remains a checker error.
 The URL is an **input effect**: read as a source, written as an effect, subject
 to the same layer rules. Views never touch `history`; views emit intents.
 
-The browser already provides most of it — `<a href>` works on its own,
-`URLPattern` matches paths natively, `pushState` + `popstate` cover navigation,
-and View Transitions handle animation. What the browser does not provide, and
-what therefore ships in core:
+The browser provides almost all of it. `URLPattern` matches paths natively, and
+the **Navigation API** — Baseline since January 2026 — turns every same-document
+navigation into one event a page may intercept, which removes the two pieces
+routers used to hand-write: delegated `<a>` click interception, and scroll and
+focus restoration on back and forward. What ships in core is what is left.
 
-- `location` as a signal
-- delegated click interception for `<a>` (same origin, primary button, no
-  Ctrl/Cmd/Shift, no `target`, no `download`) — trivial, and always written
-  wrong when left to the user
-- `navigate()`, callable only from `*.effects.ts` (`SHR-L004`)
-- scroll and focus restoration on back/forward
-- **flat path matching** — a thin wrapper over `URLPattern`, roughly thirty
-  lines, and a plain `computed` rather than new machinery:
+### The surface
 
 ```ts
-const page = computed(() => match(location(), {
-  '/orders':      () => ordersList,
-  '/orders/:id':  ({ id }) => orderDetail,
-}));
+location(): Location
+routes<T>(table: RouteTable<T>): Accessor<T | undefined>
+navigate(to: string, options?: NavigateOptions): void
+
+interface Location {
+  readonly href: string;        // the whole URL, normalised
+  readonly pathname: string;    // what a route matches on
+  readonly search: string;
+  readonly hash: string;
+}
+
+type RouteParams = Readonly<Record<string, string>>;
+type RouteTable<T> = Readonly<Record<string, (params: Accessor<RouteParams>) => T>>;
+
+interface NavigateOptions {
+  readonly replace?: boolean;   // Back skips this entry
+  readonly state?: unknown;     // restored when the entry is traversed back to
+}
 ```
 
-Without `match()` the core looks unfinished — it would hand the user a URL
-signal and no way to act on it. Flat routes must work with zero dependencies.
+`Location` holds strings and nothing else: a signal freezes what it stores, and
+a `URL` is not opaque to `DeepReadonly`, so storing one would hand out a mapped
+copy of a live object. `navigate()` is callable only from `*.effects.ts`
+(`SHR-L004`).
 
-Loading races are free: `resource()` aborts on key change, and the key includes
-`location()`. There is no loader lifecycle to invent.
+### A table, not a match call
 
-That leaves exactly one thing that is genuinely a router — **nested layouts**
-(`/app/*` renders a shell, `/app/orders/:id` renders inside it). The reason it
-stays out of core is policy, not size: a match tree needs resolution order,
-behaviour while a parent is still loading, and a rule for partial matches.
-These are the questions routers disagree about. Hence optional
-`@sheratan/router`, post-MVP.
+```ts
+const screen = routes({
+  '/':           () => mount(createHome()),
+  '/orders':     () => mount(createOrders(api)),
+  '/orders/:id': (params) => mount(createOrder(api), { id: () => params().id }),
+  '*':           () => mount(createNotFound()),
+});
+```
 
-Documented boundary: **single-level routes work out of the box; nested layouts
-are a separate install.**
+Patterns are tried **in the order they are written**, and the first that matches
+wins — a resolution rule the author can read off their own table rather than
+infer. Nothing matching yields `undefined`, which renders nothing; a `'*'` row
+is how a table says what happens instead.
 
-Validation: if the reference app can be built without the router package, the
-boundary is right. If nested layouts are needed on the first screen, they
-belong in core — and that must be discovered in Week 4, not after release.
+A bare `match(location(), { … })` was the earlier shape and does not survive
+widget mode. A pure function has no way to own the one `navigate` listener or to
+know which patterns exist, so the listener would have to intercept every
+same-origin navigation — and §10d forbids exactly that, because the host app
+owns routing. `routes()` knows its own patterns, so **a navigation is intercepted
+only when a registered route matches it**, and a widget that registers no routes
+leaves its host's links alone without opting into anything.
 
-Positioning line that falls out of this: routing is `<a href>`, `URLPattern`,
-and a resource whose key depends on the URL.
+### A screen is rebuilt when its pattern changes
+
+Not when the URL changes. `/orders/1` to `/orders/2` keeps the module and hands
+it new params, which is why a handler receives `params` as an **accessor** and
+not a value — the same rule `mount()` props already follow (§9a). Passing the
+read value instead is the reactivity trap of §9 at a route boundary.
+
+Two things follow. Loading races stay free, because `resource()` aborts on key
+change and the key can include `location()`. And a **layout is an ordinary
+screen that holds its own table**:
+
+```ts
+// the shell matched by '/app/:rest*'
+const inner = routes({
+  '/app/orders':     () => mount(createOrders(api)),
+  '/app/orders/:id': (params) => mount(createOrder(api), { id: () => params().id }),
+  '*':               () => mount(createShellIndex()),
+});
+
+html`<div class="shell"><nav>…</nav><main>${inner}</main></div>`
+```
+
+Moving between the inner routes does not rebuild the shell, because the shell's
+own pattern still matches. A nested table registers while its screen is mounted
+and unregisters when the screen is disposed, so the set of routes the listener
+will intercept is exactly the set currently on screen.
+
+Nested layouts were held out of core on the grounds that a match tree needs
+resolution order, a rule for partial matches, and behaviour while a parent is
+still loading. The first two are answered by declaring them — first match wins,
+and every table says its own fallback. The third does not arise: it is a loader
+lifecycle problem, and Sheratan has no loaders. What stays out is **guards** and
+a match tree that resolves across tables, which remain post-MVP.
+
+### Below the browser floor
+
+Without the Navigation API, core installs no listener and intercepts nothing. An
+`<a href>` performs an ordinary document load, which re-runs the app at the new
+URL; `location()` reads that URL, `routes()` matches it, and `navigate()` is
+`location.assign()`. Every screen still works — the app is multi-page instead of
+single-page, which is what a link did before any of this existed. There is no
+second routing implementation to keep alive, and no error to explain.
+
+Documented boundary: **flat and nested tables work out of the box; guards and a
+cross-table match tree are not in v0.**
+
+Validation: if the reference app needs a routing package, the boundary is wrong,
+and that must be discovered in Week 4 rather than after release.
+
+Positioning line that falls out of this: routing is `<a href>`, `URLPattern`, and
+a resource whose key depends on the URL.
 
 ## 10. Agent surface
 
@@ -1421,7 +1487,8 @@ packages/
   check/       TS-API based rule checker                (dev only)
   cli/         create / generate / check / dev
                folders, not packages: both fold into the one `sheratan` tarball
-  router/      post-MVP, optional — path matching, layouts, guards
+  router/      post-MVP, optional — guards and a cross-table match tree;
+               path matching and nested layouts are in core (§9b)
 examples/
   dashboard/   reference app: real-time dashboard over heavy data —
                streams, a 500-row virtualized table, errors, forms
@@ -1512,5 +1579,5 @@ Three empirical questions, each with a deadline and a way to answer it.
 | Question | When | How it gets answered |
 |---|---|---|
 | Do typed holes + runtime validation + checker remove the desire for a compiler? | Week 4 | Build the reference app and count the errors that slipped through |
-| Is flat `match()` enough, or are nested layouts needed on the first screen? | Week 4 | If the reference app needs `@sheratan/router`, nested layouts belong in core |
+| ~~Is flat `match()` enough, or are nested layouts needed on the first screen?~~ | **Answered** | Nested layouts are in core (§9b): a layout is a screen holding its own table, and the policy §9b feared — behaviour while a parent loads — does not arise without loaders. Guards remain the open half |
 | Does `app.ts` become a 300-line wall on a large module tree? | Week 1 | Nested factories are already legal; verify the ergonomics rather than assume |

@@ -30,6 +30,9 @@ const ORDER = [
   'each',
   'mount',
   'render',
+  'location',
+  'routes',
+  'navigate',
 ];
 
 const DECLARATION =

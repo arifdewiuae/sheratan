@@ -1,6 +1,6 @@
 // SHR-L004 (SPEC §4): the effects-only APIs are called in `*.effects.ts` and
 // nowhere else. Each starts something that outlives the call — a request, a
-// subscription, a teardown — and the module contract keeps
+// subscription, a teardown, a navigation — and the module contract keeps
 // everything that outlives a call in one file, so there is one place to read
 // when a module leaks, refetches, or navigates when it should not.
 //
@@ -11,9 +11,6 @@
 import { docsFor, RuleCode, Severity, type Finding } from '../finding.ts';
 import { Layer, NO_MODULE, placeOf, type Place } from '../layout.ts';
 import type { CallUse, Program } from '../typescript.ts';
-
-// SPEC §4 names a fifth, `navigate()`. It joins this map when the router
-// exports it: a rule cannot resolve an import that does not exist.
 
 /** The package these APIs come from; a same-named export of another is not one. */
 const RUNTIME = 'sheratan';
@@ -58,6 +55,14 @@ const EFFECTS_ONLY: ReadonlyMap<string, Api> = new Map([
     {
       does: 'registers teardown the runtime cannot see',
       fix: (effects: string) => `Register the teardown in ${effects}, beside the thing it undoes.`,
+    },
+  ],
+  [
+    'navigate',
+    {
+      does: 'changes the URL',
+      fix: (effects: string) =>
+        `Call it from ${effects} as an intent the view triggers; a view emits intents, it never acts.`,
     },
   ],
 ]);

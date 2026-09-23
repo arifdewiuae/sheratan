@@ -7,8 +7,8 @@ wrong or the rule gets amended in the same change, never silently ignored.
 ## What this is
 
 Sheratan is a frontend framework with one legal way to structure an app,
-enforced by a checker with machine-readable fixes, plus async and live data in
-the core. It's pre-release: `packages/core` holds the runtime, `packages/check` the
+enforced by a checker with machine-readable fixes, plus async, live data and
+routing in the core. It's pre-release: `packages/core` holds the runtime, `packages/check` the
 checker (SHR-L001, SHR-L002, SHR-L003, SHR-L004, SHR-L006, SHR-L007, SHR-L008, SHR-L010 and the
 one warning, SHR-T001, so far) and
 `packages/cli` the `sheratan` command: `check`, `build` and `dev` so far, with
@@ -62,7 +62,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 
 | Path | What |
 |---|---|
-| `packages/core/src/` | Runtime. Graph (`graph`, `signal`, `computed`, `watch`, `scheduler`, `owner`), templates (`template`, `instantiate`, `each`, `lis`, `mount`, `render`, `dom`), errors (`codes`, `messages`, `env`, `env.prod`, `errors`), entries (`index` public, `internal` test-only) |
+| `packages/core/src/` | Runtime. Graph (`graph`, `signal`, `computed`, `watch`, `scheduler`, `owner`), templates (`template`, `instantiate`, `each`, `lis`, `mount`, `render`, `dom`), routing (`location`, `match`, `routes`), errors (`codes`, `messages`, `env`, `env.prod`, `errors`), entries (`index` public, `internal` test-only) |
 | `packages/core/test/` | `node:test` suites; DOM via happy-dom |
 | `packages/core/scripts/` | Build (`build-prod`, `build-cli`), package checks (`verify-types`, `verify-cli`, `size`), docs (`llms`) |
 | `packages/check/src/` | The checker (`sheratan check`): `typescript` (the one adapter over `typescript/unstable/*`), `layout` (path → layer), `matrix` (SPEC §4's table as data), `rules/` (one file per code), `check` (`checkProject()`). A folder, not a package: it folds into the `sheratan` tarball |
