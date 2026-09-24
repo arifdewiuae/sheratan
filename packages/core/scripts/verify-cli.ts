@@ -4,7 +4,9 @@
 //
 // It also proves the halves of the optional peer dependency: with no compiler
 // resolvable, `check` answers with an install line rather than a resolver's
-// stack trace, and `--help` still answers at all.
+// stack trace, and `--help` still answers at all. And it proves `create`, which
+// is the one command whose data — the template — is shipped beside the bundle
+// rather than inside it.
 
 import { cp, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -23,6 +25,16 @@ const EXECUTABLE = 0o111;
 
 const CLEAN = 0;
 
+/** What a scaffolded app must contain before anything else is believed. */
+const SCAFFOLDED: readonly string[] = [
+  'package.json',
+  'index.html',
+  'app.ts',
+  'styles/global.css',
+  'services/devices.contract.ts',
+  'modules/devices/index.ts',
+];
+
 const CANNOT_RUN = 2;
 
 interface Run {
@@ -38,6 +50,20 @@ function sheratan(entry: string, args: readonly string[], cwd: string): Run {
 function expect(condition: boolean, complaint: string): void {
   if (!condition) throw new Error(complaint);
 }
+
+// The version a scaffolded app is told to install is written down rather than
+// resolved at run time, so this is the only thing keeping it true.
+const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')) as {
+  version: string;
+};
+
+const constant = await readFile(resolve(root, '../cli/src/version.ts'), 'utf8');
+
+expect(
+  constant.includes(`'${manifest.version}'`),
+  `RUNTIME_VERSION in packages/cli/src/version.ts disagrees with packages/core/package.json ` +
+    `(${manifest.version}); a scaffolded app would ask npm for a version that is not this one.`,
+);
 
 const mode = (await stat(command)).mode;
 
@@ -58,6 +84,10 @@ const bare = await mkdtemp(resolve(tmpdir(), 'sheratan-cli-'));
 
 await cp(resolve(root, 'dist/cli'), resolve(bare, 'cli'), { recursive: true });
 
+// The template rides beside the bundle, and `create` finds it with one
+// relative URL — so the copy has to keep them the same distance apart.
+await cp(resolve(root, 'dist/template'), resolve(bare, 'template'), { recursive: true });
+
 const alone = resolve(bare, 'cli/sheratan.js');
 const helped = sheratan(alone, ['--help'], bare);
 
@@ -74,6 +104,34 @@ expect(
 expect(
   unchecked.stderr.includes('npm install -D typescript@7'),
   `a missing compiler must say what to install: ${unchecked.stderr}`,
+);
+
+// `create` needs no compiler either: it copies a directory and edits one
+// manifest, which is the whole command.
+const made = resolve(bare, 'shop');
+const created = sheratan(alone, ['create', made], bare);
+
+expect(
+  created.status === CLEAN,
+  `create needs no compiler, but exited ${String(created.status)}: ${created.stderr}`,
+);
+
+const present = await Promise.all(
+  SCAFFOLDED.map(async (file) => (await readFile(resolve(made, file), 'utf8')).length > 0),
+);
+
+expect(present.every(Boolean), `the scaffolded app is missing one of ${SCAFFOLDED.join(', ')}`);
+
+const scaffolded = JSON.parse(await readFile(resolve(made, 'package.json'), 'utf8')) as {
+  name: string;
+  dependencies: Record<string, string>;
+};
+
+expect(scaffolded.name === 'shop', `the app was named ${scaffolded.name}, not after its folder`);
+
+expect(
+  scaffolded.dependencies['sheratan'] === `^${manifest.version}`,
+  `the app asks for sheratan@${String(scaffolded.dependencies['sheratan'])}, not ^${manifest.version}`,
 );
 
 // `build` is the other half of the optional peer dependency: it strips types
@@ -104,5 +162,5 @@ expect(emitted.includes("'./modules/todo/index.js'"), `build left a .ts import: 
 expect(!emitted.includes(': string'), `build left a type annotation behind: ${emitted}`);
 
 process.stdout.write(
-  'the built command checks, builds, helps and asks for the compiler it needs\n',
+  'the built command creates, checks, builds, helps and asks for the compiler it needs\n',
 );

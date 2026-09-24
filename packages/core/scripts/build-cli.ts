@@ -9,8 +9,8 @@
 // splitting is what keeps that import in a chunk of its own, so `--help` and
 // the missing-compiler message work with no TypeScript installed.
 
-import { chmod, readFile, rm } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { chmod, cp, readFile, rm } from 'node:fs/promises';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { build } from 'esbuild';
@@ -19,6 +19,15 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const entry = resolve(root, '../cli/bin/sheratan.ts');
 const outdir = resolve(root, 'dist/cli');
 const command = resolve(outdir, 'sheratan.js');
+
+// `sheratan create` copies this tree. It sits beside `dist/cli` rather than
+// inside it, so `new URL('../template/', import.meta.url)` names it both from
+// the bundle and from `packages/cli/src/` — one expression, no build-only path.
+const templateFrom = resolve(root, '../cli/template');
+const templateTo = resolve(root, 'dist/template');
+
+/** Never shipped: the workspace link tree that makes the template checkable here. */
+const NOT_TEMPLATE: ReadonlySet<string> = new Set(['node_modules', 'dist']);
 
 /** esbuild keeps the entry's own hashbang; this is the assertion that it did. */
 const SHEBANG = '#!/usr/bin/env node';
@@ -29,6 +38,7 @@ const EXECUTABLE = 0o755;
 // Chunk names carry a content hash, so yesterday's chunks would otherwise ride
 // along in the tarball for ever.
 await rm(outdir, { recursive: true, force: true });
+await rm(templateTo, { recursive: true, force: true });
 
 await build({
   entryPoints: [entry],
@@ -57,4 +67,10 @@ if (!bundle.startsWith(SHEBANG)) {
 
 await chmod(command, EXECUTABLE);
 
+await cp(templateFrom, templateTo, {
+  recursive: true,
+  filter: (source) => !NOT_TEMPLATE.has(basename(source)),
+});
+
 process.stdout.write(`built ${command} (${String(Buffer.byteLength(bundle))} bytes)\n`);
+process.stdout.write(`copied the create template to ${templateTo}\n`);

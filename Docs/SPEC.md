@@ -1478,9 +1478,24 @@ Instead, the template ships:
 - **~10 `ui/` primitives copied into the user's project**, not installed:
   Button, Input, Select, Modal, Table, Toast. shadcn's model, and it fits here
   exactly because `ui/` components are stateless by definition. They belong to
-  the user and are theirs to edit.
+  the user and are theirs to edit. **Not shipped yet** — the template has no
+  `ui/` directory, and the coverage list below reads `mount()` of a nested
+  module in its place until they land.
 - **Browser primitives over hand-rolled ones** — `<dialog>`, the popover API,
   `<details>`. Half of a typical UI kit is unnecessary in 2026.
+
+**The template is real code, not a string table.** It lives at
+`packages/cli/template/` as a workspace member of this repository, so it is
+typechecked, linted, tested and run through `sheratan check` by `pnpm check`
+like anything else. `sheratan create` copies that directory and edits exactly
+two things in `package.json`: the app's name, and the runtime version it
+depends on. There is no second copy of the template to keep in step, which is
+the failure mode a string table has and this does not.
+
+Two of the template's `package.json` scripts are written by the scaffolder
+rather than carried in the file — `dev`, `build` and `check` only mean
+something in a scaffolded app, and a `build` script in the repository would
+make `pnpm -r build` build the template.
 
 Tailwind is mentioned in the docs as compatible (no runtime, template-agnostic)
 but is never wired into `create` — that would reintroduce a build step.
@@ -1492,11 +1507,18 @@ world: it must exercise **every rule at least once**, so that the first thing
 both a human and an agent read is a correct, complete example.
 
 Required coverage: all four files; a contract-backed service passed in by
-factory; a `resource()`; a `stream()`; a `computed` deriving view shape rather
-than storing it; an atomic transition committing two responses at once; an
-`each` with a window; a `mount()` of a `ui/` primitive; an `onDispose()`; a
-scoped stylesheet that relies on tokens from `global.css` (§9a); and both test
-files populated with real assertions.
+factory; a `resource()`; a `mutation()` with an optimistic update and a
+rollback; a `stream()`; a `computed` deriving view shape rather than storing
+it; an atomic transition committing two responses at once; an `each` with a
+window; a `mount()` of a nested module — a `ui/` primitive once those ship; an
+`onDispose()`; a scoped stylesheet that relies on tokens from `global.css`
+(§9a); and both test files populated with real assertions.
+
+The module is a device-telemetry board, and its domain is deliberately not the
+domain of the Week 0 eval tasks (EVAL-TASKS §1.1). The template is the Sheratan
+arm of that eval, so a canonical module in the eval's own domain would hand
+that arm a worked answer the control arm never sees, and the gate would measure
+the template rather than the framework.
 
 Two constraints:
 
@@ -1506,6 +1528,16 @@ Two constraints:
 2. **CI asserts the canonical module passes `sheratan check` and that every
    rule code is exercised by it.** Otherwise the example rots and starts
    teaching the wrong thing.
+
+Both halves of that second constraint are asserted in
+`packages/check/test/template.test.ts`, and they are different assertions.
+*Every rule code* is proved by breaking the template nine ways, once per code,
+and requiring the checker to answer with that code — a rule added without a
+mutation fails the suite, because the list of mutations is compared against
+`RuleCode` itself rather than against a number. *The coverage list above* is
+proved separately, by reading the template's own source for each item: dropping
+`stream()` breaks no rule, so without that second assertion the template could
+quietly teach less than this section promises.
 
 This is the highest-leverage documentation in the project: ten correct files in
 every new repo beat any number of documentation pages at suppressing
@@ -1614,6 +1646,8 @@ packages/
   check/       TS-API based rule checker                (dev only)
   cli/         create / generate / check / dev
                folders, not packages: both fold into the one `sheratan` tarball
+               template/ the app `create` writes — real code, checked by CI,
+               copied to dist/template beside the bundle
   router/      post-MVP, optional — guards and a cross-table match tree;
                path matching and nested layouts are in core (§9b)
 examples/

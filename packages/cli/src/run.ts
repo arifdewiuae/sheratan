@@ -3,7 +3,7 @@
 // makes is returned as an exit code rather than taken on the process, so a
 // test runs the whole command and reads the answer.
 
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 // `finding.ts` is the shape and the severities and costs nothing to load;
@@ -11,9 +11,10 @@ import { parseArgs } from 'node:util';
 // TypeScript compiler with it and that is an optional peer dependency.
 import { Severity } from '../../check/src/finding.ts';
 import { buildProject } from './build.ts';
-import { FALLBACK_FILE } from './project.ts';
+import { FALLBACK_FILE, RUNTIME } from './project.ts';
 import { INSTALL_TYPESCRIPT, isMissingTypescript, MISSING_TYPESCRIPT } from './peer.ts';
 import { report, reportJson } from './report.ts';
+import { scaffoldApp } from './scaffold.ts';
 import { serve } from './serve.ts';
 import { Exit, paint, Style, type Terminal } from './terminal.ts';
 
@@ -27,24 +28,30 @@ const HERE = '.';
 const OUT = 'dist';
 
 /** What this build of the command can actually do, named once. */
-const SHIPPED = 'check, build and dev';
+const SHIPPED = 'create, check, build and dev';
 
 /** The port `dev` asks for first; a busy one moves it up, it does not stop it. */
 const PORT = 5173;
 
 /** Specified in SPEC §10, not built yet. Naming them beats "unknown command". */
-const PLANNED: readonly string[] = ['create', 'generate', 'explain', 'trace'];
+const PLANNED: readonly string[] = ['generate', 'explain', 'trace'];
 
-const USAGE = `sheratan check [directory] [--json]
+const USAGE = `sheratan create <app>
+sheratan check [directory] [--json]
 sheratan build [directory] [--out ${OUT}]
 sheratan dev   [directory] [--port ${String(PORT)}] [--no-reload]
 
+  app          the directory a new app is written into; it must not already exist
   directory    the project, the folder holding ${TSCONFIG} and index.html; defaults to ${HERE}
   --json       print one versioned JSON object, for an agent or an editor
   --out        where build writes, emptied first; defaults to ${OUT}
   --port       the port dev asks for; a busy one moves it up
   --no-reload  do not reload open pages on save, for an e2e run
   --help, -h   this text
+
+create writes a complete app: it runs on dev, it passes check, and its one
+module exercises every rule the checker has, so the first example read is a
+correct one.
 
 dev serves the project with types stripped on the way out, and build writes the
 same thing to a directory. No bundler, no config, no plugin pipeline, and
@@ -85,6 +92,26 @@ async function check(terminal: Terminal, directory: string, json: boolean): Prom
   return findings.some((finding) => finding.severity === Severity.Error)
     ? Exit.Violations
     : Exit.Clean;
+}
+
+/**
+ * Writes a new app, and says how to start it. The argument is a directory, so
+ * `sheratan create apps/shop` works; the app is named after its last segment,
+ * the way every other package on disk is named after its folder.
+ */
+async function create(terminal: Terminal, target: string): Promise<Exit> {
+  const root = resolve(target);
+  const app = await scaffoldApp({ root, name: basename(root) });
+
+  terminal.out(
+    `Created ${app.name} in ${app.root}, on ${RUNTIME}@${app.version}.\n\n` +
+      `  cd ${target}\n` +
+      '  npm install\n' +
+      '  npm run dev\n\n' +
+      'npm run check is the checker; npm test runs the module tests beside it.',
+  );
+
+  return Exit.Clean;
 }
 
 /** Strips the project into a directory, and says what it wrote. */
@@ -128,6 +155,15 @@ async function dev(terminal: Terminal, args: DevArgs, signal?: AbortSignal): Pro
   return Exit.Clean;
 }
 
+/** `create`'s own argument check: the directory is required, not defaulted. */
+async function created(terminal: Terminal, positionals: readonly string[]): Promise<Exit> {
+  const [, target] = positionals;
+
+  if (target === undefined) return fail(terminal, 'sheratan create needs a name for the app.');
+
+  return create(terminal, target);
+}
+
 async function dispatch(
   argv: readonly string[],
   terminal: Terminal,
@@ -152,6 +188,8 @@ async function dispatch(
 
     return Exit.Clean;
   }
+
+  if (command === 'create') return created(terminal, positionals);
 
   if (command === 'check') return check(terminal, directory, values.json);
 

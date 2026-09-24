@@ -30,15 +30,15 @@ test('no command at all is a usage error on stderr', async () => {
 
   assert.equal(await run([], terminal), Exit.Usage);
   assert.deepEqual(out, []);
-  assert.match(err.join(''), /needs a command; this build ships check/);
+  assert.match(err.join(''), /needs a command; this build ships create, check/);
   assert.match(err.join(''), USAGE);
 });
 
-test('a command SPEC specifies but Week 3 has not built says so by name', async () => {
+test('a command SPEC specifies but this build has not shipped says so by name', async () => {
   const { terminal, err } = recorder();
 
-  assert.equal(await run(['create'], terminal), Exit.Usage);
-  assert.match(err.join(''), /sheratan create is specified but not built yet/);
+  assert.equal(await run(['generate'], terminal), Exit.Usage);
+  assert.match(err.join(''), /sheratan generate is specified but not built yet/);
 });
 
 test('a command that does not exist at all is told apart from one that will', async () => {

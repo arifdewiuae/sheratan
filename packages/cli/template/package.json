@@ -1,0 +1,23 @@
+{
+  "name": "sheratan-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The `sheratan create` template. A workspace member here so the repo typechecks, lints and tests it; the scaffolder rewrites its name and its runtime version on the way out.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --conditions=development --test \"{lib,modules,services}/**/*.test.ts\"",
+    "lint": "oxlint",
+    "format": "oxfmt"
+  },
+  "dependencies": {
+    "sheratan": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.4",
+    "happy-dom": "20.14.5",
+    "oxfmt": "0.67.0",
+    "oxlint": "1.82.0",
+    "typescript": "7.0.2"
+  }
+}

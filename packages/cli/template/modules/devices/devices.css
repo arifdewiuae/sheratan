@@ -1,0 +1,144 @@
+/* The devices module's styles (SPEC §9a). Every rule lives inside one @scope
+   block keyed to the class the view puts on the module root, with a lower
+   boundary at any nested module: a parent's `.reading` can never reach into a
+   child's. The root is a class and not `[data-module=…]` because Gecko
+   collapses two scoping roots that differ only by attribute value — see the
+   matrix in SPEC §9a. Tokens come from styles/global.css, because custom
+   properties inherit through the boundary; the layer comes from the `@import`
+   there, which is why there is no `@layer` rule here. */
+
+@scope (.module-devices) to ([data-module], [data-ui]) {
+  :scope {
+    max-width: 46rem;
+    margin: 0 auto;
+    display: grid;
+    gap: calc(var(--space) * 2);
+  }
+
+  .head h1 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  .sub {
+    margin: 0.25rem 0 0;
+    color: var(--t55);
+    font-size: 0.95rem;
+  }
+
+  .note {
+    margin: 0;
+    color: var(--t55);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+  }
+
+  .note.error {
+    color: var(--ink);
+  }
+
+  .filter {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--t55);
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .filter select {
+    border: 1px solid var(--hair);
+    border-radius: 0;
+    padding: 0.35rem 0.6rem;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    text-transform: none;
+    cursor: pointer;
+  }
+
+  .filter select:hover {
+    border-color: var(--ink);
+  }
+
+  /* The scroll viewport a windowed `each` is sized against. Its height comes
+     from `--list-h`, published by the view from the same constant the window
+     arithmetic divides by, so the two cannot drift (SPEC §9). */
+  .devices {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: var(--list-h);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Scroll anchoring has to be off in a windowed list. The spacer above the
+       rows changes height on every scroll step; the browser would compensate
+       by moving scrollTop, which fires another scroll event, and the list
+       would run to its own end. */
+    overflow-anchor: none;
+    border-top: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+  }
+
+  /* `each`'s spacers stand in for the rows that are not in the DOM. Never an
+     anchor: a box whose whole job is to change height is the worst possible
+     thing for the browser to hold still against. */
+  .devices > [role='presentation'] {
+    border: 0;
+    overflow-anchor: none;
+  }
+
+  /* Height comes from `--row-h`, which the view publishes from one TypeScript
+     constant: a windowed list needs a row height it can trust. `border-box`
+     in the base layer is what makes the border free. */
+  .device {
+    display: grid;
+    grid-template-columns: 1fr 7rem 5.5rem 7rem;
+    align-items: center;
+    gap: var(--space);
+    height: var(--row-h);
+    padding: 0 var(--space);
+    border-bottom: 1px solid var(--hair);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .device-room {
+    color: var(--t55);
+  }
+
+  .calibrate {
+    border: 1px solid var(--hair);
+    border-radius: 0;
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .calibrate:hover:not(:disabled) {
+    border-color: var(--ink);
+  }
+
+  .calibrate:disabled {
+    color: var(--t55);
+    cursor: progress;
+  }
+
+  @media (max-width: 34rem) {
+    .device {
+      grid-template-columns: 1fr 5rem 6rem;
+    }
+
+    .device-room {
+      display: none;
+    }
+  }
+}

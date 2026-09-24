@@ -222,6 +222,28 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  packages/cli/template:
+    dependencies:
+      sheratan:
+        specifier: workspace:*
+        version: link:../../core
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.4
+        version: 24.13.4
+      happy-dom:
+        specifier: 20.14.5
+        version: 20.14.5
+      oxfmt:
+        specifier: 0.67.0
+        version: 0.67.0
+      oxlint:
+        specifier: 1.82.0
+        version: 1.82.0(oxlint-tsgolint@7.0.2001)
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   packages/core:
     devDependencies:
       '@arethetypeswrong/cli':

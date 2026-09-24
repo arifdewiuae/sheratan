@@ -1,0 +1,20 @@
+/* The reading module's styles (SPEC §9a). A nested module gets its own scope,
+   which is what the parent's lower boundary stops at: `.reading` here and
+   `.reading` in another module are two different things, with no naming
+   convention holding them apart. */
+
+@scope (.module-reading) to ([data-module], [data-ui]) {
+  :scope {
+    text-align: right;
+  }
+
+  .reading {
+    color: var(--ink);
+  }
+
+  .reading.out {
+    color: var(--ink);
+    font-weight: 500;
+    border-bottom: 2px solid var(--ink);
+  }
+}
