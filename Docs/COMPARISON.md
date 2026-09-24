@@ -1,14 +1,16 @@
 # What it takes to match one import
 
-**Measured 2026-09-16.** Reproduce with [`comparison/`](comparison/README.md).
+**Size measured 2026-09-16, speed 2026-09-24.** Reproduce with
+[`comparison/`](comparison/README.md).
 
 Sheratan is one package. The question this answers is what another stack has to
 install, and ship, to reach the same feature set — not "which framework is
 smaller", which is a question about nothing.
 
 Size is the least interesting axis here, and it is first only because it is the
-easiest to verify. The one that the project exists for is
-[authorability by an agent](#the-axis-nobody-else-competes-on), below.
+easiest to verify. [Speed](#how-fast-a-reorder-is) comes next because a small
+runtime that reconciles badly is worth nothing. The axis the project exists for
+is [authorability by an agent](#the-axis-nobody-else-competes-on), last.
 
 Every row is bundled by the same esbuild call, minified the same way and gzipped
 at the same level, importing only the APIs that stack needs for the capabilities
@@ -45,6 +47,53 @@ The three bold rows are where the package count comes from. Every other stack
 treats virtualization and the async request lifecycle as somebody else's
 problem, which is defensible — and which is why "React is 3 kB" is a number
 about `createElement`, not about an application.
+
+## How fast a reorder is
+
+**The Week 1 gate** (`Docs/EVAL.md`): a 500-row list, reordered, within **2× of
+Solid**. Solid is the baseline because it is the fastest of the five at exactly
+this — fine-grained, compiled, no virtual DOM — so clearing it is a claim worth
+making and failing it is a reason to stop and fix reconciliation.
+
+Both arms render the same 500 rows, apply the same 20 swaps per frame from the
+same seeded sequence, and commit once. The sample is the work inside one
+animation frame: apply the swaps, commit, and force style and layout, because a
+runtime that only queues DOM writes has not paid for them until the page is laid
+out again. 600 frames per run, 5 runs, the first 120 frames discarded.
+
+| Arm | p95 frame | p95 across the 5 runs | median frame | frames over 16.7 ms |
+|---|---|---|---|---|
+| **Sheratan** | **3.1 ms** | 2.8–3.4 ms | 1.2 ms | 0 |
+| Solid 1.9 | 2.6 ms | 2.4–2.6 ms | 1.0 ms | 0 |
+
+**1.19× of Solid on p95, 1.20× on the median frame — the gate is met.**
+
+Four sessions of 5 runs each on the same machine read **1.19×, 1.27×, 1.35× and
+1.19×** on p95, and **1.20× every time** on the median frame. The median is the
+number to trust: p95 is the thirtieth-worst frame out of six hundred, so it
+tracks whatever else the machine was doing, and the table above is one session
+rather than an average of them. Both arms are well inside the range either way.
+
+Neither arm drops a frame. At this size both finish a reorder in under a fifth
+of the budget, so the multiple is the interesting part, not the milliseconds.
+
+**The instrument was checked against a deliberately broken reconciler.** With
+`longestIncreasing()` stubbed to return nothing — so every row moves instead of
+the minimum — Sheratan reads 4.6 ms p95 and 3.9 ms median, **1.77×**. That is
+what the benchmark is for: it sees a reconciler doing 500 moves where 40 would
+do. It is also a fair warning about the gate, since a runtime that bad still
+passes a 2× bar on this workload.
+
+Why not measure the interval between frames: at 60 Hz a runtime that finishes in
+2 ms and one that finishes in 12 ms both produce 16.7 ms frames, and the number
+says nothing until one of them falls behind the display. What a reorder costs is
+the work inside the frame.
+
+**Machine and build.** Apple M2 Pro, macOS 26.6.2, Node 24.18.0, headless
+Chromium 153.0.8010.12 with background throttling off. Sheratan is its published
+production bundle, not `src`; Solid is compiled by `babel-preset-solid`, because
+measuring it through a runtime template engine would understate the baseline and
+the gate is stated against Solid at its best.
 
 ## The axis nobody else competes on
 
@@ -117,10 +166,14 @@ Read these before quoting the table.
    which shakes far worse than ESM. That is a real cost of using them, not a
    measurement artefact.
 6. **Sheratan's own number is its whole runtime.** There is no second package to
-   add later for state, data or lists. There is also no router yet: SPEC §9b
-   budgets `match()` at roughly thirty lines over `URLPattern`, but until it is
-   written that is an estimate, and it will move this number.
-7. **Bytes are the easy axis, not the important one.** Every row here would be
+   add later for state, data or lists. Routing landed after this table was
+   recorded and is not in it: `location`, `routes()` and `navigate()` cost
+   558 B brotli, and no other stack's row carries a router either, so adding
+   one is a change to every row rather than to ours.
+7. **The speed table is one workload on one machine.** Reordering is the
+   operation the gate names; it is not a benchmark suite, and nothing here says
+   anything about first paint, memory or a hundred-thousand-row table.
+8. **Bytes are the easy axis, not the important one.** Every row here would be
    unchanged if one of these frameworks shipped a checker and machine-readable
    fixes tomorrow, and that would matter far more than the kilobytes.
 
@@ -128,4 +181,5 @@ Read these before quoting the table.
 
 React 19.3.0 · React DOM 19.3.0 · Vue 3.5.42 · Svelte 5.57.0 · Solid 1.9.15 ·
 Angular 19.2.25 (`@angular/cdk` 19.2.19) · RxJS 7.8.2 · TanStack Query 5.103.0
-(Svelte 6.2.0) · TanStack Virtual 3.13–3.14 · esbuild 0.28.2
+(Svelte 6.2.0) · TanStack Virtual 3.13–3.14 · esbuild 0.28.2 · Playwright
+1.63.0 · babel-preset-solid 1.9.9

@@ -2,15 +2,17 @@
   "name": "sheratan-comparison",
   "private": true,
   "type": "module",
-  "description": "Not part of the workspace. Installs the frameworks Docs/COMPARISON.md measures.",
+  "description": "Its own pnpm root. Installs the frameworks Docs/COMPARISON.md measures, so none of them can become a dependency of Sheratan.",
   "scripts": {
-    "measure": "node measure.ts"
+    "measure": "node measure.ts",
+    "perf": "node perf/run.ts"
   },
   "devDependencies": {
     "@angular/cdk": "19.2.19",
     "@angular/common": "19.2.25",
     "@angular/core": "19.2.25",
     "@angular/platform-browser": "19.2.25",
+    "@babel/core": "7.28.5",
     "@tanstack/react-query": "5.103.0",
     "@tanstack/react-virtual": "3.14.13",
     "@tanstack/solid-query": "5.103.0",
@@ -19,7 +21,9 @@
     "@tanstack/svelte-virtual": "3.13.39",
     "@tanstack/vue-query": "5.103.0",
     "@tanstack/vue-virtual": "3.13.39",
+    "babel-preset-solid": "1.9.9",
     "esbuild": "0.28.2",
+    "playwright": "1.63.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "rxjs": "7.8.2",

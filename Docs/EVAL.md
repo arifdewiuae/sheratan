@@ -191,12 +191,16 @@ it is worth more than the numbers.
 
 Results as they land: [EVAL-RESULTS.md](EVAL-RESULTS.md). Week 0's self-repair
 half ran on 2026-09-16 and is met at 60/60; the comparison half is unmeasured.
+Week 1's gate ran on 2026-09-24 and is met at 1.19× — the method, the spread
+and the sensitivity check are in
+[COMPARISON.md](COMPARISON.md#how-fast-a-reorder-is).
 
 | When | Gate | If failed |
 |---|---|---|
 | Week 0 | One-turn self-repair ≥ 80%, and median iterations on ≥3 tasks no worse than React — measured against a small **real** signal runtime, not an empty mock | Stop. Cost: 3 days. |
 | | ↳ self-repair: **met**, 60/60, `claude-sonnet-5`, 2026-09-16 · median iterations vs React: **not run** | |
 | Week 1 | 500-row reordering within 2× of Solid | Fix reconciliation before anything else |
+| | ↳ **met**, **1.19×** on p95 frame time (Sheratan 3.1 ms, Solid 1.9 2.6 ms) and 1.20× on the median frame, 5 runs, headless Chromium, 2026-09-24 | |
 | Week 2 | Correct and leak-free first: 1000 mount/unmount cycles leave zero live subscriptions | Fix ownership before measuring anything |
 | Week 4 | 60fps under 1000 msg/sec, once keyed reconciliation is real | Scheduler or renderer is wrong; the headline claim dies |
 | Week 5 | Self-repair ≥ 80% in one turn | Ship, but lead with performance, not the AI claim |

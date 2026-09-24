@@ -27,7 +27,7 @@ const STACKS: Record<string, string> = {
     export const used = [createSignal, createMemo, createEffect, batch, onCleanup, createRoot, For, untrack, render, template, insert, effect, setAttribute, delegateEvents, QueryClient, createQuery, createVirtualizer];
   `,
   'Svelte 5': `
-    import App from './app.svelte.js';
+    import App from './app.svelte';
     import { mount, unmount, tick } from 'svelte';
     import { QueryClient, createQuery } from '@tanstack/svelte-query';
     import { createVirtualizer } from '@tanstack/svelte-virtual';
