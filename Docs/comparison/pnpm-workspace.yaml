@@ -1,0 +1,28 @@
+# This directory is its own pnpm root on purpose. `Docs/comparison/` installs
+# the frameworks the comparison measures, and none of them may become a
+# dependency of Sheratan — the repository root's workspace globs
+# (`packages/*`, `examples/*`) never reach here, and this file stops pnpm
+# walking up to find them.
+#
+# The supply-chain settings mirror the root's, for the same reasons.
+
+packages: []
+
+minimumReleaseAge: 4320
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+
+# No dependency lifecycle script runs unless listed here as true. esbuild's
+# postinstall only re-verifies the platform binary optionalDependencies
+# already supplied, and vue-demi's only picks a Vue 2/3 shim we never load.
+strictDepBuilds: true
+allowBuilds:
+  esbuild: false
+  vue-demi: false
+
+# `@babel/core` still asks for semver 6, whose releases predate npm provenance,
+# so `trustPolicy` reads the downgrade as a possible takeover. semver 7 is a
+# drop-in for the two calls Babel makes, and pinning it keeps the policy on
+# rather than turning it off for the whole directory.
+overrides:
+  semver: '^7.7.2'

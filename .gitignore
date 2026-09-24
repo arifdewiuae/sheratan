@@ -1,5 +1,13 @@
 # Dependencies (pnpm only; pnpm-lock.yaml is committed)
 node_modules/
+
+# Docs/comparison/ is its own pnpm root and installs six frameworks purely to
+# measure them. Committing its lockfile puts all six transitive trees into the
+# repository's dependency graph — which is the thing that directory exists to
+# avoid, and which makes an advisory in someone else's framework block an
+# unrelated PR. Its package.json pins every direct version exactly, and
+# COMPARISON.md lists them, which is what the rows are measured against.
+Docs/comparison/pnpm-lock.yaml
 .pnpm-store/
 package-lock.json
 yarn.lock
