@@ -18,6 +18,13 @@ Run `pnpm install` from **inside this directory**. Running it with
 `pnpm-lock.yaml`, which is not what anyone wants and is why the local
 `pnpm-workspace.yaml` exists.
 
+The lockfile this produces is **not committed**. Committing it would put six
+frameworks' transitive trees into the repository's dependency graph, which is
+the thing this directory exists to avoid — and an advisory in someone else's
+framework would then block an unrelated pull request. What the rows are
+measured against is pinned instead in `package.json`, exactly, and listed in
+[`../COMPARISON.md`](../COMPARISON.md#versions).
+
 ## Size — `pnpm measure`
 
 `measure.ts` bundles one entry per stack with esbuild — `bundle`, `minify`,
