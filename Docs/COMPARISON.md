@@ -61,28 +61,40 @@ animation frame: apply the swaps, commit, and force style and layout, because a
 runtime that only queues DOM writes has not paid for them until the page is laid
 out again. 600 frames per run, 5 runs, the first 120 frames discarded.
 
-| Arm | p95 frame | p95 across the 5 runs | median frame | frames over 16.7 ms |
-|---|---|---|---|---|
-| **Sheratan** | **3.1 ms** | 2.8–3.4 ms | 1.2 ms | 0 |
-| Solid 1.9 | 2.6 ms | 2.4–2.6 ms | 1.0 ms | 0 |
+Five sessions, each of them 5 runs, on the same machine:
 
-**1.19× of Solid on p95, 1.20× on the median frame — the gate is met.**
+| Session | Sheratan p95 | Solid p95 | ratio | Sheratan median frame | Solid median frame |
+|---|---|---|---|---|---|
+| 1 | 3.1 ms | 2.6 ms | 1.19× | 1.2 ms | 1.0 ms |
+| 2 | 3.3 ms | 2.6 ms | 1.27× | 1.2 ms | 1.0 ms |
+| 3 | 3.1 ms | 2.3 ms | 1.35× | 1.2 ms | 1.0 ms |
+| 4 | 3.1 ms | 2.6 ms | 1.19× | 1.2 ms | 1.0 ms |
+| 5 | 1.6 ms | 2.3 ms | 0.70× | 1.1 ms | 1.0 ms |
 
-Four sessions of 5 runs each on the same machine read **1.19×, 1.27×, 1.35× and
-1.19×** on p95, and **1.20× every time** on the median frame. The median is the
-number to trust: p95 is the thirtieth-worst frame out of six hundred, so it
-tracks whatever else the machine was doing, and the table above is one session
-rather than an average of them. Both arms are well inside the range either way.
+**The gate is met in every session, with margin.** The honest summary is that on
+this workload the two are at parity: **1.1–1.2× of Solid on the median frame**,
+and anywhere from **0.70× to 1.35×** on p95 — a spread wider than the gap
+between the arms, which is what it looks like when the number is bounded by the
+machine rather than by the runtime.
 
-Neither arm drops a frame. At this size both finish a reorder in under a fifth
-of the budget, so the multiple is the interesting part, not the milliseconds.
+Quote the median frame. p95 is the thirtieth-worst frame out of six hundred, so
+it picks up whatever else the machine was doing; the median moved by 0.1 ms
+across five sessions while p95 moved by 1.7 ms.
+
+Neither arm drops a frame in any session. At this size both finish a reorder in
+under a fifth of the budget, so the multiple is the interesting part, not the
+milliseconds.
 
 **The instrument was checked against a deliberately broken reconciler.** With
 `longestIncreasing()` stubbed to return nothing — so every row moves instead of
-the minimum — Sheratan reads 4.6 ms p95 and 3.9 ms median, **1.77×**. That is
-what the benchmark is for: it sees a reconciler doing 500 moves where 40 would
-do. It is also a fair warning about the gate, since a runtime that bad still
-passes a 2× bar on this workload.
+the minimum — Sheratan reads **3.9 ms on the median frame against Solid's 1.0,
+and 4.6 ms p95**. That is what the benchmark is for: a 3.9× median where the
+working reconciler sits at 1.1–1.2× is a reconciler doing 500 moves where 40
+would do, and the number says so immediately.
+
+It is also a fair warning about the gate as written: on p95 that same broken
+reconciler reads 1.77×, so it would still clear a 2× bar on this workload. The
+median frame separates them; p95 does not.
 
 Why not measure the interval between frames: at 60 Hz a runtime that finishes in
 2 ms and one that finishes in 12 ms both produce 16.7 ms frames, and the number
