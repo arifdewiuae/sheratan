@@ -14,8 +14,10 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500&family=IBM+Plex+Mono:wght@400&display=swap"
     />
+    <!-- One link, as every Sheratan page has (SPEC §9a): global.css imports the
+         module sheets itself. Linking one directly would load it outside every
+         layer, because the layer is assigned at the import. -->
     <link rel="stylesheet" href="../styles/global.css" />
-    <link rel="stylesheet" href="../modules/dashboard/dashboard.css" />
   </head>
   <body>
     <!--
@@ -85,7 +87,7 @@
       }, 1000);
 
       const view = () =>
-        html` <section class="app" data-module="dashboard">
+        html` <section class="module-dashboard" data-module="dashboard">
           <header class="head">
             <h1>No build step</h1>
             <p class="sub">Plain JavaScript, published ESM, any static file server.</p>

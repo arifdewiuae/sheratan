@@ -1,96 +1,97 @@
-/* The orders module's styles (SPEC §9a). One @scope block keyed to the
-   attribute the view puts on its root, with a lower boundary at any nested
-   module: the screens this layout mounts style themselves, and nothing here
-   reaches into them. Tokens come from styles/global.css, because custom
-   properties inherit through the boundary. */
+/* The orders module's styles (SPEC §9a). One @scope block keyed to the class
+   the view puts on its root, with a lower boundary at any nested module: the
+   screens this layout mounts style themselves, and nothing here reaches into
+   them. The root is a class and not `[data-module=…]` because Gecko collapses
+   two scoping roots that differ only by attribute value — see the matrix in
+   SPEC §9a. Tokens come from styles/global.css, because custom properties
+   inherit through the boundary; the layer comes from the `@import` there,
+   which is why there is no `@layer` rule here. */
 
-@layer modules {
-  @scope ([data-module="orders"]) to ([data-module], [data-ui]) {
-    :scope {
-      max-width: 54rem;
-      margin: 0 auto;
-      display: grid;
-      gap: calc(var(--space) * 3);
-    }
+@scope (.module-orders) to ([data-module], [data-ui]) {
+  :scope {
+    max-width: 54rem;
+    margin: 0 auto;
+    display: grid;
+    gap: calc(var(--space) * 3);
+  }
 
-    .orders-nav {
-      display: flex;
-      align-items: baseline;
-      gap: calc(var(--space) * 2);
-      border-bottom: 1px solid var(--rule);
-      padding-bottom: var(--space);
-    }
+  .orders-nav {
+    display: flex;
+    align-items: baseline;
+    gap: calc(var(--space) * 2);
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: var(--space);
+  }
 
-    .orders-nav a {
-      color: var(--ink);
-      text-decoration: none;
-      border-bottom: 2px solid transparent;
-      padding-bottom: 2px;
-    }
+  .orders-nav a {
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    padding-bottom: 2px;
+  }
 
-    .orders-nav a:hover,
-    .orders-nav a:focus-visible {
-      border-bottom-color: var(--rule);
-    }
+  .orders-nav a:hover,
+  .orders-nav a:focus-visible {
+    border-bottom-color: var(--rule);
+  }
 
-    /* The current screen, said by the view rather than guessed from the URL
-       in CSS — `location()` is state like any other. */
-    .orders-nav a[aria-current='page'] {
-      border-bottom-color: var(--ink);
-    }
+  /* The current screen, said by the view rather than guessed from the URL
+     in CSS — `location()` is state like any other. */
+  .orders-nav a[aria-current='page'] {
+    border-bottom-color: var(--ink);
+  }
 
-    .orders-count {
-      margin-left: auto;
-      color: var(--ink-dim);
-      font-family: var(--mono);
-      font-size: 0.85rem;
-    }
+  .orders-count {
+    margin-left: auto;
+    color: var(--ink-dim);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+  }
 
-    .order-table {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      gap: 1px;
-      background: var(--rule);
-      border: 1px solid var(--rule);
-    }
+  .order-table {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
 
-    .order-row {
-      display: flex;
-      justify-content: space-between;
-      gap: var(--space);
-      background: var(--paper);
-      padding: calc(var(--space) * 0.75) var(--space);
-    }
+  .order-row {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space);
+    background: var(--paper);
+    padding: calc(var(--space) * 0.75) var(--space);
+  }
 
-    .order-value {
-      font-family: var(--mono);
-      color: var(--ink-dim);
-    }
+  .order-value {
+    font-family: var(--mono);
+    color: var(--ink-dim);
+  }
 
-    .order-fields {
-      display: grid;
-      grid-template-columns: max-content 1fr;
-      gap: var(--space) calc(var(--space) * 2);
-      margin: 0 0 calc(var(--space) * 2);
-    }
+  .order-fields {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space) calc(var(--space) * 2);
+    margin: 0 0 calc(var(--space) * 2);
+  }
 
-    .order-fields dt {
-      color: var(--ink-dim);
-    }
+  .order-fields dt {
+    color: var(--ink-dim);
+  }
 
-    .order-fields dd {
-      margin: 0;
-      font-family: var(--mono);
-    }
+  .order-fields dd {
+    margin: 0;
+    font-family: var(--mono);
+  }
 
-    .note {
-      color: var(--ink-dim);
-    }
+  .note {
+    color: var(--ink-dim);
+  }
 
-    .note.error {
-      color: var(--bad, var(--ink));
-    }
+  .note.error {
+    color: var(--bad, var(--ink));
   }
 }

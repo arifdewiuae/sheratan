@@ -55,7 +55,7 @@ export function ordersView(state: OrdersState, screens: OrdersScreens): Template
 
   const listing = computed(() => (location().pathname === '/orders' ? CURRENT : NOT_CURRENT));
 
-  return html`<section class="orders" data-module="orders">
+  return html`<section class="module-orders" data-module="orders">
     <nav class="orders-nav">
       <a href="/" data-link="home">Dashboard</a>
       <a href="/orders" data-link="orders" aria-current=${listing}>All orders</a>

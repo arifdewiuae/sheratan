@@ -1,0 +1,14 @@
+/* One module sheet, in the shape SPEC §9a prescribes: a class root, a lower
+   boundary at any nested module, and no `@layer` rule — styling.css assigns
+   the layer where it imports this file. */
+
+@scope (.module-alpha) to ([data-module], [data-ui]) {
+  .row {
+    color: rgb(10, 10, 10);
+    /* A declaration no other fixture sheet sets, so the lower boundary can be
+       asserted on its own: gamma is a module inside alpha, and a parent's
+       `.row` must not reach it. Colour alone could not show that — gamma's
+       sheet is imported later and would win the cascade either way. */
+    text-decoration-line: underline;
+  }
+}

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Style scoping conformance (SPEC §9a)</title>
+    <!--
+      Not a page of the app: a fixture for styling.e2e.ts, which runs on every
+      engine because SPEC §9a has no fallback path. It lives under e2e/ so
+      `sheratan build` leaves it behind, and it uses no framework — every rule
+      it proves is a CSS rule, and a runtime in the way would only obscure which
+      of the two is wrong when it fails.
+
+      The arrangement is the one the app does not have: `beta` is a *sibling*
+      of `alpha`, not a child. Gecko collapses two scoping roots that differ
+      only by attribute value, and it does so only between siblings, which is
+      why every earlier check of this mechanism passed.
+    -->
+    <link rel="stylesheet" href="/e2e/fixtures/styling.css" />
+  </head>
+  <body>
+    <section class="module-alpha" data-module="alpha">
+      <p class="row" data-row="alpha">alpha</p>
+
+      <section class="module-gamma" data-module="gamma">
+        <p class="row" data-row="gamma">gamma, nested inside alpha</p>
+      </section>
+    </section>
+
+    <section class="module-beta" data-module="beta">
+      <p class="row" data-row="beta">beta, beside alpha</p>
+    </section>
+  </body>
+</html>

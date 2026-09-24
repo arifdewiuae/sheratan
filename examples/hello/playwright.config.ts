@@ -8,6 +8,12 @@ const PORT = 5174;
 const SERVER_TIMEOUT_MS = 30_000;
 const isCI = process.env['CI'] !== undefined;
 
+/** The spec that has to hold on every engine, and nowhere else (SPEC §9a). */
+const MATRIX_SPEC = /styling\.e2e\.ts$/;
+
+/** Playwright's names for the three engines, as `devices` spells them. */
+const MATRIX_ENGINES = ['Chrome', 'Firefox', 'Safari'] as const;
+
 export default defineConfig({
   testDir: 'e2e',
   testMatch: /.*\.e2e\.ts$/,
@@ -29,7 +35,18 @@ export default defineConfig({
     timeout: SERVER_TIMEOUT_MS,
   },
   projects: [
-    { name: 'dev build', use: devices['Desktop Chrome'] },
-    { name: 'prod build', use: devices['Desktop Chrome'] },
+    { name: 'dev build', testIgnore: MATRIX_SPEC, use: devices['Desktop Chrome'] },
+    { name: 'prod build', testIgnore: MATRIX_SPEC, use: devices['Desktop Chrome'] },
+
+    // SPEC §9a is the one mechanism with no fallback path, and the engines do
+    // not agree about it — so it is the one spec that runs on all three, while
+    // the rest of the suite stays on Chromium. Running everything everywhere
+    // would mostly measure the Navigation API's uneven support, which is a
+    // different question with its own answer in §9b.
+    ...MATRIX_ENGINES.map((engine) => ({
+      name: `styling ${engine.toLowerCase()}`,
+      testMatch: MATRIX_SPEC,
+      use: devices[`Desktop ${engine}`],
+    })),
   ],
 });

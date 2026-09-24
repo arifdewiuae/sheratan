@@ -209,7 +209,7 @@ export function dashboardView(state: DashboardState, intents: DashboardIntents):
     </ul>`;
   });
 
-  return html` <section class="app" data-module="dashboard">
+  return html` <section class="module-dashboard" data-module="dashboard">
     <header class="head">
       ${lockup()} ${intro()}
       <nav class="head-nav"><a href="/orders" data-link="orders">Orders</a></nav>
