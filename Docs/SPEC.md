@@ -1205,7 +1205,9 @@ fallback path — which makes the matrix part of the specification rather than a
 note, and `examples/hello`'s `styling.e2e.ts` runs it on every engine on every
 push.
 
-Measured 2026-09-24, headless, on Playwright 1.63.0:
+Measured 2026-09-24, headless, on Playwright 1.63.0. The one failure is
+confirmed in **release Firefox 156.0** on macOS as well, not only Playwright's
+build, so it is a Gecko behaviour rather than a test-harness artefact:
 
 | | Chromium 153 | Firefox 155 | WebKit 26.6 |
 |---|---|---|---|
@@ -1236,6 +1238,14 @@ lines, with no framework involved:
 `examples/hello` was never affected, by luck: its two module roots carried
 `class="app"` and `class="orders"` for layout, which is enough to tell them
 apart. The markup this section prescribed was not so lucky.
+
+**Nothing is shimmed, and nothing needs to be.** Gecko implements `@scope`,
+`@layer` and `@import … layer()`; every other row of the matrix passes there.
+The rule above does not tolerate the bug, it removes the precondition — a
+scoping root is a class, unique per module by construction, so two sibling
+roots can never be the indistinguishable pair the bug needs. The one case where
+two sibling roots do carry the same class is two instances of the same module,
+which are meant to look the same. A polyfill would have nothing to fill.
 
 ### Composing modules: `mount()`
 
