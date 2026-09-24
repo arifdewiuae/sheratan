@@ -71,6 +71,8 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `packages/cli/src/` | The `sheratan` command (SPEC §10): `run()` returns an exit code and writes through an injected `Terminal`, `report` holds both output formats, `strip`, `build` and `serve` turn a project into plain ESM, written to a directory or served. A folder, not a package: it folds into the same tarball |
 | `packages/cli/bin/` | The one file that owns a process: it hands `run()` the real streams and sets `process.exitCode` |
 | `packages/cli/template/` | The app `sheratan create` writes (SPEC §10b). A workspace member, so `pnpm check` typechecks, lints, tests and `sheratan check`s it — a template that is not live code is a template that rots. `build-cli.ts` copies it to `dist/template`, beside the bundle, which is why `scaffold.ts` finds it with one relative URL in both layouts. Its `dev`, `build` and `check` scripts are written by the scaffolder, not carried in the file: a `build` script here would make `pnpm -r build` build the template |
+| `packages/eval/` | The Week 0 falsification gates (EVAL §2.3), and the only package that spends money. Two instruments: **self-repair** — one restricted turn, no shell, `scripts/run.ts` — and the **task eval**, `scripts/task.ts`, an agent with a shell iterating against a hidden suite (EVAL-TASKS §1.4). An arm is a record in `src/arms/`, never a branch, so a third stack is a directory and a row. `src/frozen.ts` reads the task set out of `Docs/EVAL-TASKS.md` and refuses to run if §2 onward has moved. Deliberately outside `pnpm check` except its own unit tests and `evalkit`'s |
+| `packages/eval/evalkit/` | The deterministic fake backend every task runs against (EVAL-TASKS §1.3). Frozen. `/api`, `/ws/prices`, and the `/__control` and `/__inspect` surfaces that tests use and agents must never see — the harness proxy 404s them at the app's origin and voids any run that asks |
 | `examples/hello/` | The reference app in the canonical module shape (SPEC §4): a live dashboard, a routed `/orders` layout with two screens inside it, and their e2e specs. It runs on `sheratan dev`, the shipped command, so the example and the product cannot drift |
 | `.oxlintrc.json`, `.oxfmtrc.json` | The one lint config and the one formatter config |
 | `Docs/` | SPEC, EVAL, EVAL-TASKS, TASKS, brand identity |
@@ -217,6 +219,14 @@ reason: it shows in the editor as you type, and the checker does not yet. So
 **a change to the import matrix or the I/O globals updates `.oxlintrc.json` in
 the same PR**, or the two start giving different verdicts. The lint rules go
 once the checker has editor feedback (TASKS, Week 3 CLI).
+
+**`Docs/EVAL-TASKS.md` is frozen from §2 down.** The subsets, the twelve task
+prompts, the hidden-test lists, the brownfield base app, the self-repair
+sub-eval and the API contract are pinned by digest in
+`packages/eval/src/frozen.ts`, checked on every eval run and in `pnpm check`.
+A change there is a new version of the task set and a new digest, never an
+edit in place — a number published against a task set nobody can prove is the
+original is not evidence. §1 is harness configuration and may change.
 
 **A new checker rule needs a mutation in `packages/check/test/template.test.ts`.**
 That suite compares its list of mutations against `RuleCode` itself, so a code

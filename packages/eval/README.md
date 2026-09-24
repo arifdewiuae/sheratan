@@ -38,6 +38,45 @@ It spawns the `claude` CLI, so it needs one on the PATH and it costs money.
 The full 60 runs are a few dollars. It is deliberately **not** part of
 `pnpm check`.
 
+## The other half — the task eval
+
+The gate above is one of two. EVAL's Week 0 gate also asks whether **median
+iterations on ≥ 3 tasks is no worse than React**, and that is a different
+instrument: an agent with a shell, iterating against a hidden suite until it
+converges or runs out of tries (EVAL-TASKS §1.4).
+
+```sh
+pnpm --filter @sheratan/eval task -- --task T01 --arm sheratan --smoke
+pnpm --filter @sheratan/eval task -- --task T01 --arm sheratan --seeds 5
+```
+
+One run stands up a sandbox with the arm scaffolded into it, `evalkit` behind
+it, the arm's own dev server, and a proxy that makes those last two **one
+origin** — because the contract the agent reads promises the base URL is the
+origin the page came from, and honouring that per-arm would configure the arms
+differently, which §1.1 forbids.
+
+Three properties are worth knowing before reading a number from it:
+
+- **The hidden suite is never in the sandbox.** It runs from this package
+  against the app's origin. Ten iterations of an agent with a shell cannot
+  read what was never in the directory it was given.
+- **The conversation is resumed, not restarted.** Otherwise "three iterations"
+  would mean three first attempts.
+- **`/__control` and `/__inspect` are unreachable at the app's origin.** The
+  hidden tests reach them on `evalkit`'s own URL, so a request for one at the
+  app's origin can only be an arm that went looking. It voids the run.
+
+**This build has no hidden suites yet**, which is why `--smoke` exists and why
+it prints a banner saying so. A smoke run measures cost and wall-clock and
+nothing else; convergence in it means the arm called itself done and the
+project was clean, not that the task was met.
+
+Smoke runs are **not** kept in `results/`. That directory is the evidence
+behind published numbers, and a run that scores nothing sitting beside runs
+that do is an invitation to quote it. Their cost and wall-clock go in TASKS,
+with the command that reproduces them.
+
 ## What is in here
 
 | Path | What |
@@ -47,8 +86,13 @@ The full 60 runs are a few dollars. It is deliberately **not** part of
 | `src/detect.ts` | The scanner that finds them and emits the SPEC §8 JSON |
 | `src/cases.ts` | The twelve injections |
 | `src/tree.ts`, `src/sandbox.ts` | Reading, patching and materialising a run |
-| `src/agent.ts` | One turn |
+| `src/agent.ts` | One turn, no shell — the self-repair half |
 | `src/verify.ts`, `src/cycles.ts` | The verdict, and one thing recorded beside it |
+| `src/frozen.ts` | The task set, read from the frozen document and digest-checked |
+| `src/arm.ts`, `src/arms/` | What the harness knows about a stack. An arm is data, so a third one is a directory and a row |
+| `src/session.ts` | A conversation with a shell, resumed across iterations |
+| `src/iterate.ts` | EVAL-TASKS §1.4, and nothing else |
+| `src/stage.ts`, `src/proxy.ts` | One run stood up: sandbox, backend, dev server, one origin |
 | `test/hosts.test.ts` | The behaviour suite. **The agent never sees this** |
 | `test/detect.test.ts` | Proof each rule fires, and does not fire on what merely looks like it |
 | `results/` | Every prompt, reply and diff. Committed (EVAL §2.5) |
@@ -107,6 +151,12 @@ Stated here rather than discovered by a reader later.
 `Docs/EVAL-TASKS.md` is frozen at `eval-tasks-v1` and does not change. Where
 this harness reads it differently, it says so:
 
+- **The freeze is pinned at §2 onward, not on the whole file.** The whole-file
+  digest recorded in TASKS stopped matching, because §1.2's arms table
+  legitimately gained the Svelte row on 2026-09-17. Every task prompt, hidden-
+  test list, subset, the brownfield base app, §5 and the API contract are
+  byte-identical to the tag; `src/frozen.ts` pins that surface and refuses a
+  run if it moves.
 - **§5 lists the hosts as "the reference solutions to T01, T03 and T04, plus
   the T04 effects file — 4 working files".** A violation class needs a file of
   the right kind to land in (I/O in a view needs a view), so the four hosts are
