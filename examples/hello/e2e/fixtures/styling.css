@@ -1,0 +1,25 @@
+/* The global stylesheet's shape (SPEC §9a), with fixture modules in place of
+   the app's: layer order first, then the list, then tokens and base. */
+
+@layer tokens, base, ui, modules;
+
+@import url('/e2e/fixtures/alpha.css') layer(modules);
+@import url('/e2e/fixtures/beta.css') layer(modules);
+@import url('/e2e/fixtures/gamma.css') layer(modules);
+
+@layer tokens {
+  :root {
+    --fixture-token: rgb(40, 40, 40);
+  }
+}
+
+@layer base {
+  /* Deliberately more specific than anything the module sheets use, and
+     deliberately the colour nothing should end up. A module rule beats it on
+     layer order alone; if layers stop working, every assertion below reads
+     rgb(1, 1, 1) and says so. */
+  [data-module] .row,
+  .row {
+    color: rgb(1, 1, 1);
+  }
+}

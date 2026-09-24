@@ -76,6 +76,9 @@ jobs:
 
 
   e2e:
+    # The ruleset on `develop` and `main` requires this check by name, so
+    # renaming it silently stops the rule applying. It covers the styling
+    # matrix on three engines too (SPEC §9a); the name stays as it is.
     name: End-to-end (Chromium, dev and prod builds)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -112,8 +115,11 @@ jobs:
 
       # Browsers come from an explicit command, never a postinstall script:
       # pnpm blocks dependency lifecycle scripts (pnpm-workspace.yaml).
-      - name: Install Chromium
-        run: pnpm --filter example-hello exec playwright install --with-deps chromium
+      # Firefox and WebKit are here for one spec, styling.e2e.ts: SPEC §9a has
+      # no fallback path and the engines disagree about `@scope`, so the rule
+      # is checked where it has to hold rather than where it is convenient.
+      - name: Install browsers
+        run: pnpm --filter example-hello exec playwright install --with-deps chromium firefox webkit
 
       - name: Run end-to-end tests
         run: pnpm --filter example-hello e2e

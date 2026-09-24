@@ -1026,12 +1026,19 @@ interpolate user data without thinking, so the default must be the safe one.
 
 ### CSS without a build step
 
-Component styles are plain `.css` files loaded through CSS module scripts
-(`import sheet from './button.css' with { type: 'css' }`). No bundler, no
-runtime CSS-in-JS.
+Component styles are plain `.css` files, listed by `styles/global.css` and
+loaded by the browser. No bundler, no runtime CSS-in-JS, and no JavaScript in
+the path: a stylesheet is fetched because a stylesheet named it.
 
-`adoptedStyleSheets` on `document` is global: attaching a sheet does not scope
-it. Scoping therefore needs its own decision, made here.
+**CSS module scripts are not the mechanism.**
+`import sheet from './button.css' with { type: 'css' }` reads well and works in
+two engines out of three — WebKit 26.6 throws `TypeError: Import attribute type
+"css" is not valid`, so the sheet never arrives and the module renders unstyled
+with nothing logged. A styling model has to work everywhere §1's floor claims,
+and this one has no fallback that is not a second styling model.
+
+Loading is therefore settled here and scoping in §9a; `adoptedStyleSheets` on
+`document` would not have scoped anything anyway, which is why §9a exists.
 
 ## 9a. Style scoping
 
@@ -1050,24 +1057,23 @@ Rejected, with reasons:
 
 ### The rule
 
-Every module and `ui/` component root carries its name as an attribute, set by
-the runtime at mount, never written by hand:
+Every module and `ui/` component root carries its name **twice**, set by the
+runtime at mount, never written by hand — as a class, which is what CSS scopes
+to, and as an attribute, which is what everything else selects on:
 
 ```html
-<section data-module="orders"> … </section>
-<button data-ui="button"> … </button>
+<section class="module-orders" data-module="orders"> … </section>
+<button class="ui-button" data-ui="button"> … </button>
 ```
 
-Its stylesheet wraps **all** rules in exactly one `@scope` block keyed to that
-attribute, with a lower boundary at any nested module or component:
+Its stylesheet puts **all** rules in exactly one `@scope` block keyed to the
+class, with a lower boundary at any nested module or component:
 
 ```css
 /* modules/orders/orders.css */
-@layer modules {
-  @scope ([data-module="orders"]) to ([data-module], [data-ui]) {
-    :scope { display: grid; gap: var(--space-3); }
-    .row   { border-bottom: 1px solid var(--color-hairline); }
-  }
+@scope (.module-orders) to ([data-module], [data-ui]) {
+  :scope { display: grid; gap: var(--space-3); }
+  .row   { border-bottom: 1px solid var(--color-hairline); }
 }
 ```
 
@@ -1075,16 +1081,78 @@ The lower boundary is the point: a parent's `.row` never styles a child
 module's `.row`. Class names stay short and readable in devtools because they
 cannot collide.
 
-`sheratan generate module` and `sheratan create` write this wrapper; nobody
-types it from memory.
+There is no `@layer` wrapper in the file. The layer is assigned where the sheet
+is imported (below), so a module sheet says what it styles and nothing about
+precedence.
+
+**Why two names for one thing.** A single attribute would be tidier, and
+`@scope ([data-module="orders"])` was the rule here until it was measured.
+Gecko resolves two scoping roots that differ only by an attribute *value* to
+the same scope, and the first sheet then wins both — silently, nothing logged.
+It needs three things at once, which is why it survived this long unseen:
+
+- the two modules are **siblings**; nested inside one another is correct,
+- their roots are otherwise **indistinguishable to the style system** — same
+  tag name, same class list. Distinct classes or distinct tag names are
+  correct; distinct `id`s are **not**,
+- and the sheets are scoped by attribute value rather than by class.
+
+Two `<section data-module="…">` roots side by side is all three, and that was
+this section's own example markup. A class root removes two of them at once:
+the class is the scope, and it differs per module. It is correct in every
+engine measured (matrix below).
+
+The attribute stays for everything that is not scoping — the lower boundary
+needs one generic selector for "any module", which per-module class names
+cannot give, and tests and devtools already read it.
+
+`sheratan generate module` and `sheratan create` write both; nobody types them
+from memory.
+
+### How a module stylesheet is loaded
+
+`styles/global.css` names every module sheet, and assigns its layer at the
+import:
+
+```css
+@layer tokens, base, ui, modules;
+
+@import url('/ui/button/button.css') layer(ui);
+@import url('/modules/orders/orders.css') layer(modules);
+
+@layer tokens { … }
+@layer base   { … }
+```
+
+The `@layer` statement comes first — it is the one rule allowed before
+`@import` — so the order is fixed before any sheet arrives, whatever order they
+arrive in.
+
+One list, in the language the files are written in, reachable by the checker:
+`SHR-L009` compares it against the directories on disk, so a module added
+without its sheet, or a sheet left behind by a deleted module, fails
+`sheratan check` rather than rendering slightly wrong. That is the whole reason
+the list is in CSS and not in `index.html`, where nothing would be reading it.
+
+The cost is one round trip: the browser cannot discover the imports until
+`global.css` has parsed. The alternative — a `<link>` per module in
+`index.html` — saves that trip and gives up the check, since `index.html` is
+markup the checker does not read. It also puts the sheet outside every layer,
+because the layer is assigned at the import and a `<link>` has no equivalent,
+and an unlayered rule beats every layered one. There is one way to load a
+module sheet, and this is it.
 
 ### Common styles
 
 There is exactly one global stylesheet, `styles/global.css`, linked from
-`index.html`. It declares the layer order once and may contain only two layers:
+`index.html` — the only `<link rel="stylesheet">` in the app. It declares the
+layer order, lists the module and `ui/` sheets, and may itself contain only two
+layers:
 
 ```css
 @layer tokens, base, ui, modules;
+
+@import url('/modules/orders/orders.css') layer(modules);
 
 @layer tokens { :root { --space-3: 12px; --color-hairline: rgb(0 0 0 / .12); } }
 @layer base   { *, *::before, *::after { box-sizing: border-box; } body { margin: 0; } }
@@ -1118,17 +1186,56 @@ Checked over `.css` files by the checker:
 
 | Violation | Message states |
 |---|---|
-| Module / `ui/` sheet has a rule outside its single `@scope` block | "all rules must be inside `@scope ([data-module=\"orders\"])`" |
-| `@scope` root does not match the file's own module or component name | the expected selector |
+| Module / `ui/` sheet has a rule outside its single `@scope` block | "all rules must be inside `@scope (.module-orders)`" |
+| `@scope` root is not the file's own `.module-<name>` / `.ui-<name>` class | the expected selector |
+| `@scope` root is an attribute selector | the class to use, and that Gecko collapses attribute roots |
 | `@scope` block has no `to (…)` lower boundary | the canonical boundary |
+| Module / `ui/` sheet contains an `@layer` rule | "the layer is assigned by `global.css`'s `@import`" |
+| A module or `ui/` sheet on disk that `global.css` does not import | the `@import` line to add |
+| An `@import` in `global.css` naming a sheet that does not exist | the file, and the module it belonged to |
 | `global.css` contains a layer other than `tokens` / `base`, or a class selector in `base` | allowed layers |
 | A module sheet declares a custom property on `:root` | "tokens live in global.css" |
 | `!important` anywhere outside `base` | "layers already decide precedence" |
 
-Browser support: `@scope` and `@layer` are required. The target niche is
+### Browser support
+
+`@scope`, `@layer` and `@import … layer()` are required. The target niche is
 authenticated app UIs on current evergreen browsers (§1), so there is no
-fallback path. Verify the support matrix in Week 1, before templates are built
-on it.
+fallback path — which makes the matrix part of the specification rather than a
+note, and `examples/hello`'s `styling.e2e.ts` runs it on every engine on every
+push.
+
+Measured 2026-09-24, headless, on Playwright 1.63.0:
+
+| | Chromium 153 | Firefox 155 | WebKit 26.6 |
+|---|---|---|---|
+| `@layer` order across sheets | ✅ | ✅ | ✅ |
+| `@import … layer(modules)` | ✅ | ✅ | ✅ |
+| `@scope` lower boundary stops at a nested module | ✅ | ✅ | ✅ |
+| Tokens inherit through the boundary | ✅ | ✅ | ✅ |
+| **Sibling `@scope` roots differing only by an attribute value** | ✅ | ❌ | ✅ |
+| Sibling `@scope` roots as classes | ✅ | ✅ | ✅ |
+| CSS module scripts (`with { type: 'css' }`) | ✅ | ✅ | ❌ |
+
+The two ❌ are why this section reads as it does. Both are reproduced in a few
+lines, with no framework involved:
+
+```html
+<style>
+  @scope ([data-module="a"]) { .row { color: red } }
+  @scope ([data-module="b"]) { .row { color: blue } }
+</style>
+<section data-module="a"><p class="row">a</p></section>
+<section data-module="b"><p class="row">b</p></section>
+<!-- Gecko paints both rows red. Correct again if the roots become `.a` / `.b`,
+     if either section carries a class the other does not, if their tag names
+     differ, or if the second is nested inside the first. Giving them different
+     `id`s does not help. -->
+```
+
+`examples/hello` was never affected, by luck: its two module roots carried
+`class="app"` and `class="orders"` for layout, which is enough to tell them
+apart. The markup this section prescribed was not so lucky.
 
 ### Composing modules: `mount()`
 

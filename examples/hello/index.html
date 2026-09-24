@@ -18,12 +18,11 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500&family=IBM+Plex+Mono:wght@400&display=swap"
     />
-    <!-- Tokens and base, then one scoped sheet per module (SPEC §9a). With no
-         bundler there is nothing to collect them, so a module's stylesheet is
-         linked the same way its module is imported: once, by name. -->
+    <!-- The only stylesheet link in the app (SPEC §9a). It declares the layer
+         order and imports one scoped sheet per module, so the list of modules
+         lives in CSS where the checker reads it, not in markup where it would
+         not. -->
     <link rel="stylesheet" href="/styles/global.css" />
-    <link rel="stylesheet" href="/modules/dashboard/dashboard.css" />
-    <link rel="stylesheet" href="/modules/orders/orders.css" />
     <!-- One import map, no bundler. `?build=prod` swaps in the production build. -->
     <script type="importmap">
       { "imports": { "sheratan": "/sheratan/dev/index.js" } }

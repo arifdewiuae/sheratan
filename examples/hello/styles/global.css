@@ -1,11 +1,20 @@
-/* Tokens and base layers only (SPEC §9a): this file declares the layer order
-   once, and `ui` and `modules` are filled by the scoped sheets that own them —
-   modules/dashboard/dashboard.css here. The tokens are the brand's, from
-   Docs/sheratan-identity.html, including the rule that there is no accent
-   colour. They reach scoped styles by inheriting, which is also how they cross
-   a widget-mode boundary. */
+/* The app's one stylesheet link (SPEC §9a). It does three things and no more:
+   declares the layer order, names every module sheet, and holds `tokens` and
+   `base`. The tokens are the brand's, from Docs/sheratan-identity.html,
+   including the rule that there is no accent colour. They reach scoped styles
+   by inheriting, which is also how they cross a widget-mode boundary. */
 
+/* First, because it is the one rule allowed before `@import`: the order is
+   fixed here, whatever order the sheets below arrive in. */
 @layer tokens, base, ui, modules;
+
+/* Every module sheet, with its layer assigned at the import — which is why
+   none of them contains an `@layer` rule. This list is the one place a module
+   sheet is named, and `SHR-L009` checks it against the directories on disk, so
+   a module added without its sheet fails `sheratan check` instead of rendering
+   slightly wrong. */
+@import url('/modules/dashboard/dashboard.css') layer(modules);
+@import url('/modules/orders/orders.css') layer(modules);
 
 @layer tokens {
   :root {
