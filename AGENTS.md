@@ -11,8 +11,8 @@ enforced by a checker with machine-readable fixes, plus async, live data and
 routing in the core. It's pre-release: `packages/core` holds the runtime, `packages/check` the
 checker (SHR-L001, SHR-L002, SHR-L003, SHR-L004, SHR-L006, SHR-L007, SHR-L008, SHR-L010 and the
 one warning, SHR-T001, so far) and
-`packages/cli` the `sheratan` command: `check`, `build` and `dev` so far, with
-`create`, `generate`, `explain` and `trace` specified and not built.
+`packages/cli` the `sheratan` command: `create`, `check`, `build` and `dev` so
+far, with `generate`, `explain` and `trace` specified and not built.
 
 **Source of truth, in order:**
 1. `Docs/SPEC.md`
@@ -44,6 +44,7 @@ pnpm test                        # node:test
 pnpm coverage                    # tests + coverage gate (fails below threshold)
 pnpm verify                      # consumer types, publint, attw, size budget, llms.txt freshness
 pnpm security                    # pnpm audit + registry signature verification
+pnpm sheratan create <dir>       # write a new app from packages/cli/template
 pnpm sheratan check <dir>        # the CLI on an app, from source; --json for the machine shape
 pnpm sheratan build <dir>        # strip types into <dir>/dist, with a 404.html deep-link fallback; --out picks another directory
 pnpm sheratan dev <dir>          # serve it with types stripped; --port, --no-reload
@@ -66,9 +67,10 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `packages/core/test/` | `node:test` suites; DOM via happy-dom |
 | `packages/core/scripts/` | Build (`build-prod`, `build-cli`), package checks (`verify-types`, `verify-cli`, `size`), docs (`llms`) |
 | `packages/check/src/` | The checker (`sheratan check`): `typescript` (the one adapter over `typescript/unstable/*`), `layout` (path → layer), `matrix` (SPEC §4's table as data), `rules/` (one file per code), `check` (`checkProject()`). A folder, not a package: it folds into the `sheratan` tarball |
-| `packages/check/test/` | Real TypeScript programs on disk: the whole import matrix as one project, a failing case per rule, and both apps in this repo checked clean |
+| `packages/check/test/` | Real TypeScript programs on disk: the whole import matrix as one project, a failing case per rule, both apps in this repo checked clean, and `template.test.ts` — the `create` template broken once per rule code, which is how SPEC §10b's "every rule is exercised" stops being a claim |
 | `packages/cli/src/` | The `sheratan` command (SPEC §10): `run()` returns an exit code and writes through an injected `Terminal`, `report` holds both output formats, `strip`, `build` and `serve` turn a project into plain ESM, written to a directory or served. A folder, not a package: it folds into the same tarball |
 | `packages/cli/bin/` | The one file that owns a process: it hands `run()` the real streams and sets `process.exitCode` |
+| `packages/cli/template/` | The app `sheratan create` writes (SPEC §10b). A workspace member, so `pnpm check` typechecks, lints, tests and `sheratan check`s it — a template that is not live code is a template that rots. `build-cli.ts` copies it to `dist/template`, beside the bundle, which is why `scaffold.ts` finds it with one relative URL in both layouts. Its `dev`, `build` and `check` scripts are written by the scaffolder, not carried in the file: a `build` script here would make `pnpm -r build` build the template |
 | `examples/hello/` | The reference app in the canonical module shape (SPEC §4): a live dashboard, a routed `/orders` layout with two screens inside it, and their e2e specs. It runs on `sheratan dev`, the shipped command, so the example and the product cannot drift |
 | `.oxlintrc.json`, `.oxfmtrc.json` | The one lint config and the one formatter config |
 | `Docs/` | SPEC, EVAL, EVAL-TASKS, TASKS, brand identity |
@@ -215,6 +217,12 @@ reason: it shows in the editor as you type, and the checker does not yet. So
 **a change to the import matrix or the I/O globals updates `.oxlintrc.json` in
 the same PR**, or the two start giving different verdicts. The lint rules go
 once the checker has editor feedback (TASKS, Week 3 CLI).
+
+**A new checker rule needs a mutation in `packages/check/test/template.test.ts`.**
+That suite compares its list of mutations against `RuleCode` itself, so a code
+added without one fails immediately — which is the point. The template is the
+first example every user and every agent reads, and a rule it does not exercise
+is a rule the example does not teach.
 
 **Two things a new lint rule needs:**
 - **Break the code once to prove the rule fires.** A rule that matches nothing

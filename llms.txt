@@ -25,7 +25,7 @@ hole gets the computed.
 ## 2. API
 
 ```ts
-import { signal, computed, watch, batch, resource, mutation, stream, onDispose, flush, html, each, mount, render, location, routes, navigate } from 'sheratan';
+import { signal, computed, watch, batch, resource, mutation, stream, onDispose, flush, html, each, mount, render, location, routes, navigate, Backoff, ResourceStatus, MutationStatus, StreamStatus } from 'sheratan';
 ```
 
 <!-- generated from TSDoc by packages/core/scripts/llms.ts -->
@@ -168,7 +168,7 @@ const user = resource({
   key: () => ['user', state.userId()] as const,
   fetch: ({ key, signal }) => api.getUser(key[1], signal),
   staleAfter: 30_000,
-  retry: { attempts: 3, backoff: 'exponential' },
+  retry: { attempts: 3, backoff: Backoff.Exponential },
 });
 ```
 
@@ -197,7 +197,10 @@ What it guarantees, so you never write it again:
 - `staleAfter` revalidates in the background: `'refreshing'` with `data()`
   still readable, then `'ready'`. Leave it out and a key is fetched once.
 - `retry.attempts` counts the first try, so `3` is one try and two retries.
-  Backoff starts at 100 ms, and `'exponential'` doubles it.
+  Backoff starts at 100 ms; `Backoff.Exponential` doubles it each attempt and
+  `Backoff.Fixed` does not. The status constants are named the same way —
+  `ResourceStatus`, `MutationStatus`, `StreamStatus` — so nothing in an app has
+  to spell a state as a bare string.
 
 A resource holds its own value and nothing else's: there is no cache shared
 between modules. Two modules asking for the same key make two requests, and
@@ -531,10 +534,24 @@ module (SHR-T001 warns when missing). End-to-end tests live in `e2e/`.
 ## 9b. Running and shipping an app
 
 ```sh
+npx sheratan create <app>                    # a complete app, in the canonical shape
 npx sheratan check [directory] [--json]      # the architecture rules
 npx sheratan dev   [directory] [--port 5173] # serve it, types stripped on the way out
 npx sheratan build [directory] [--out dist]  # the same thing, written to a directory
 ```
+
+**Start here rather than from memory.** `create` writes a working app whose one
+module is the canonical shape: a contract-backed service, a `resource()`, a
+`mutation()` with optimistic update and rollback, a `stream()`, a windowed
+`each`, a `mount()` of a nested module, a scoped stylesheet, and both test
+files with real assertions. It passes `sheratan check` with no findings, and CI
+proves that every rule code is exercised by it — so the example in front of you
+is correct by construction rather than by review. Copy its shape; do not invent
+one.
+
+The argument is a directory, so `sheratan create apps/shop` works, and the app
+takes its name from the last segment. It refuses a directory that already has
+files in it.
 
 `dev` serves the project and reloads open pages on a save; a save that will not
 strip is painted over the page instead of waiting for the next request. It

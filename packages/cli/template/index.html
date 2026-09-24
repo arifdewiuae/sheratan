@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>sheratan app</title>
+    <!-- The app's one stylesheet link (SPEC §9a). `styles/global.css` declares
+         the layer order and imports one scoped sheet per module, so the list
+         of modules lives in CSS where the checker can read it. -->
+    <link rel="stylesheet" href="/styles/global.css" />
+    <!-- One import map, no bundler. `sheratan dev` answers this specifier, and
+         `sheratan build` rewrites it to the runtime it copies beside the page. -->
+    <script type="importmap">
+      { "imports": { "sheratan": "/sheratan/dev/index.js" } }
+    </script>
+  </head>
+  <body>
+    <main id="app"></main>
+    <script type="module" src="/app.ts"></script>
+  </body>
+</html>

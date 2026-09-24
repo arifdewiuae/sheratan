@@ -1,4 +1,4 @@
-// The public API (SPEC §5, §6, §9, §9b). Twenty-one names: if this list grows,
+// The public API (SPEC §5, §6, §9, §9b). Twenty-two names: if this list grows,
 // check it against axiom A5 first — the whole surface fits on one screen.
 
 export { ErrorCode } from './codes.ts';
@@ -10,7 +10,7 @@ export { mount } from './mount.ts';
 export { mutation, MutationStatus } from './mutation.ts';
 export { render } from './render.ts';
 export { routes } from './routes.ts';
-export { resource, ResourceStatus } from './resource.ts';
+export { Backoff, resource, ResourceStatus } from './resource.ts';
 export { batch, flush } from './scheduler.ts';
 export { signal } from './signal.ts';
 export { stream, StreamStatus } from './stream.ts';

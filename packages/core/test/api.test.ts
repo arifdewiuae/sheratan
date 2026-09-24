@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 
 import * as api from '../src/index.ts';
 import {
+  Backoff,
   ErrorCode,
   html,
   mount,
@@ -26,6 +27,7 @@ import {
 
 test('the package exports exactly its documented names', () => {
   assert.deepEqual(Object.keys(api).toSorted(), [
+    'Backoff',
     'ErrorCode',
     'MutationStatus',
     'ResourceStatus',
@@ -48,6 +50,17 @@ test('the package exports exactly its documented names', () => {
     'stream',
     'watch',
   ]);
+});
+
+test('a retry strategy is named rather than spelled', () => {
+  const options: ResourceOptions<number, readonly [string]> = {
+    key: () => ['one'],
+    fetch: () => Promise.resolve(1),
+    retry: { attempts: 3, backoff: Backoff.Exponential },
+  };
+
+  assert.equal(options.retry?.backoff, 'exponential');
+  assert.equal(Backoff.Fixed, 'fixed');
 });
 
 // Types are erased before this file runs, so the list above cannot see them.
