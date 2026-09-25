@@ -22,7 +22,8 @@
     "**/coverage/**",
     "site/**",
     "Docs/**",
-    "packages/eval/controls/**"
+    "packages/eval/controls/**",
+    "packages/eval/references/**"
   ],
   "rules": {
     "@stylistic/padding-line-between-statements": [
@@ -214,7 +215,14 @@
       }
     },
     {
-      "files": ["**/test/**", "**/*.test.ts", "**/scripts/**", "**/e2e/**", "**/*.e2e.ts"],
+      "files": [
+        "**/test/**",
+        "**/*.test.ts",
+        "**/scripts/**",
+        "**/e2e/**",
+        "**/*.e2e.ts",
+        "**/suites/**"
+      ],
       "rules": {
         "typescript/no-magic-numbers": "off",
         "typescript/no-non-null-assertion": "off",

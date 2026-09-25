@@ -6,7 +6,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, sep } from 'node:path';
 
-import type { Case } from './cases.ts';
+import type { Case, Patch } from './cases.ts';
 import type { SourceFile } from './source.ts';
 
 const SOURCE = '.ts';
@@ -59,23 +59,31 @@ function occurrences(text: string, find: string): number {
 }
 
 /**
- * Applies a case's patches. Each `find` must appear exactly once in its file,
- * so a host edited out from under a case fails the run instead of quietly
- * producing a tree with no violation in it.
+ * Applies patches to a tree. Each `find` must appear exactly once in its file,
+ * so a file edited out from under a patch fails loudly instead of quietly
+ * producing a tree the patch no longer describes. `id` is what a failure is
+ * blamed on.
+ *
+ * @example
+ * const broken = applyPatches(files, 'T01-order', [{ file, find, replace }]);
  */
-export function inject(files: readonly SourceFile[], one: Case): SourceFile[] {
+export function applyPatches(
+  files: readonly SourceFile[],
+  id: string,
+  patches: readonly Patch[],
+): SourceFile[] {
   const byPath = new Map(files.map((file) => [file.path, file.text]));
 
-  for (const patch of one.patches) {
+  for (const patch of patches) {
     const text = byPath.get(patch.file);
 
-    if (text === undefined) throw new Error(`${one.id}: no file ${patch.file}`);
+    if (text === undefined) throw new Error(`${id}: no file ${patch.file}`);
 
     const count = occurrences(text, patch.find);
 
     if (count !== 1) {
       throw new Error(
-        `${one.id}: the patch for ${patch.file} matched ${String(count)} times, expected 1`,
+        `${id}: the patch for ${patch.file} matched ${String(count)} times, expected 1`,
       );
     }
 
@@ -83,4 +91,9 @@ export function inject(files: readonly SourceFile[], one: Case): SourceFile[] {
   }
 
   return [...byPath].map(([path, text]) => ({ path, text }));
+}
+
+/** Applies one case's patches, which is {@link applyPatches} blamed on the case. */
+export function inject(files: readonly SourceFile[], one: Case): SourceFile[] {
+  return applyPatches(files, one.id, one.patches);
 }

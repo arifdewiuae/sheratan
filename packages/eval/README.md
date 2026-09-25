@@ -24,6 +24,7 @@ pnpm --filter @sheratan/eval test          # the detector's own tests
 pnpm --filter @sheratan/eval check:cases   # every injection still leaves a working app
 pnpm --filter @sheratan/eval selfrepair    # the gate: 12 cases x 5 seeds
 pnpm --filter @sheratan/eval report        # the newest run, as a table
+pnpm --filter @sheratan/eval suites        # proves the hidden suites (needs a browser)
 ```
 
 Narrower runs, for working on the harness:
@@ -60,6 +61,55 @@ else about the arm — the registry, the clean commands, the contamination gate
 "Clean" for this arm is exactly what EVAL-TASKS §1.2 names: `eslint .` then
 `tsc --noEmit`, both at 0. Its own test suite is *not* part of that, because
 the table does not name it.
+
+## The hidden suites
+
+The task eval scores an iteration on two things: the arm's own clean commands,
+and the hidden suite for that task (EVAL-TASKS §1.4). The suites are the three
+Week 0 tasks — **T01, T03 and T04** — written verbatim from §3, one Playwright
+spec each, in `suites/`.
+
+They never enter the sandbox. They run from this package, against the origin
+the harness serves the arm's app on, so ten iterations of an agent with a
+shell cannot read them. The agent is told the **names** of the tests that
+failed and never their bodies: the checker speaks in full because a
+machine-readable remedy is what SPEC A3 claims, and the suite does not because
+an agent that could read the assertions would be writing to them.
+
+**Neutral by construction, and checked.** `test/neutral.test.ts` asserts that
+no suite names a framework and that only `suites/harness.ts` names a test-only
+surface. The second rule matters more than it looks: `/__control` and
+`/__inspect` are reached at `evalkit`'s own address, and a suite that asked for
+one at the app's origin would be recorded as tampering — voiding every run it
+was scoring.
+
+**Proved before they score anything**, by `pnpm --filter @sheratan/eval suites`:
+
+1. Against the arm's **reference implementation**, every assertion passes, and
+   the app is clean by the arm's own definition. A correct app that a hidden
+   test fails is a hidden test that would have failed a correct agent.
+2. Against that reference with **one thing deliberately broken**, exactly the
+   tests that name the break fail — no more and no fewer. A suite that passes
+   a broken app is measuring nothing and would report a wash as a result.
+
+The second half is not ceremony. Writing it found a real fault in T04: the
+rollback assertion read the badge immediately after the click, which is
+satisfied by the value the row started with, before the optimistic update has
+even landed — so an app that never rolled anything back passed. A revert
+cannot be asserted without first observing the thing being reverted, and the
+mutation is what said so.
+
+The Sheratan reference is `hosts/` — §5 already calls it the reference
+solution to T01, T03 and T04 — assembled with the shell in
+`references/sheratan/`, which adds only what `hosts/` lacks to be a page: an
+entry, an `index.html`, the manifests and an HTTP adapter. `hosts/` itself is
+untouched, deliberately: it is the tree the self-repair gate measured 60/60
+against, and adding a file to it would change what that agent sees.
+
+**References are not arms, and must never be registered as such.** They
+contain the `data-testid` hooks the tasks name, and `src/contamination.ts`
+runs over every arm in `ARMS` — registering one would hand an agent the
+answer, and the gate would say so.
 
 ## The other half — the task eval
 
@@ -114,6 +164,10 @@ with the command that reproduces them.
 | `src/rules.ts` | The three rules, and the exact text the agent is shown |
 | `src/detect.ts` | The scanner that finds them and emits the SPEC §8 JSON |
 | `src/cases.ts` | The twelve injections |
+| `references/sheratan/` | The shell that turns `hosts/` into a bootable page: entry, `index.html`, manifests, HTTP adapter. A fragment on purpose — it only typechecks once assembled, which the proof does with `sheratan check` |
+| `suites/` | The hidden suites (T01, T03, T04) and the one harness that owns both origins |
+| `src/suite.ts` | Running one suite against a live stage, and reporting names only |
+| `src/reference.ts`, `src/mutations.ts` | The reference app per arm, and the deliberate breaks that prove a suite would notice |
 | `src/tree.ts`, `src/sandbox.ts` | Reading, patching and materialising a run |
 | `src/agent.ts` | One turn, no shell — the self-repair half |
 | `src/verify.ts`, `src/cycles.ts` | The verdict, and one thing recorded beside it |
@@ -126,6 +180,7 @@ with the command that reproduces them.
 | `src/contamination.ts` | The check that no arm is handed a task's DOM hooks, in its docs or its scaffold |
 | `test/hosts.test.ts` | The behaviour suite. **The agent never sees this** |
 | `test/detect.test.ts` | Proof each rule fires, and does not fire on what merely looks like it |
+| `test/neutral.test.ts` | Proof no suite names a framework, and only the harness names a hidden surface |
 | `results/` | Every prompt, reply and diff. Committed (EVAL §2.5) |
 
 ## The method, exactly
