@@ -26,6 +26,9 @@ const POLL_MS = 200;
 /** How long one clean command may take. A cold type-check is not instant. */
 const CLEAN_TIMEOUT_MS = 180_000;
 
+/** How long a dev server gets to go away politely before it is killed. */
+const STOP_TIMEOUT_MS = 5_000;
+
 /** Where a server announces itself, which is how the arm's real port is learnt. */
 const ANNOUNCED = /https?:\/\/[^\s/]*:(\d+)/u;
 
@@ -142,6 +145,33 @@ async function answering(child: ChildProcess, asked: number, said: () => string)
   throw new Error(`the arm's server said nothing in ${String(SERVER_TIMEOUT_MS)}ms: ${said()}`);
 }
 
+/** Resolves `false` after `ms`, for racing something that should be faster. */
+function waited(ms: number): Promise<boolean> {
+  return new Promise<boolean>((settle) => void setTimeout(() => settle(false), ms));
+}
+
+/**
+ * Stops the arm's dev server and waits until it is actually gone. Not a
+ * courtesy: a server still flushing into the sandbox when the tree is removed
+ * makes the removal fail with ENOTEMPTY, and the run reports a teardown error
+ * instead of its result. Vite takes long enough after SIGTERM to hit it.
+ */
+async function stopServing(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+
+  const ended = new Promise<boolean>((settle) => void child.once('exit', () => settle(true)));
+
+  child.kill();
+
+  const went = await Promise.race([ended, waited(STOP_TIMEOUT_MS)]);
+
+  if (went) return;
+
+  child.kill('SIGKILL');
+
+  await ended;
+}
+
 /** Starts the arm's dev server and waits until it answers. */
 async function startServing(root: string, arm: Arm): Promise<Serving> {
   const asked = await freePort();
@@ -191,7 +221,9 @@ export async function setUpStage(options: StageOptions): Promise<Stage> {
   const stop = async (): Promise<void> => {
     await proxy?.[Symbol.asyncDispose]();
 
-    serving?.child.kill();
+    // In this order, and each one awaited: nothing may still be writing into
+    // the sandbox when it is removed.
+    if (serving !== undefined) await stopServing(serving.child);
 
     await kit?.close();
     await rm(root, { recursive: true, force: true });
