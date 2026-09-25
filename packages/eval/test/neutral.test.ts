@@ -8,6 +8,9 @@
 //   2. No suite names a test-only surface. Those are reached at `evalkit`'s
 //      own address, and a suite that asked for one at the app's origin would
 //      be recorded as tampering — voiding every run it was scoring.
+//   3. Every arm is proved with the same breaks. A suite that has been shown
+//      to notice a missing rollback in one framework and never asked about it
+//      in the other is not one instrument, whatever its text says.
 //
 // `harness.ts` is the one exemption from the second rule, because it is the
 // one file that owns the two origins and keeps that knowledge out of the
@@ -18,6 +21,8 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { MUTATIONS } from '../src/mutations.ts';
+import { REFERENCES } from '../src/reference.ts';
 import { PACKAGE } from '../src/sandbox.ts';
 import { SUITES, WEEK_0 } from '../src/suite.ts';
 
@@ -91,5 +96,33 @@ test('the harness is what reaches them, so the exemption is not vacuous', async 
 
   for (const surface of HIDDEN) {
     assert.ok(text.includes(surface), `${HARNESS} no longer reaches ${surface}`);
+  }
+});
+
+/** What one arm's reference is proved with, as a comparable set of names. */
+function breaksFor(arm: string): readonly string[] {
+  return (MUTATIONS.get(arm) ?? []).map((one) => one.id).toSorted();
+}
+
+test('every reference is proved with something, not merely run', async () => {
+  for (const arm of REFERENCES.keys()) {
+    assert.ok(
+      breaksFor(arm).length > 0,
+      `${arm} has a reference and no mutations: the suites would be shown to pass it and never shown to catch it`,
+    );
+  }
+});
+
+test('the arms are proved with the same breaks, or they are not one instrument', async () => {
+  const [first, ...rest] = [...REFERENCES.keys()];
+
+  assert.ok(first !== undefined, 'no references at all');
+
+  for (const arm of rest) {
+    assert.deepEqual(
+      breaksFor(arm),
+      breaksFor(first),
+      `${arm} and ${first} are proved with different breaks; whichever is missing is an assertion nobody has shown would fire for that arm`,
+    );
   }
 });

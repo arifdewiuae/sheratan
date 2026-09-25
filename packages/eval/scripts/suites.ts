@@ -12,20 +12,32 @@
 //      name that break fail. A suite that passes a broken app is measuring
 //      nothing, and would report a wash as a result.
 
+import { existsSync } from 'node:fs';
+
 import { armNamed, type Arm } from '../src/arm.ts';
 import { MUTATIONS, type Mutation } from '../src/mutations.ts';
-import { mutatedOf, REFERENCES } from '../src/reference.ts';
+import { INSTALLED, mutatedOf, REFERENCES } from '../src/reference.ts';
 import { runSuite, WEEK_0 } from '../src/suite.ts';
 import { setUpStage } from '../src/stage.ts';
 import type { SuiteRun } from '../src/iterate.ts';
 
 const FAILED = 1;
 
+/** Where the one arm whose tree may be missing is installed from. */
+const INSTALL_IN = 'controls/react';
+
 function valueOf(argv: readonly string[], flag: string, fallback: string): string {
   const at = argv.indexOf(flag);
 
   return at === -1 ? fallback : (argv[at + 1] ?? fallback);
 }
+
+const argv = process.argv.slice(2);
+
+/** One task, or every Week 0 task when the flag is absent. */
+const only = valueOf(argv, '--task', '');
+
+const inScope = (task: string): boolean => only === '' || task === only;
 
 /** One suite, on its own stage, torn down however it ends. */
 async function against(arm: Arm, task: string): Promise<SuiteRun> {
@@ -121,23 +133,75 @@ async function proveMutations(arm: Arm, mutations: readonly Mutation[]): Promise
   return failed;
 }
 
-const argv = process.argv.slice(2);
-const id = valueOf(argv, '--arm', 'sheratan');
-const arm = armNamed(REFERENCES, id);
-const only = valueOf(argv, '--task', '');
-const wanted = (task: string): boolean => only === '' || task === only;
+/** Whether this arm's reference has a tree to borrow, and what to do if not. */
+function installed(id: string): boolean {
+  const modules = INSTALLED.get(id);
 
-const tasks = WEEK_0.filter(wanted);
-const mutations = (MUTATIONS.get(id) ?? []).filter((one) => wanted(one.task));
-
-if (mutations.length === 0) {
-  throw new Error(
-    `No mutations for ${id}${only === '' ? '' : ` ${only}`}; the proof is half of one.`,
-  );
+  return modules !== undefined && existsSync(modules);
 }
 
-const brokenReference = await proveReference(arm, tasks);
-const unclean = await proveClean(arm);
-const brokenMutations = await proveMutations(arm, mutations);
+/**
+ * Said loudly, and never in passing. A proof that quietly covers one arm is
+ * the failure this whole script exists to prevent: the suites would be green
+ * against the framework they were written beside, and untested against the one
+ * they are supposed to be neutral towards.
+ */
+function announceSkip(id: string): void {
+  console.log(`SKIP  ${id} — nothing installed at ${String(INSTALLED.get(id))}`);
+  console.log('      The suites are NOT proved against this arm.');
+  console.log(`      pnpm --dir ${INSTALL_IN} install --ignore-workspace\n`);
+}
 
-if (brokenReference || unclean || brokenMutations) process.exitCode = FAILED;
+/** One arm's reference, both halves. */
+async function prove(id: string, tasks: readonly string[]): Promise<boolean> {
+  const arm = armNamed(REFERENCES, id);
+  const mutations = (MUTATIONS.get(id) ?? []).filter((one) => inScope(one.task));
+
+  if (mutations.length === 0) {
+    throw new Error(
+      `No mutations for ${id}${only === '' ? '' : ` ${only}`}; the proof is half of one.`,
+    );
+  }
+
+  const brokenReference = await proveReference(arm, tasks);
+  const unclean = await proveClean(arm);
+  const brokenMutations = await proveMutations(arm, mutations);
+
+  return brokenReference || unclean || brokenMutations;
+}
+
+const tasks = WEEK_0.filter(inScope);
+
+// No `--arm` means every arm that has a reference. A suite is neutral or it is
+// not, and asking about one arm at a time is for debugging, not for the proof.
+const named = valueOf(argv, '--arm', '');
+const ids = named === '' ? [...REFERENCES.keys()] : [named];
+
+// Resolved before anything is stood up, so a name that is not an arm is told
+// what the arms are rather than reported as an arm with nothing installed.
+for (const id of ids) armNamed(REFERENCES, id);
+
+let failed = false;
+const proved: string[] = [];
+
+for (const id of ids) {
+  if (!installed(id)) {
+    announceSkip(id);
+
+    // Asked for by name, it is an error: the answer to "prove React" is not
+    // silence. Reached by default, it is a gap the banner above has named.
+    failed ||= named !== '';
+
+    continue;
+  }
+
+  // eslint-disable-next-line no-await-in-loop -- each arm owns every port its stages take
+  failed ||= await prove(id, tasks);
+  proved.push(id);
+
+  console.log('');
+}
+
+console.log(`proved against: ${proved.length === 0 ? 'nothing' : proved.join(', ')}`);
+
+if (failed) process.exitCode = FAILED;

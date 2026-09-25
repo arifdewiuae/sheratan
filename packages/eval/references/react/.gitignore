@@ -1,0 +1,6 @@
+# No trailing slash: a sandbox reaches the installed tree through a *symlink*,
+# and so does anyone checking this app by hand. `node_modules/` would match a
+# real directory and let the link through.
+node_modules
+dist
+*.tsbuildinfo

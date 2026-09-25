@@ -136,6 +136,13 @@ jobs:
     # they are proved the way a rule is: against a correct app, which must pass,
     # and against that app deliberately broken, which must fail in exactly the
     # named places. Its own job because it needs a browser, like `e2e`.
+    #
+    # Both arms, which is why React is installed here and nowhere else in CI. A
+    # suite proved against one framework is the instrument that would hand that
+    # framework the result, so proving it on a laptop and taking the rest on
+    # trust would leave the only claim that matters unchecked by anyone else.
+    # `controls/react` is its own pnpm root, so none of this reaches Sheratan's
+    # dependency graph (SPEC A4) or the audit, which reads the root lockfile.
     name: Hidden suites (Chromium)
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -158,6 +165,9 @@ jobs:
 
       - name: Build the runtime the reference app imports
         run: pnpm build
+
+      - name: Install the React arm (its own pnpm root, committed lockfile)
+        run: pnpm --dir packages/eval/controls/react install --frozen-lockfile --ignore-workspace
 
       - name: Resolve the Playwright version
         id: playwright
