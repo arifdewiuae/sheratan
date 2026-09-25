@@ -15,6 +15,7 @@
   "ignorePatterns": [
     "Docs/**",
     "site/**",
+    "packages/eval/controls/**",
     "llms.txt",
     "**/*.md",
     "pnpm-lock.yaml",

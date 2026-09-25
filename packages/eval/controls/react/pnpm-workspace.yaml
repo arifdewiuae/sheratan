@@ -1,0 +1,39 @@
+# This directory is its own pnpm root on purpose. It installs React and its
+# toolchain so the eval has a control arm to measure against, and none of that
+# may become a dependency of Sheratan (SPEC A4) — the repository root's
+# workspace globs (`packages/*`, `examples/*`) do not reach here, and this file
+# stops pnpm walking up to find them. Same arrangement as `Docs/comparison/`,
+# for the same reason.
+#
+# Install it with `pnpm install --ignore-workspace` from this directory. No
+# eval run installs anything: `src/arms/react.ts` symlinks what is here.
+
+packages: []
+
+# The supply-chain settings mirror the root's, for the same reasons.
+minimumReleaseAge: 4320
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+
+strictDepBuilds: true
+# esbuild's postinstall only re-verifies the platform binary that
+# optionalDependencies already supplied.
+allowBuilds:
+  esbuild: false
+
+# Vite depends on `rolldown: ~1.2.6`, which floats to whatever was published
+# this week — and its platform bindings are usually hours old, so a fresh
+# resolve fails `minimumReleaseAge` rather than picking something older. A
+# control arm is pinned anyway: this names the version the lockfile holds
+# instead of letting the range decide, and it is the same treatment
+# `Docs/comparison/` gives `semver`. Raise it deliberately, not by accident.
+overrides:
+  rolldown: '1.2.9'
+
+  # `@vitejs/plugin-react` runs Fast Refresh through Babel, and `@babel/core`
+  # still asks for semver 6, whose releases predate npm provenance — so
+  # `trustPolicy` reads the downgrade as a possible takeover. semver 7 is a
+  # drop-in for the two calls Babel makes, and pinning it keeps the policy on
+  # rather than turning it off for the whole directory. Same override, same
+  # reason, as `Docs/comparison/`.
+  semver: '^7.7.2'
