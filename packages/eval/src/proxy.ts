@@ -10,7 +10,10 @@
 // It is also where tampering is caught. `/__control` and `/__inspect` are
 // named nowhere an agent can read, and the hidden tests reach them on
 // `evalkit`'s own URL — so a request for one *here* can only be an arm that
-// went looking, and the run says so rather than scoring it.
+// went looking, and the run says so rather than scoring it. That has to hold
+// on the upgrade path as well: a WebSocket is a request, and one routed to the
+// backend without reading its path is a control API reachable at the app's
+// origin with nothing recorded.
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { connect, type Socket } from 'node:net';
@@ -51,6 +54,19 @@ export interface ProxyOptions {
 
 function forBackend(pathname: string): boolean {
   return BACKEND_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+/**
+ * Whether this is a test-only surface, recording it if it is. Both paths ask,
+ * because both paths can carry one: what differs is only how a request that
+ * was never going to be answered is refused.
+ */
+function hidden(caught: string[], pathname: string): boolean {
+  if (!pathname.startsWith(HIDDEN_PREFIX)) return false;
+
+  caught.push(pathname);
+
+  return true;
 }
 
 function headersOf(request: IncomingMessage): Headers {
@@ -98,7 +114,7 @@ async function forward(
   response.end(new Uint8Array(await answer.arrayBuffer()));
 }
 
-/** Pipes an upgrade straight through, which is how the price socket survives. */
+/** Pipes an upgrade to `to`, which is how the price socket survives. */
 function upgrade(request: IncomingMessage, client: Duplex, head: Buffer, to: string): void {
   const target = new URL(to);
   const lines = Object.entries(request.headers).map(([name, value]) => `${name}: ${String(value)}`);
@@ -122,8 +138,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   const server: Server = createServer((request, response) => {
     const { pathname } = new URL(request.url ?? '/', options.app);
 
-    if (pathname.startsWith(HIDDEN_PREFIX)) {
-      caught.push(pathname);
+    if (hidden(caught, pathname)) {
       response.writeHead(NOT_FOUND).end();
 
       return;
@@ -139,7 +154,20 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   });
 
   server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
-    upgrade(request, socket, head, options.backend);
+    const { pathname } = new URL(request.url ?? '/', options.app);
+
+    if (hidden(caught, pathname)) {
+      // There is no 404 to send on a connection that was never established,
+      // so closing it is the refusal. What voids the run is the record.
+      socket.destroy();
+
+      return;
+    }
+
+    // Not every upgrade belongs to the backend. An arm's dev server may have
+    // a socket of its own, and handing it to `evalkit` would break the arm
+    // for a reason no task prompt explains.
+    upgrade(request, socket, head, forBackend(pathname) ? options.backend : options.app);
   });
 
   await new Promise<void>((settle) => server.listen(options.port ?? 0, '127.0.0.1', settle));

@@ -22,9 +22,10 @@ const REPOSITORY = resolve(PACKAGE, '../..');
 const APP_NAME = 'eval-app';
 
 /**
- * The agent's whole documentation budget (EVAL-TASKS §1.5). SPEC §10 caps
- * `llms.txt` at 8,000 tokens, which is the same number, and that is not a
- * coincidence: the budget was set to what the framework promises an agent.
+ * The agent's whole documentation budget (EVAL-TASKS §1.5), and the one file
+ * it is. SPEC §10 caps `llms.txt` at the same 10,000 tokens `DOC_BUDGET`
+ * holds, which is not a coincidence — the budget is what the framework
+ * promises an agent. `budget.ts` counts this file before every run.
  */
 export const SHERATAN_DOCS: string = join(REPOSITORY, 'llms.txt');
 
