@@ -38,6 +38,29 @@ It spawns the `claude` CLI, so it needs one on the PATH and it costs money.
 The full 60 runs are a few dollars. It is deliberately **not** part of
 `pnpm check`.
 
+## The control arm
+
+The comparison has two arms, and the second one is a committed application:
+
+```sh
+cd packages/eval/controls/react
+pnpm install --ignore-workspace     # once, by hand. No eval run installs anything.
+```
+
+It is its own pnpm root, so React never enters Sheratan's dependency graph,
+and its lockfile is committed on purpose — a control that drifts between runs
+invalidates the measurement it exists to provide. A sandbox symlinks the
+installed tree.
+
+Without that install, `test/stage.react.test.ts` skips with the command above
+rather than failing: CI has no React in it and must not grow one. Everything
+else about the arm — the registry, the clean commands, the contamination gate
+— is proved without it.
+
+"Clean" for this arm is exactly what EVAL-TASKS §1.2 names: `eslint .` then
+`tsc --noEmit`, both at 0. Its own test suite is *not* part of that, because
+the table does not name it.
+
 ## The other half — the task eval
 
 The gate above is one of two. EVAL's Week 0 gate also asks whether **median
@@ -47,7 +70,7 @@ converges or runs out of tries (EVAL-TASKS §1.4).
 
 ```sh
 pnpm --filter @sheratan/eval task -- --task T01 --arm sheratan --smoke
-pnpm --filter @sheratan/eval task -- --task T01 --arm sheratan --seeds 5
+pnpm --filter @sheratan/eval task -- --task T01 --arm react --seeds 5
 ```
 
 One run stands up a sandbox with the arm scaffolded into it, `evalkit` behind
@@ -65,7 +88,12 @@ Three properties are worth knowing before reading a number from it:
   would mean three first attempts.
 - **`/__control` and `/__inspect` are unreachable at the app's origin.** The
   hidden tests reach them on `evalkit`'s own URL, so a request for one at the
-  app's origin can only be an arm that went looking. It voids the run.
+  app's origin can only be an arm that went looking. It voids the run — over
+  HTTP and over a WebSocket upgrade alike.
+- **Each arm's documentation is counted before the first seed**, with the
+  evaluated model's own counter, and a document over §1.5's budget refuses the
+  run rather than warning. Sheratan is at 9,593 tokens and the control at
+  9,689, against 10,000.
 
 **This build has no hidden suites yet**, which is why `--smoke` exists and why
 it prints a banner saying so. A smoke run measures cost and wall-clock and
@@ -82,6 +110,7 @@ with the command that reproduces them.
 | Path | What |
 |---|---|
 | `hosts/` | A working four-module app in the canonical shape (SPEC §4): customers (T01), new-order (T03), orders (T04), notifications |
+| `controls/react/` | The control arm's application, and `DOCS.md`, its whole §1.5 documentation budget. Its own pnpm root; see above |
 | `src/rules.ts` | The three rules, and the exact text the agent is shown |
 | `src/detect.ts` | The scanner that finds them and emits the SPEC §8 JSON |
 | `src/cases.ts` | The twelve injections |
@@ -89,7 +118,7 @@ with the command that reproduces them.
 | `src/agent.ts` | One turn, no shell — the self-repair half |
 | `src/verify.ts`, `src/cycles.ts` | The verdict, and one thing recorded beside it |
 | `src/frozen.ts` | The task set, read from the frozen document and digest-checked |
-| `src/arm.ts`, `src/arms/` | What the harness knows about a stack. An arm is data, so a third one is a directory and a row |
+| `src/arm.ts`, `src/arms/` | What the harness knows about a stack. An arm is data, so a third one is a directory and a row — `sheratan.ts` and `react.ts` are both about seventy lines, most of it comment |
 | `src/session.ts` | A conversation with a shell, resumed across iterations |
 | `src/iterate.ts` | EVAL-TASKS §1.4, and nothing else |
 | `src/stage.ts`, `src/proxy.ts` | One run stood up: sandbox, backend, dev server, one origin |

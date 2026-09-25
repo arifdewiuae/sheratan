@@ -17,7 +17,13 @@
     "builtin": true,
     "es2024": true
   },
-  "ignorePatterns": ["**/dist/**", "**/coverage/**", "site/**", "Docs/**"],
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/coverage/**",
+    "site/**",
+    "Docs/**",
+    "packages/eval/controls/**"
+  ],
   "rules": {
     "@stylistic/padding-line-between-statements": [
       "error",

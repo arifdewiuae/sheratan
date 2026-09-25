@@ -9,7 +9,8 @@
 //
 // Two tools are withheld on purpose. Web search and fetch would let an arm
 // read documentation the other arm's budget does not include, and the whole
-// comparison rests on §1.5's 8,000 tokens being all either one gets.
+// comparison rests on §1.5's budget being all either one gets. The number
+// itself lives in `budget.ts`, so it is not restated here to go stale.
 
 import { spawn } from 'node:child_process';
 
@@ -68,9 +69,9 @@ export interface SessionOptions {
   readonly model: string;
   /**
    * The documentation and the API contract, appended to the agent's own
-   * system prompt. EVAL-TASKS §1.5 budgets the documentation half at 8,000
-   * tokens per arm; §6 puts the contract outside that budget, identically for
-   * every arm.
+   * system prompt. EVAL-TASKS §1.5 budgets the documentation half per arm and
+   * `budget.ts` counts it; §6 puts the contract outside that budget,
+   * identically for every arm.
    */
   readonly system: string;
 }

@@ -13,6 +13,7 @@ import {
   type Count,
 } from '../src/budget.ts';
 import { readBudget } from '../src/frozen.ts';
+import { reactArm } from '../src/arms/react.ts';
 import { sheratanArm } from '../src/arms/sheratan.ts';
 
 /** A count that came out at `tokens`, with plausible raw totals behind it. */
@@ -45,6 +46,20 @@ test('a document over the budget refuses the run, and says by how much', () => {
       // has to re-derive both before they can act on it (A2, A3).
       assert.match(error.message, new RegExp(`Cut ${String(over)} tokens`, 'u'));
       assert.match(error.message, /llms\.txt/u);
+
+      return true;
+    },
+  );
+});
+
+test('the refusal names the arm whose document is over, not just the budget', () => {
+  // Two arms now, each with its own document. A failure that said only "over
+  // budget" would send the reader to the wrong file half the time.
+  assert.throws(
+    () => assertWithinBudget(reactArm, counted(DOC_BUDGET + 1)),
+    (error: Error) => {
+      assert.match(error.message, /DOCS\.md/u);
+      assert.match(error.message, /React 19/u);
 
       return true;
     },

@@ -1,0 +1,58 @@
+/* The app's one stylesheet link. It does three things and no more:
+   declares the layer order, names every module sheet, and holds `tokens` and
+   `base`. Tokens reach scoped styles by inheriting, which is also how they
+   cross a module boundary. */
+
+/* First, because it is the one rule allowed before `@import`: the order is
+   fixed here, whatever order the sheets below arrive in. */
+@layer tokens, base, ui, modules;
+
+/* Every module sheet, with its layer assigned at the import — which is why
+   none of them contains an `@layer` rule. This list is the one place a module
+   sheet is named. */
+@import url('/modules/devices/devices.css') layer(modules);
+@import url('/modules/reading/reading.css') layer(modules);
+
+@layer tokens {
+  :root {
+    --ground: #fafaf8;
+    --ink: #000000;
+    --t66: rgba(0, 0, 0, 0.66);
+    --t55: rgba(0, 0, 0, 0.55);
+    --hair: rgba(0, 0, 0, 0.12);
+    --space: 0.75rem;
+    --sans: system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #000000;
+      --ink: #fafaf8;
+      --t66: rgba(250, 250, 248, 0.7);
+      --t55: rgba(250, 250, 248, 0.58);
+      --hair: rgba(250, 250, 248, 0.2);
+    }
+  }
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: calc(var(--space) * 4) var(--space);
+    background: var(--ground);
+    color: var(--ink);
+    font: 15px/1.6 var(--sans);
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+}
