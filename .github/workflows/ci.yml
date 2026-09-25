@@ -131,6 +131,53 @@ jobs:
           path: examples/hello/playwright-report/
           retention-days: 7
 
+  suites:
+    # The hidden suites are the instrument the Week 0 gate is measured with, so
+    # they are proved the way a rule is: against a correct app, which must pass,
+    # and against that app deliberately broken, which must fail in exactly the
+    # named places. Its own job because it needs a browser, like `e2e`.
+    name: Hidden suites (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the runtime the reference app imports
+        run: pnpm build
+
+      - name: Resolve the Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter @sheratan/eval exec playwright --version | tr ' ' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore browsers
+        id: browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      # Chromium only: these suites assert application behaviour, not engine
+      # behaviour, and running them on three engines would measure the engines.
+      - name: Install browsers
+        run: pnpm --filter @sheratan/eval exec playwright install --with-deps chromium
+
+      - name: Prove the suites
+        run: pnpm --filter @sheratan/eval suites
+
   dependency-review:
     name: Dependency review
     # Needs GitHub Advanced Security on private repositories, so it switches

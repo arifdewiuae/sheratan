@@ -11,9 +11,11 @@
     "report": "node scripts/report.ts",
     "check:cases": "node scripts/check-cases.ts",
     "evalkit": "node evalkit/src/main.ts",
-    "task": "node scripts/task.ts"
+    "task": "node scripts/task.ts",
+    "suites": "node scripts/suites.ts"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "24.13.4",
     "happy-dom": "20.14.5",
     "sheratan": "workspace:*",

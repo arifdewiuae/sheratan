@@ -16,6 +16,7 @@ import { armNamed, type Arm } from '../src/arm.ts';
 import { assertWithinBudget, countTokens, describeCount } from '../src/budget.ts';
 import { CONTRACT_FILE, readTaskSet, taskNamed, type Task } from '../src/frozen.ts';
 import { iterate, ITERATION_CAP, type SuiteRun, type TaskRun } from '../src/iterate.ts';
+import { SUITES } from '../src/suite.ts';
 import { openSession, TOOLS } from '../src/session.ts';
 import { PACKAGE } from '../src/sandbox.ts';
 import { setUpStage } from '../src/stage.ts';
@@ -24,13 +25,6 @@ const MODEL = 'claude-sonnet-5';
 const SEEDS = 5;
 const MONEY = 2;
 const SECONDS = 1000;
-
-/**
- * The hidden suites, by task id. Empty in this build: the suites are their own
- * change, and a half-written one scoring a run is worse than none at all.
- */
-const SUITES: ReadonlyMap<string, (origin: string, backend: string) => Promise<SuiteRun>> =
-  new Map();
 
 /** What `--smoke` judges with instead. Loud on purpose — see `announce`. */
 const NO_SUITE: SuiteRun = { ok: true, failing: [], raw: 'no hidden suite ran' };
