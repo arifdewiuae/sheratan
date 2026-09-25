@@ -224,9 +224,16 @@ technical. Widening a grid after looking at it is optional stopping: buy more
 seeds only when the answer is unwelcome and the number stops meaning anything.
 So the rule is fixed **before** a grid runs and applied whichever way it
 leans. For the Week 0 matrix, decided 2026-09-25 with nothing measured but the
-smoke: five seeds per task per arm is the answer, and a task is widened to ten
-only if its two medians come out **equal**, because a tie is the one outcome
-five seeds genuinely cannot resolve.
+smoke: **three** seeds per task per arm is the answer, and a task is widened to
+five only if its two medians come out **equal**, because a tie is the one
+outcome three seeds genuinely cannot resolve.
+
+Three rather than the five EVAL-TASKS §1.4 asked for, and the reason is cost
+rather than method — a cell is a whole agent session, and thirty of them is
+four to five hours of one account's usage. The amendment is in §1.4 itself.
+What it costs is precision: the median of three moves on a single unlucky run,
+so **a margin inside one iteration is a tie at this sample size**, and any
+number published from this grid has to say so beside itself.
 
 A probe that scores nothing — `--smoke` on a task with no suite — is **not**
 kept in `results/`. That directory is the evidence behind published numbers,

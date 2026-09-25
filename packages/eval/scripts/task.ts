@@ -27,7 +27,8 @@ import { TOOLS } from '../src/session.ts';
 import { stampedInto } from '../src/results.ts';
 
 const MODEL = 'claude-sonnet-5';
-const SEEDS = 5;
+/** EVAL-TASKS §1.4 step 5, as amended on 2026-09-25 from five. */
+const SEEDS = 3;
 const MONEY = 2;
 const SECONDS = 1000;
 

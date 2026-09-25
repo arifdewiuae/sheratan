@@ -66,7 +66,24 @@ control or inspection API, or the tests.
 3. On failure the agent receives: the full checker/linter output, and the
    **names** of failing hidden tests (not their bodies).
 4. Cap: **10 iterations.** Not converging is a recorded outcome.
-5. 5 seeds per task per arm. Report median and IQR (EVAL §2.1–2.2).
+5. **3 seeds per task per arm.** Report median and IQR (EVAL §2.1–2.2).
+
+> **Amended 2026-09-25, from 5.** Reduced for cost: a cell is a full agent
+> session, and five seeds across three tasks and two arms is thirty of them —
+> four to five hours and $50–110 of model usage against the account that also
+> runs the development of this project. Three seeds is eighteen cells.
+>
+> Recorded because it is a real loss of precision, not a tidy-up. The median of
+> three moves on a single unlucky run in a way the median of five does not, and
+> the IQR of three barely deserves the name. Any number published from a
+> three-seed grid says so beside itself, and a margin inside one iteration is
+> not a result at this sample size — it is a tie.
+>
+> Decided **before any cell of the grid had landed**, with nothing measured but
+> a two-cell smoke, so it is a sample size chosen in ignorance of the answer
+> rather than after seeing one. The five-seed grid remains the thing to run if
+> the number matters enough to pay for it, and `--resume` will widen this one
+> into it without re-running a cell.
 
 ### 1.5 Prompt budget — fixed now
 
