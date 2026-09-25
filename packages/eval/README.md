@@ -111,6 +111,36 @@ contain the `data-testid` hooks the tasks name, and `src/contamination.ts`
 runs over every arm in `ARMS` — registering one would hand an agent the
 answer, and the gate would say so.
 
+### Both arms, or the instrument is the result
+
+`references/react/` is the same three tasks written in the control arm's stack,
+and it exists because a suite proved against one framework is exactly the
+instrument that would hand that framework the win. The proof runs over every
+reference by default, and the same eleven breaks are required of each:
+`test/neutral.test.ts` fails if one arm is proved with a smaller set than the
+other, because an assertion nobody has shown would fire for an arm is not an
+assertion for that arm.
+
+It paid for itself immediately. Three things the suites exposed, none of which
+was visible from the Sheratan side alone:
+
+| Found | What it was |
+|---|---|
+| Two `GET /api/customers` per page load | `StrictMode` mounts, unmounts and remounts, and the second mount refetches. Three Week 0 assertions count requests, so **every React run would have failed T01 for a dev-mode diagnostic**. Removed from `controls/react` as well — the arm, not the app, was wrong |
+| A double-click sent two orders | `disabled={isPending}` is not a lock. TanStack delivers a status change through its batched notifier, so the attribute is true a microtask after `mutate` — later than the second click. A `useRef` latch is the guard that holds |
+| The documented optimistic-update recipe fails | Snapshotting the cache entry in `onMutate` and restoring it in `onError` makes one failed write undo a concurrent one. The rollback has to restore **one row**, and the refetch on settle has to wait for the last write |
+
+The first is the one that mattered. It was a systematic bias **against** the
+control arm, worth roughly a third of T01's assertions, and it would have made
+Sheratan look better for a reason that has nothing to do with framework design.
+No suite was changed to accommodate any of it.
+
+`references/react/` borrows `controls/react`'s installed tree, so it needs that
+one-time `pnpm install --ignore-workspace` and installs nothing itself. Without
+it the proof **says so loudly and names the command** rather than quietly
+proving one arm; CI installs it, so the parity claim is checked by something
+other than a laptop.
+
 ## The other half — the task eval
 
 The gate above is one of two. EVAL's Week 0 gate also asks whether **median
@@ -165,6 +195,7 @@ with the command that reproduces them.
 | `src/detect.ts` | The scanner that finds them and emits the SPEC §8 JSON |
 | `src/cases.ts` | The twelve injections |
 | `references/sheratan/` | The shell that turns `hosts/` into a bootable page: entry, `index.html`, manifests, HTTP adapter. A fragment on purpose — it only typechecks once assembled, which the proof does with `sheratan check` |
+| `references/react/` | The same three tasks in the control arm's stack, so the suites are proved against both. A whole app, not a shell: there is no shared tree to preserve. Borrows `controls/react`'s `node_modules` |
 | `suites/` | The hidden suites (T01, T03, T04) and the one harness that owns both origins |
 | `src/suite.ts` | Running one suite against a live stage, and reporting names only |
 | `src/reference.ts`, `src/mutations.ts` | The reference app per arm, and the deliberate breaks that prove a suite would notice |

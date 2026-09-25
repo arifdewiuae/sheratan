@@ -1,0 +1,12 @@
+{
+  "name": "eval-reference-react",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A correct React implementation of the Week 0 tasks, so the hidden suites are proved against both arms before they score either. Not an arm: it contains the hooks the tasks name. Borrows controls/react's installed node_modules; installs nothing of its own.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  }
+}

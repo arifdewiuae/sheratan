@@ -74,7 +74,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `packages/eval/` | The Week 0 falsification gates (EVAL §2.3), and the only package that spends money. Two instruments: **self-repair** — one restricted turn, no shell, `scripts/run.ts` — and the **task eval**, `scripts/task.ts`, an agent with a shell iterating against a hidden suite (EVAL-TASKS §1.4). An arm is a record in `src/arms/`, never a branch, so a third stack is a directory and a row. `src/frozen.ts` reads the task set out of `Docs/EVAL-TASKS.md` and refuses to run if §2 onward has moved; `src/budget.ts` counts an arm's documentation with the evaluated model's own counter and refuses a run over §1.5's budget; `src/contamination.ts` refuses an arm that has been handed a task's DOM hooks. Deliberately outside `pnpm check` except its own unit tests and `evalkit`'s — the hidden suites are their own CI job, because they need a browser |
 | `packages/eval/controls/react/` | The control arm of the Week 0 comparison (EVAL-TASKS §1.2): Vite + React 19 + TanStack Query v5 + Zustand, in the same app shape and the same device-telemetry domain as the `create` template. **Its own pnpm root** — `pnpm-workspace.yaml` with `packages: []` stops pnpm walking up, so React never becomes a dependency of Sheratan (A4). Installed once by hand with `pnpm install --ignore-workspace`; a run symlinks that tree and installs nothing. **Its lockfile is committed**, deliberately unlike `Docs/comparison/`: a control that drifts between runs invalidates the measurement. Ignored by the root `.oxlintrc.json` and `.oxfmtrc.json` — it has its own ESLint, and this repo has neither ESLint nor JSX. `DOCS.md` is its §1.5 budget, counted like `llms.txt` |
 | `packages/eval/suites/` | The hidden suites the task eval scores with (EVAL-TASKS §1.4): T01, T03 and T04, verbatim from §3, one Playwright spec each. They never enter the sandbox — they run from this package against the origin the arm's app is served on. `harness.ts` is the only file that knows where `evalkit` actually is, and `test/neutral.test.ts` holds both halves of §1.1: no suite names a framework, and no suite but the harness names a test-only surface |
-| `packages/eval/references/` | A correct implementation of the Week 0 tasks per arm, so a suite is proved before it scores. **Not arms, and never registered as such** — they contain the hooks the tasks name, and the contamination gate would rightly fail them. `sheratan/` is only the shell that makes `hosts/` bootable; `hosts/` stays byte-identical, because it is the tree the self-repair gate measured against. `src/mutations.ts` breaks that reference once per thing a suite claims to check, and `pnpm --filter @sheratan/eval suites` requires exactly the named tests to fail — the same discipline `packages/check/test/template.test.ts` holds for rules |
+| `packages/eval/references/` | A correct implementation of the Week 0 tasks **per arm**, so a suite is proved before it scores. **Not arms, and never registered as such** — they contain the hooks the tasks name, and the contamination gate would rightly fail them. `sheratan/` is only the shell that makes `hosts/` bootable; `hosts/` stays byte-identical, because it is the tree the self-repair gate measured against. `react/` is a whole app, since that arm has no shared tree to preserve, and borrows `controls/react`'s installed `node_modules`. `src/mutations.ts` breaks each reference once per thing a suite claims to check, and `pnpm --filter @sheratan/eval suites` requires exactly the named tests to fail — the same discipline `packages/check/test/template.test.ts` holds for rules |
 | `packages/eval/evalkit/` | The deterministic fake backend every task runs against (EVAL-TASKS §1.3). Frozen. `/api`, `/ws/prices`, and the `/__control` and `/__inspect` surfaces that tests use and agents must never see — the harness proxy refuses them at the app's origin — on the HTTP path and the upgrade path alike — and voids any run that asks |
 | `examples/hello/` | The reference app in the canonical module shape (SPEC §4): a live dashboard, a routed `/orders` layout with two screens inside it, and their e2e specs. It runs on `sheratan dev`, the shipped command, so the example and the product cannot drift |
 | `.oxlintrc.json`, `.oxfmtrc.json` | The one lint config and the one formatter config |
@@ -252,6 +252,20 @@ That suite compares its list of mutations against `RuleCode` itself, so a code
 added without one fails immediately — which is the point. The template is the
 first example every user and every agent reads, and a rule it does not exercise
 is a rule the example does not teach.
+
+**A hidden suite is proved against every arm, with the same breaks.** A suite
+proved against one framework is precisely the instrument that would hand that
+framework the result: its timings, its update boundaries and its idea of when
+a row has arrived are all baked in unexamined. `pnpm --filter @sheratan/eval
+suites` runs over every reference by default, and `test/neutral.test.ts` fails
+if one arm is proved with a smaller set of mutations than another — an
+assertion nobody has shown would fire for an arm is not an assertion for that
+arm. This is not theoretical either: proving the suites against React found
+`StrictMode` doubling every request, which would have failed **every** React
+run on T01's request counts for a development-mode diagnostic. The fix went
+into the arm. **No suite may be changed to accommodate one arm**; if a suite
+has to move, it was biased, and the other arm's proof is re-run and the change
+said out loud.
 
 **A hidden suite needs a mutation in `packages/eval/src/mutations.ts`, for the
 same reason.** A suite is the instrument the Week 0 gate is measured with, and
