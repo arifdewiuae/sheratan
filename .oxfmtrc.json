@@ -17,6 +17,7 @@
     "site/**",
     "packages/eval/controls/**",
     "packages/eval/references/react/**",
+    "packages/eval/results/**",
     "llms.txt",
     "**/*.md",
     "pnpm-lock.yaml",

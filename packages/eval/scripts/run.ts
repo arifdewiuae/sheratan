@@ -9,16 +9,17 @@
 // Every run's prompt, reply and resulting diff is written under results/, and
 // those logs are committed: a number nobody can re-read is not evidence.
 
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { promptFor, takeTurn, Told } from '../src/agent.ts';
 import { CASES, type Case } from '../src/cases.ts';
 import { detect } from '../src/detect.ts';
-import { HOSTS, PACKAGE, prepare } from '../src/sandbox.ts';
+import { HOSTS, prepare } from '../src/sandbox.ts';
 import { inject, readTree } from '../src/tree.ts';
 import type { SourceFile } from '../src/source.ts';
+import { stampedInto } from '../src/results.ts';
 import { verify } from '../src/verify.ts';
 
 const SEEDS = 5;
@@ -138,15 +139,11 @@ const chosen = CASES.filter(
 
 if (chosen.length === 0) throw new Error(`no case matches ${String(opts.only ?? opts.code)}`);
 
-const stamp = new Date().toISOString().replaceAll(':', '-').slice(0, 19);
-
 const label = [opts.told === Told.Full ? '' : opts.told, opts.code?.toLowerCase() ?? '']
   .filter((part) => part !== '')
   .join('-');
 
-const into = join(PACKAGE, 'results', label === '' ? stamp : `${stamp}-${label}`);
-
-await mkdir(into, { recursive: true });
+const { stamp, into } = await stampedInto(label);
 
 const total = chosen.length * opts.seeds;
 
