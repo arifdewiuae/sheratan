@@ -93,6 +93,8 @@ with the command that reproduces them.
 | `src/session.ts` | A conversation with a shell, resumed across iterations |
 | `src/iterate.ts` | EVAL-TASKS §1.4, and nothing else |
 | `src/stage.ts`, `src/proxy.ts` | One run stood up: sandbox, backend, dev server, one origin |
+| `src/budget.ts` | EVAL-TASKS §1.5, counted with the model's own counter and refused rather than warned |
+| `src/contamination.ts` | The check that no arm is handed a task's DOM hooks, in its docs or its scaffold |
 | `test/hosts.test.ts` | The behaviour suite. **The agent never sees this** |
 | `test/detect.test.ts` | Proof each rule fires, and does not fire on what merely looks like it |
 | `results/` | Every prompt, reply and diff. Committed (EVAL §2.5) |
@@ -145,6 +147,27 @@ Stated here rather than discovered by a reader later.
 - **One model, one day.** Agent performance is a moving baseline. Every result
   records its model and date, and a stale number is worse than none
   (EVAL §2.5).
+
+## Two things that were not instruments until 2026-09-25
+
+**The budget was never counted.** EVAL-TASKS §1.5 fixed it, SPEC §10 promised
+`llms.txt` would fit, TASKS recorded an estimate of "~4.0–4.7k", and nothing
+measured anything. The first real count came back at **11,537 tokens**. The
+count is the sum of `input_tokens`, `cache_creation_input_tokens` and
+`cache_read_input_tokens` — differencing `input_tokens` alone, which is what
+the plan said, reads 2 on a cached prompt and would have reported every
+document as free.
+
+**`llms.txt` contained the answers.** Its canonical module was a complete,
+working **T01** — the same four `data-testid` hooks, the same columns, the same
+endpoint — and its list and mutation examples carried three of **T04**'s. Every
+testid the document defined belonged to a task. Two of the three Week 0 gate
+tasks would have measured recall of the documentation instead of authoring.
+`src/contamination.ts` now runs over every arm's documentation *and* its
+scaffold, in `pnpm check`. It catches the mechanical form only: the same
+example with its hooks renamed is still the answer, so the fix was moving
+`llms.txt` onto the `create` template's device-telemetry domain, and the gate
+is what stops it coming back.
 
 ## Deviations from the frozen task set
 

@@ -1452,7 +1452,14 @@ sheratan build                 # strips types into a deployable directory
 - **`llms.txt`** at the repo and docs root: full API surface, the import
   matrix, canonical module example, error-code index, and — first item — the
   reactivity trap (`${s.total}` in a hole is reactive; `${s.total()}` is read
-  once). Must fit in ~8k tokens.
+  once). **Must fit in 10,000 tokens**, counted with the evaluated model's own
+  counter, not estimated. The original target was "~8k", written here before
+  `llms.txt` existed and never measured; the first real count, 2026-09-25, came
+  back at 11,537. Decontaminating and cutting it reached 9,593, and the last
+  1,500 would have cost the error-code index and the wrong→right pairs — the
+  enforcement documentation, which is the thing the framework is for. The cap
+  is now a measured number with a margin, enforced by
+  `packages/eval/src/budget.ts` rather than asserted here.
 - **Skill** (`SKILL.md`): when to use, how to scaffold via the CLI, how to read
   checker output, how to read a trace, the "one way to do each thing" table.
 - **Generation over recall.** Agents call `sheratan generate` instead of writing

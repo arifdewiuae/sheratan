@@ -13,6 +13,7 @@ import { join } from 'node:path';
 
 import { ARMS } from '../src/arms/index.ts';
 import { armNamed, type Arm } from '../src/arm.ts';
+import { assertWithinBudget, countTokens, describeCount } from '../src/budget.ts';
 import { CONTRACT_FILE, readTaskSet, taskNamed, type Task } from '../src/frozen.ts';
 import { iterate, ITERATION_CAP, type SuiteRun, type TaskRun } from '../src/iterate.ts';
 import { openSession, TOOLS } from '../src/session.ts';
@@ -146,6 +147,16 @@ if (!SUITES.has(task.id) && !opts.smoke) {
   );
 }
 
+// EVAL-TASKS §1.5 asserts the budget **before a run starts**, so a document
+// that has grown past it costs two probes rather than a matrix of runs and a
+// retraction. It is measured per run, not per seed: the document does not
+// change between seeds.
+const count = await countTokens(await readFile(arm.docs, 'utf8'), opts.model);
+
+console.log(`${describeCount(arm, count)}\n`);
+
+assertWithinBudget(arm, count);
+
 const stamp = new Date().toISOString().replaceAll(':', '-').slice(0, 19);
 const into = join(PACKAGE, 'results', `${stamp}-${task.id}-${arm.id}`);
 
@@ -198,6 +209,9 @@ await writeFile(
       // `--restricted`. Recorded rather than described: what the agent could
       // do is the difference between the two instruments.
       tools: TOOLS,
+      // The other controlled variable (§1.5), with both raw totals so the
+      // subtraction is auditable from the log alone.
+      docBudget: count,
       seeds: opts.seeds,
       cap: opts.cap,
       hiddenSuite: SUITES.has(task.id),

@@ -70,12 +70,24 @@ control or inspection API, or the tests.
 
 ### 1.5 Prompt budget — fixed now
 
-- **8,000 tokens of documentation per arm**, counted with the evaluated
+- **10,000 tokens of documentation per arm**, counted with the evaluated
   model's own token counter, identical system prompt otherwise.
-- Sheratan arm: `llms.txt` (≤ 8,000 by SPEC §10).
-- Control arm: a curated 8,000-token document covering TanStack Query,
+- Sheratan arm: `llms.txt` (≤ 10,000 by SPEC §10).
+- Control arm: a curated 10,000-token document covering TanStack Query,
   Zustand, and the project's folder conventions, written **before** the first
   run and committed with the harness.
+
+> **Amended 2026-09-25, from 8,000.** The original figure was inherited from
+> SPEC §10's "~8k", which was written before `llms.txt` existed and was never
+> counted. The first real count put `llms.txt` at **11,537 tokens**; removing
+> every redundancy reached 9,593, and the remaining gap would have cost the
+> error-code index and the wrong→right pairs. Raised **for every arm**, and
+> recorded here rather than in a commit message, because a budget changed after
+> results would be indefensible — this one is changed before any hidden suite
+> exists and before any comparative run. If anything it favours the control,
+> which has two libraries and a folder convention to cover in the same space.
+> The number is cross-checked against `packages/eval/src/budget.ts` on every
+> run, so this line and the code cannot drift.
 - Model, model version and date are recorded per run; both arms use the same.
 
 ### 1.6 Tags

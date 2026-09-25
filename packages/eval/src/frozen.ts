@@ -45,6 +45,34 @@ const MEASURED_FROM = '## 2.';
 /** The three tasks the Week 0 kill-gate is ruled on (§2). */
 export const WEEK_ZERO: readonly string[] = ['T01', 'T03', 'T04'];
 
+/** How §1.5 states the documentation budget. */
+const BUDGET = /\*\*([\d,]+) tokens of documentation per arm\*\*/u;
+
+/**
+ * The documentation budget, read from §1.5 rather than copied out of it.
+ *
+ * §1.5 sits above the digested region, because §1 is harness configuration —
+ * but the budget is a controlled variable, not configuration, and it has now
+ * moved once. `budget.ts` holds the same number as a constant and a test
+ * asserts they agree, so changing the document without the code (or the code
+ * without the document) fails instead of quietly measuring against the old cap.
+ *
+ * @example
+ * assert.equal(await readBudget(), DOC_BUDGET);
+ */
+export async function readBudget(): Promise<number> {
+  const document = await readFile(TASK_SET_FILE, 'utf8');
+  const found = BUDGET.exec(document);
+
+  if (found === null) {
+    throw new Error(
+      `${TASK_SET_FILE} §1.5 no longer states the budget as "**N tokens of documentation per arm**".`,
+    );
+  }
+
+  return Number((found[1] as string).replaceAll(',', ''));
+}
+
 /** One task, as the document defines it. */
 export interface Task {
   /** `T01`, `T03`, … */
