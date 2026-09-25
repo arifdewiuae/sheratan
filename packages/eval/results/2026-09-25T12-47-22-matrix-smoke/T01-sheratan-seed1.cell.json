@@ -1,0 +1,10 @@
+{
+  "task": "T01",
+  "arm": "sheratan",
+  "seed": 1,
+  "converged": true,
+  "iterations": 1,
+  "costUSD": 1.3215972,
+  "durationMs": 318886,
+  "tampering": []
+}

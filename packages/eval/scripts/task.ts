@@ -1,33 +1,36 @@
 // The task eval (EVAL-TASKS §1.4): one task, one arm, an agent with a shell,
-// up to ten iterations. The other half of the Week 0 gate — `run.ts` is the
-// self-repair half, and this is the one that has never been measured.
+// up to ten iterations.
 //
-//   pnpm --filter @sheratan/eval task -- --task T01 --arm sheratan --smoke
-//   pnpm --filter @sheratan/eval task -- --task T01 --arm sheratan --seeds 5
+//   pnpm --filter @sheratan/eval task -- --task T01 --arm sheratan
+//   pnpm --filter @sheratan/eval task -- --task T01 --arm react --seeds 5
+//
+// One cell of the grid, by hand. `matrix.ts` runs the whole grid the Week 0
+// gate is decided on, through the same `runCell` this does — a probe that
+// priced a cell differently from the way the matrix ran it would be pricing
+// something else.
 //
 // Every prompt, reply and iteration is written under results/, and those logs
 // are committed: a number nobody can re-read is not evidence.
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { ARMS } from '../src/arms/index.ts';
 import { armNamed, type Arm } from '../src/arm.ts';
 import { assertWithinBudget, countTokens, describeCount } from '../src/budget.ts';
-import { CONTRACT_FILE, readTaskSet, taskNamed, type Task } from '../src/frozen.ts';
-import { iterate, ITERATION_CAP, type SuiteRun, type TaskRun } from '../src/iterate.ts';
+import { type Cell, spreadOf } from '../src/analysis.ts';
+import { runCell, systemFor } from '../src/cell.ts';
+import { ITERATION_CAP } from '../src/iterate.ts';
+import { readTaskSet, taskNamed, type Task } from '../src/frozen.ts';
 import { SUITES } from '../src/suite.ts';
-import { openSession, TOOLS } from '../src/session.ts';
-import { PACKAGE } from '../src/sandbox.ts';
-import { setUpStage } from '../src/stage.ts';
+import { TOOLS } from '../src/session.ts';
+import { stampedInto } from '../src/results.ts';
 
 const MODEL = 'claude-sonnet-5';
-const SEEDS = 5;
+/** EVAL-TASKS §1.4 step 5, as amended on 2026-09-25 from five. */
+const SEEDS = 3;
 const MONEY = 2;
 const SECONDS = 1000;
-
-/** What `--smoke` judges with instead. Loud on purpose — see `announce`. */
-const NO_SUITE: SuiteRun = { ok: true, failing: [], raw: 'no hidden suite ran' };
 
 interface Options {
   readonly task: string;
@@ -55,63 +58,6 @@ function options(argv: readonly string[]): Options {
   };
 }
 
-/**
- * The documentation and the API contract, appended to the agent's own system
- * prompt. §1.5 budgets the documentation; §6 puts the contract outside that
- * budget, identically for every arm.
- */
-async function systemFor(arm: Arm): Promise<string> {
-  const [docs, contract] = await Promise.all([
-    readFile(arm.docs, 'utf8'),
-    readFile(CONTRACT_FILE, 'utf8'),
-  ]);
-
-  return `${docs}\n\n---\n\n${contract}`;
-}
-
-/** What one seed of one task on one arm is run with. */
-interface Once {
-  readonly task: Task;
-  readonly arm: Arm;
-  readonly seed: number;
-  readonly opts: Options;
-  /** The results directory this seed's logs are written into. */
-  readonly into: string;
-}
-
-/** One seed, start to finish, with everything it said kept on disk. */
-async function once({ task, arm, seed, opts, into }: Once): Promise<TaskRun> {
-  const stage = await setUpStage({ arm, seed });
-  const stem = `${task.id}-${arm.id}-seed${String(seed)}`;
-
-  try {
-    const system = await systemFor(arm);
-    const session = openSession({ root: stage.root, model: opts.model, system });
-    const suite = SUITES.get(task.id);
-
-    const run = await iterate({
-      session,
-      judge: {
-        clean: async () => stage.clean(),
-        suite: async () => (suite === undefined ? NO_SUITE : suite(stage.origin, stage.backend)),
-      },
-      prompt: `${task.prompt}\n\nThe app is served at ${stage.origin}.`,
-      cap: opts.cap,
-      tampering: () => stage.tampering(),
-    });
-
-    await writeFile(
-      join(into, `${stem}.log.json`),
-      `${JSON.stringify(run.log, null, 2)}\n`,
-      'utf8',
-    );
-
-    return run;
-  } finally {
-    await stage[Symbol.asyncDispose]();
-  }
-}
-
 /** Says what this run can and cannot be quoted for. */
 function announce(task: Task, arm: Arm, opts: Options): void {
   console.log(`${task.id} — ${task.title}`);
@@ -126,6 +72,17 @@ function announce(task: Task, arm: Arm, opts: Options): void {
     'NO HIDDEN SUITE. This build has none, so convergence here means the arm\n' +
       'called itself done and the project was clean — not that the task was met.\n' +
       'No gate number may come from this run.\n',
+  );
+}
+
+/** One line per seed, as it finishes, because a matrix is watched not awaited. */
+function say(cell: Cell): void {
+  const how = cell.converged ? `converged in ${String(cell.iterations)}` : 'did not converge';
+  const voided = cell.tampering.length === 0 ? '' : `  VOID: reached ${cell.tampering.join(', ')}`;
+
+  console.log(
+    `seed ${String(cell.seed)}  ${how}  $${cell.costUSD.toFixed(MONEY)}  ` +
+      `${(cell.durationMs / SECONDS).toFixed(0)}s${voided}`,
   );
 }
 
@@ -151,10 +108,7 @@ console.log(`${describeCount(arm, count)}\n`);
 
 assertWithinBudget(arm, count);
 
-const stamp = new Date().toISOString().replaceAll(':', '-').slice(0, 19);
-const into = join(PACKAGE, 'results', `${stamp}-${task.id}-${arm.id}`);
-
-await mkdir(into, { recursive: true });
+const { stamp, into } = await stampedInto(`${task.id}-${arm.id}`);
 
 // Identical for every seed of a run, so it is recorded once rather than
 // thirty times. It is the whole of what the arm was told, which is the thing
@@ -163,30 +117,26 @@ await writeFile(join(into, 'system.txt'), await systemFor(arm), 'utf8');
 
 announce(task, arm, opts);
 
-const runs: TaskRun[] = [];
+const cells: Cell[] = [];
 
 for (let seed = 1; seed <= opts.seeds; seed++) {
   // eslint-disable-next-line no-await-in-loop -- each seed owns two servers and a port
-  const run = await once({ task, arm, seed, opts, into });
+  const cell = await runCell({ task, arm, seed, model: opts.model, cap: opts.cap, into });
 
-  runs.push(run);
-
-  const how = run.converged ? `converged in ${String(run.iterations)}` : 'did not converge';
-
-  console.log(
-    `seed ${String(seed)}  ${how}  $${run.costUSD.toFixed(MONEY)}  ` +
-      `${(run.durationMs / SECONDS).toFixed(0)}s` +
-      (run.tampering.length === 0 ? '' : `  VOID: reached ${run.tampering.join(', ')}`),
-  );
+  cells.push(cell);
+  say(cell);
 }
 
 // A run that reached for a test-only surface is void, whatever it then did:
 // counting it as converged would let an arm improve its own number by
 // cheating and have the cheating recorded in a field nobody sums.
-const scored = runs.filter((run) => run.tampering.length === 0);
-const converged = scored.filter((run) => run.converged);
-const cost = runs.reduce((sum, run) => sum + run.costUSD, 0);
-const iterations = converged.map((run) => run.iterations).toSorted((a, b) => a - b);
+const scored = cells.filter((cell) => cell.tampering.length === 0);
+const cost = cells.reduce((sum, cell) => sum + cell.costUSD, 0);
+
+// Censored at the cap: a run that never converged is a recorded outcome
+// (§1.4 step 4), and dropping it would flatter whichever arm fails more.
+// `analysis.ts` says why at length, and `test/analysis.test.ts` proves it.
+const iterations = scored.map((cell) => cell.iterations).toSorted((a, b) => a - b);
 
 await writeFile(
   join(into, 'summary.json'),
@@ -210,10 +160,11 @@ await writeFile(
       cap: opts.cap,
       hiddenSuite: SUITES.has(task.id),
       scored: scored.length,
-      converged: converged.length,
+      converged: scored.filter((cell) => cell.converged).length,
       iterations,
+      spread: iterations.length === 0 ? undefined : spreadOf(iterations),
       costUSD: cost,
-      voided: runs.length - scored.length,
+      voided: cells.length - scored.length,
     },
     null,
     2,
@@ -221,6 +172,8 @@ await writeFile(
   'utf8',
 );
 
-console.log(`\n${String(converged.length)}/${String(scored.length)} converged`);
+const converged = scored.filter((cell) => cell.converged).length;
+
+console.log(`\n${String(converged)}/${String(scored.length)} converged`);
 console.log(`iterations ${iterations.length === 0 ? 'none' : iterations.join(', ')}`);
 console.log(`cost $${cost.toFixed(MONEY)} · logs in ${into}`);

@@ -1,0 +1,889 @@
+# React control arm — everything you are given
+
+You are working in a Vite + React 19 application that uses **TanStack Query v5**
+for anything that comes from the API and **Zustand** for anything the person
+did. This document is the whole reference you get: there is no web access.
+
+---
+
+## 1. The app you are in
+
+```
+index.html            the page; loads /styles/global.css and /main.tsx
+main.tsx              composition root: the ONLY place a contract meets an adapter
+lib/                  pure helpers, no app knowledge (units, layout numbers)
+services/
+  devices.contract.ts the interface modules depend on
+  devices.fixture.ts  an in-memory implementation of it
+  devices.context.ts  how a module is handed the contract
+modules/
+  devices/            store + queries + components
+    index.ts          the module's ONLY public surface
+    Devices.tsx       components — pure functions of state
+    devices.store.ts  Zustand: client state and its transitions
+    devices.queries.ts TanStack Query: server state, the only impure file
+    devices.css
+  reading/            components only, no state of its own
+    index.ts, Reading.tsx, reading.css
+styles/global.css     layer order, design tokens, and one @import per module sheet
+```
+
+### The rules this app is written to
+
+1. **A module is a directory with an `index.ts`.** Nothing outside a module
+   imports one of its files directly — import the directory's `index.ts`.
+2. **Server state is not client state.** Anything that came from the API lives
+   in the TanStack Query cache. Anything the person did — a filter, a scroll
+   offset, which rows are busy — lives in the Zustand store. Never copy query
+   data into the store: you will then own keeping two copies in step, and they
+   will disagree.
+3. **Everything derivable is derived.** Sorting, filtering, counting and
+   grouping are computed where they are used, from the cache or the store.
+   They are not extra fields.
+4. **Components do no I/O.** They call the hooks in `*.queries.ts`. A `fetch`
+   inside a component is the thing this layout exists to prevent.
+5. **Dependencies arrive as parameters.** A module asks for the contract with
+   `useDeviceApi()` and never learns what implements it, which is what makes a
+   fake one in a test free.
+
+### The contract
+
+`services/devices.contract.ts` is the interface. Every promise-returning
+method takes an `AbortSignal` and honours it:
+
+```ts
+export interface DeviceApi {
+  list(room: string, signal: AbortSignal): Promise<readonly Device[]>;
+  limits(signal: AbortSignal): Promise<Limits>;
+  calibrate(id: number, signal: AbortSignal): Promise<Device>;
+  subscribe(onReadings: (r: readonly Reading[]) => void, signal: AbortSignal): Unsubscribe;
+}
+```
+
+Get it with `useDeviceApi()` from `services/devices.context.ts`. If you add a
+method, add it to the interface **and** to the fixture, or `tsc` fails.
+
+If a task needs data this contract does not describe, call `fetch` from a new
+`services/*.ts` adapter and give it the same shape: an interface, an
+implementation, an `AbortSignal` on every method. Do not scatter `fetch` calls
+through components.
+
+### Adding a module
+
+Create `modules/<name>/`, give it an `index.ts` that exports the component,
+add `@import url('/modules/<name>/<name>.css') layer(modules);` to
+`styles/global.css` if it has styles, and render it from its parent.
+
+---
+
+## 2. Running it
+
+```sh
+pnpm dev         # Vite dev server. Already running — do not start a second one.
+pnpm lint        # eslint .        MUST exit 0
+pnpm typecheck   # tsc --noEmit    MUST exit 0
+pnpm test        # node --test on the *.test.ts files
+```
+
+`pnpm lint` and `pnpm typecheck` are the two commands that decide whether your
+work counts as clean. Run both before you say you are done.
+
+Dependencies are already installed. **Do not run `pnpm install` or add
+packages** — there is no network, and the ones you have are the ones you get:
+React, React DOM, TanStack Query, Zustand, Vite, ESLint, TypeScript.
+
+Imports carry their extension (`./devices.store.ts`, `./Devices.tsx`). That is
+deliberate and it is what the existing files do; follow it.
+
+Hot module replacement is off, so a change is picked up on reload.
+
+---
+
+## 3. React 19, as this app uses it
+
+### Components
+
+A component is a function returning markup. It must be pure: same props and
+state in, same markup out, no side effects in the body.
+
+```tsx
+export function DeviceName({ device }: { readonly device: Device }): JSX.Element {
+  return <span className="device-name">{device.name}</span>;
+}
+```
+
+`className`, not `class`. `htmlFor`, not `for`. Event handlers are camelCase
+props (`onClick`, `onChange`, `onSubmit`, `onScroll`, `onKeyDown`).
+
+### Rules of hooks
+
+Hooks are called at the top level of a component or of another hook — never
+inside a condition, a loop, or after an early `return`. `eslint-plugin-react-hooks`
+is on and will fail `pnpm lint` if you break this. If a value is needed only
+sometimes, call the hook unconditionally and use the result conditionally.
+
+### State and effects
+
+```tsx
+const [open, setOpen] = useState(false);
+```
+
+`useState` is for state a single component owns. Anything two components need
+goes in the Zustand store instead of being lifted and threaded through props.
+
+`useEffect` is for synchronising with something outside React — a
+subscription, a timer, an event listener. It is **not** for deriving a value
+from props or state; derive that during render.
+
+```tsx
+useEffect(() => {
+  const controller = new AbortController();
+  const stop = api.subscribe(onBatch, controller.signal);
+
+  return () => {
+    stop();
+    controller.abort();
+  };
+}, [api, onBatch]);
+```
+
+Every effect that starts something returns a function that stops it. The
+dependency array lists every value from the render that the effect reads. In
+development React mounts, unmounts and remounts each component once, on
+purpose, to prove your cleanup works.
+
+### Lists
+
+```tsx
+{devices.map((device) => <DeviceRow key={device.id} device={device} />)}
+```
+
+`key` is a stable identity from the data — an id, never the array index, and
+never `Math.random()`. A wrong key makes React reuse the wrong row's state.
+
+### Events and forms
+
+```tsx
+<select value={room} onChange={(event) => filtered(event.currentTarget.value)}>
+```
+
+A controlled input takes `value` and `onChange` together. An input with
+`value` and no `onChange` is read-only and React warns about it.
+
+For a form, prevent the default and read the fields:
+
+```tsx
+const [text, setText] = useState('');
+
+<form onSubmit={(event) => { event.preventDefault(); onSave(Number(text)); }}>
+  <label htmlFor="limit">Upper limit</label>
+  <input id="limit" name="limit" value={text} onChange={(e) => setText(e.currentTarget.value)} />
+  <button type="submit">Save</button>
+</form>;
+```
+
+`<button>` inside a form defaults to `type="submit"`; one that is not
+submitting needs `type="button"`.
+
+Keep validation messages in state and render them beside the field. An element
+that should not be in the page yet is not rendered at all, rather than
+rendered and hidden.
+
+### Conditional rendering
+
+```tsx
+if (query.isPending) return <p className="note">Loading…</p>;
+if (query.isError) return <p className="note" role="alert">{query.error.message}</p>;
+
+return <DeviceList board={query.data} />;
+```
+
+Early returns read better than nested ternaries. Note `role="alert"` on
+something that appears to announce a problem.
+
+Beware `{count && <p>…</p>}`: when `count` is `0`, React renders the `0`. Write
+`{count > 0 && <p>…</p>}`.
+
+### Context
+
+React 19 renders a context object directly as its provider:
+
+```tsx
+<DeviceApiContext value={api}>{children}</DeviceApiContext>
+```
+
+and `use(Context)` reads it. `services/devices.context.ts` wraps that in
+`useDeviceApi()`, which throws if the provider is missing rather than falling
+back to something nobody meant to use.
+
+Context is for things that rarely change — the API adapter, a theme. It is not
+a state manager: every consumer re-renders when the value changes, which is
+what the Zustand store is for.
+
+### Types
+
+`strict` is on, with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`.
+So `array[0]` is `T | undefined` and you must check it. Props interfaces use
+`readonly` fields. No `any`: use `unknown` at a boundary and narrow.
+
+---
+
+## 4. TanStack Query v5
+
+Everything that comes from the API goes through Query. It owns fetching,
+caching, retrying, cancelling, and knowing when something is stale. You do not
+write that yourself, and you do not copy its data into a store.
+
+### The client
+
+`main.tsx` already does this:
+
+```tsx
+const client = new QueryClient();
+
+createRoot(host).render(
+  <QueryClientProvider client={client}>…</QueryClientProvider>,
+);
+```
+
+Defaults can be set once:
+
+```ts
+new QueryClient({
+  defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
+});
+```
+
+### Reading: `useQuery`
+
+```ts
+export function useBoard(): UseQueryResult<Board, Error> {
+  const api = useDeviceApi();
+  const room = useDevicesStore((state) => state.room);
+
+  return useQuery({
+    queryKey: ['board', room],
+    queryFn: async ({ signal }): Promise<Board> => {
+      const [devices, limits] = await Promise.all([api.list(room, signal), api.limits(signal)]);
+
+      return { devices, limits };
+    },
+  });
+}
+```
+
+**The query key is the identity of the data.** It is an array of anything
+serialisable, and everything the `queryFn` reads that can change must be in
+it. `['board', room]` means one cache entry per room: switch rooms and you get
+that room's entry, switch back and the first one is still there. Leave `room`
+out of the key and both rooms share one entry, which is the classic
+stale-data bug.
+
+**`queryFn` is given an `AbortSignal`.** Pass it down to every call you make.
+Query aborts it when the query is cancelled, which is what stops a slow answer
+for the room you left landing after a fast one for the room you are on.
+
+### What a query gives you
+
+| Field | Meaning |
+|---|---|
+| `data` | the value, or `undefined` while there has never been one |
+| `isPending` | there is no data yet (v5's name; v4 called it `isLoading`) |
+| `isError` / `error` | the fetch failed after its retries; `error` is typed |
+| `isSuccess` | there is data |
+| `isFetching` | a request is in flight right now, first or not |
+| `isRefetching` | fetching **and** there is already data — show a subtle marker, not the loading screen |
+| `refetch()` | ask again now; returns a promise |
+| `status` | `'pending' | 'error' | 'success'` if you prefer a switch |
+
+The three-way shape is the whole loading/error/ready story:
+
+```tsx
+if (board.isPending) return <p className="note">Loading devices…</p>;
+
+if (board.isError) {
+  return (
+    <p className="note" role="alert">
+      {board.error.message}
+      <button type="button" onClick={() => void board.refetch()}>Try again</button>
+    </p>
+  );
+}
+
+return <DeviceList board={board.data} />;
+```
+
+After those two checks TypeScript knows `board.data` is defined, so there is
+no `!` and no optional chain.
+
+### Retrying
+
+```ts
+useQuery({
+  queryKey: ['board', room],
+  queryFn,
+  retry: 2,                                       // 3 attempts in total
+  retryDelay: (attempt) => 100 * 2 ** attempt,    // 100 ms, then 200 ms
+});
+```
+
+`retry: 2` means two retries after the first attempt. While it is retrying the
+query is still `isPending` — it does not report an error until it has given up,
+which is usually what you want a screen to do. `retry: false` turns it off.
+
+### Other options worth knowing
+
+- `enabled: id !== undefined` — do not fetch until there is something to fetch.
+- `staleTime` — how long data counts as fresh (default `0`); fresh data is not
+  refetched on mount or refocus. `gcTime` — how long an unused entry is kept
+  (default 5 minutes).
+- `select: (data) => …` — derive a shape from the cached value without storing
+  it. Runs every render, so keep it cheap.
+- `placeholderData: keepPreviousData` (imported from the same package) — keep
+  the previous key's data on screen while a new key loads, which is what stops
+  a list blanking on every keystroke of a filter.
+- `refetchInterval: 5_000` — poll. Prefer a real subscription when there is one.
+
+### Writing: `useMutation`
+
+```ts
+const calibrate = useMutation({
+  mutationFn: (id: number) => api.calibrate(id, new AbortController().signal),
+});
+
+<button type="button" disabled={calibrate.isPending} onClick={() => calibrate.mutate(id)}>
+  Calibrate
+</button>
+```
+
+`mutate(input)` fires and forgets; `mutateAsync(input)` returns a promise, and
+if you use it you must catch, or an unhandled rejection is thrown. A mutation
+gives you `isPending`, `isError`, `error`, `data` and `reset()`.
+
+Unlike a query, a mutation is **not** cancelled when the component unmounts and
+its `mutationFn` is not handed a signal.
+
+### After a write: invalidate
+
+```ts
+const client = useQueryClient();
+
+useMutation({
+  mutationFn: (id: number) => api.calibrate(id, new AbortController().signal),
+  onSuccess: () => {
+    void client.invalidateQueries({ queryKey: ['board'] });
+  },
+});
+```
+
+`invalidateQueries` marks every entry whose key **starts with** that prefix as
+stale and refetches the ones being displayed. Prefix matching is why the first
+element of a key is a plain string naming the thing.
+
+### Optimistic updates
+
+Move the screen before the request lands, and put it back if it fails. This is
+the documented recipe and it is worth following exactly:
+
+```ts
+useMutation({
+  mutationFn: (id: number) => api.calibrate(id, new AbortController().signal),
+
+  onMutate: async (id: number) => {
+    const key = ['board', room];
+
+    // A refetch already in flight would land after this edit and overwrite it.
+    await client.cancelQueries({ queryKey: key });
+
+    const previous = client.getQueryData<Board>(key);
+
+    client.setQueryData<Board>(key, (board) =>
+      board === undefined
+        ? board
+        : { ...board, devices: board.devices.map((d) => (d.id === id ? { ...d, calibrated: true } : d)) },
+    );
+
+    return { key, previous };
+  },
+
+  onError: (_error, _id, context) => {
+    if (context !== undefined) client.setQueryData(context.key, context.previous);
+  },
+
+  onSettled: (_data, _error, _id, context) => {
+    if (context !== undefined) void client.invalidateQueries({ queryKey: context.key });
+  },
+});
+```
+
+Four things make this correct, and each of them is a bug if you skip it:
+
+1. **`cancelQueries` first**, or a refetch that is already running lands after
+   your edit and undoes it.
+2. **Snapshot before you write.** The value `onMutate` returns is handed to
+   `onError` and `onSettled` as their last argument — that is the rollback.
+3. **`setQueryData` immutably.** Build new objects; never mutate what you got
+   back, because Query hands you the cached value itself.
+4. **`onSettled` runs either way.** Clear the in-flight marks there, not in
+   `onSuccess`, or a failed write leaves the row stuck.
+
+If two rows can be written at once, keep the in-flight marks as a set of ids
+rather than one boolean, or the second write clears the first one's mark.
+
+### Reading and writing the cache directly
+
+```ts
+client.getQueryData<Board>(['board', room]);        // what is cached, or undefined
+client.setQueryData<Board>(['board', room], next);  // put a value in
+client.cancelQueries({ queryKey: ['board'] });      // abort in-flight fetches
+client.removeQueries({ queryKey: ['board'] });      // forget entries entirely
+```
+
+### Paging
+
+- **Page at a time**: the page number goes in the key, with
+  `placeholderData: keepPreviousData` so the current page stays on screen while
+  the next one loads.
+- **Accumulating**: `useInfiniteQuery` with `initialPageParam` and
+  `getNextPageParam: (last, all) => …` returning the next cursor, or
+  `undefined` when there are none. It gives `data.pages`, `fetchNextPage()`
+  and `hasNextPage`.
+
+### Live data
+
+Query has no socket of its own. Subscribe in an effect and either write the
+messages into the Zustand store (what this app does for readings) or fold them
+into the cache with `setQueryData`: the store when they are their own stream of
+values, `setQueryData` when they are updates to something a query already owns.
+
+Tear the subscription down in the effect's cleanup, and hold the connection
+state in React state rather than reading `readyState` during render — React
+will not re-render for that.
+
+---
+
+## 5. Zustand
+
+Everything the person did — a filter, a scroll offset, which ids are busy, a
+draft, whether a panel is open — goes here. Not what came from the API.
+
+### A store
+
+```ts
+import { create } from 'zustand';
+
+export interface DevicesStore {
+  readonly room: string;
+  readonly calibrating: readonly number[];
+
+  readonly filtered: (room: string) => void;
+  readonly calibrationStarted: (id: number) => void;
+  readonly calibrationSettled: (id: number) => void;
+}
+
+export const useDevicesStore = create<DevicesStore>()((set) => ({
+  room: '',
+  calibrating: [],
+
+  filtered: (room) => set({ room }),
+
+  calibrationStarted: (id) => set((current) => ({ calibrating: [...current.calibrating, id] })),
+
+  calibrationSettled: (id) =>
+    set((current) => ({ calibrating: current.calibrating.filter((one) => one !== id) })),
+}));
+```
+
+Note the `create<T>()(…)` double call: that is how Zustand gets the type
+inference right in TypeScript, and it is not a typo.
+
+`set` **merges** a partial state at the top level — you return only the fields
+that changed. It does not merge deeply: to change one field of a nested object
+you build a new object.
+
+`set((current) => …)` when the next value depends on the last one. `set({…})`
+when it does not.
+
+### Reading in a component
+
+```tsx
+const room = useDevicesStore((state) => state.room);
+const filtered = useDevicesStore((state) => state.filtered);
+```
+
+**Always select the narrowest slice you need.** `useDevicesStore()` with no
+selector subscribes the component to every field, so it re-renders on every
+change anywhere in the store.
+
+A selector must return something stable. Returning a new object or array every
+time makes the component re-render on every store change, because the result
+never compares equal:
+
+```tsx
+// Wrong: a new array each call.
+const both = useDevicesStore((s) => [s.room, s.scrollTop]);
+
+// Right: two selections…
+const room = useDevicesStore((s) => s.room);
+const scrollTop = useDevicesStore((s) => s.scrollTop);
+
+// …or one, compared shallowly.
+import { useShallow } from 'zustand/shallow';
+const { room, scrollTop } = useDevicesStore(useShallow((s) => ({ room: s.room, scrollTop: s.scrollTop })));
+```
+
+A selector may compute:
+
+```tsx
+const busy = useDevicesStore((state) => state.calibrating.includes(device.id));
+```
+
+That returns a boolean, which is stable, so the row re-renders only when *its*
+answer changes.
+
+Actions are stable for the life of the store, so selecting one never causes a
+re-render and it is safe in a dependency array.
+
+### Outside React
+
+```ts
+useDevicesStore.getState().filtered('Loft');          // read or act, no subscription
+useDevicesStore.setState({ room: '' });                // write from anywhere
+const stop = useDevicesStore.subscribe((s) => …);      // observe
+```
+
+`getState()` is how an effect, a socket handler or a test reaches the store
+without subscribing. In a test, `setState(INITIAL)` between cases puts it back:
+one store serves the whole application, so a test that leaves it dirty is one
+the next test depends on.
+
+### What not to put in it
+
+- Anything a query owns. If it came from the API, it is in the cache.
+- Anything one component owns and nothing else reads. That is `useState`.
+- Derived values. Compute them in a selector or during render.
+
+---
+
+## 6. The three of them together
+
+A screen usually needs all three layers, and the split is always the same:
+
+```tsx
+export function Devices(): JSX.Element {
+  const board = useBoard();             // server state: Query
+  const room = useDevicesStore((s) => s.room);   // client state: Zustand
+  const [open, setOpen] = useState(false);       // one component's own state
+
+  useLiveReadings();                     // subscription, inside an effect
+
+  …
+}
+```
+
+The question to ask about any new piece of state is: *who is the authority?*
+If the answer is "the server", it is a query. If it is "this person, in this
+tab", it is the store. If it is "this component, and nothing else cares", it
+is `useState`.
+
+### A filter that drives a fetch
+
+Put the filter in the store, and put the store value in the query key. The
+query refetches because the key changed; you never call anything by hand.
+
+```ts
+const room = useDevicesStore((state) => state.room);
+
+useQuery({ queryKey: ['board', room], queryFn: … });
+```
+
+### A detail panel that loads on demand
+
+```ts
+const selected = useDevicesStore((state) => state.selected);   // number | undefined
+
+const detail = useQuery({
+  queryKey: ['device', selected],
+  queryFn: ({ signal }) => api.device(selected as number, signal),
+  enabled: selected !== undefined,
+});
+```
+
+With `enabled`, `isPending` stays true while the query is disabled — if you
+need to tell "nothing chosen" from "loading", check the store value, not the
+query.
+
+### A long list
+
+Render only the rows in view. Keep the scroll offset in the store, compute the
+window from it, slice the sorted array, and put a spacer above and below so the
+scrollbar is the height the whole list would be:
+
+```tsx
+const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT_PX) - OVERSCAN);
+const shown = rows.slice(first, first + WINDOW_ROWS);
+
+<ul className="devices" onScroll={(e) => scrolled(e.currentTarget.scrollTop)}>
+  <li role="presentation" style={{ height: first * ROW_HEIGHT_PX }} />
+  {shown.map((row) => <DeviceRow key={row.id} device={row} />)}
+  <li role="presentation" style={{ height: (rows.length - first - shown.length) * ROW_HEIGHT_PX }} />
+</ul>
+```
+
+The row height in the stylesheet and the row height in that arithmetic are one
+constant in `lib/layout.ts`, published to CSS as a custom property. Two copies
+of that number is a list that drifts as you scroll.
+
+---
+
+## 7. Tests
+
+`node --test` with `node:assert/strict`, on the `.ts` files directly. happy-dom
+supplies the DOM. There is no testing library and no JSX in tests — Node strips
+types from `.ts` but cannot compile `.tsx` — so a test that needs to render
+uses `createElement` and `act`:
+
+```ts
+await act(async () => {
+  root.render(createElement(QueryClientProvider, { client }, createElement(Probe)));
+});
+```
+
+Pure things — the store's transitions, the derivations, the helpers in `lib/` —
+need none of that. Test those directly; they are the cheapest tests you have.
+
+A fake for the contract is an object literal, because the contract is an
+interface — no mocking framework.
+
+---
+
+## 8. Wrong → right
+
+**Copying query data into a store**
+
+```ts
+// Wrong
+useEffect(() => { setDevices(query.data ?? []); }, [query.data]);
+// Right
+const devices = query.data?.devices ?? [];
+```
+
+**A value left out of the query key**
+
+```ts
+// Wrong: every room shares one cache entry
+useQuery({ queryKey: ['board'], queryFn: () => api.list(room, signal) });
+// Right
+useQuery({ queryKey: ['board', room], queryFn: … });
+```
+
+**Dropping the signal**
+
+```ts
+// Wrong: the request you navigated away from still lands
+queryFn: () => api.list(room, new AbortController().signal),
+// Right
+queryFn: ({ signal }) => api.list(room, signal),
+```
+
+**Mutating the cache in place**
+
+```ts
+// Wrong
+client.setQueryData<Board>(key, (board) => { board!.devices[0]!.calibrated = true; return board; });
+// Right
+client.setQueryData<Board>(key, (board) =>
+  board === undefined ? board : { ...board, devices: withCalibration(board.devices, id, true) });
+```
+
+**Optimistic update with no rollback**
+
+```ts
+// Wrong: onMutate edits the cache and nothing puts it back
+onMutate: (id) => { client.setQueryData(key, edit); },
+// Right: return the snapshot, restore it in onError
+onMutate: async (id) => { const previous = client.getQueryData(key); … return { previous }; },
+onError: (_e, _id, context) => client.setQueryData(key, context?.previous),
+```
+
+**Clearing the in-flight mark in `onSuccess`**
+
+```ts
+// Wrong: a failed write leaves the row disabled forever
+onSuccess: (_d, id) => settled(id),
+// Right
+onSettled: (_d, _e, id) => settled(id),
+```
+
+**Subscribing without a selector**
+
+```ts
+// Wrong: re-renders on every change anywhere in the store
+const { room } = useDevicesStore();
+// Right
+const room = useDevicesStore((state) => state.room);
+```
+
+**A selector that allocates**
+
+```ts
+// Wrong: a new object every call, so it never compares equal
+const view = useDevicesStore((s) => ({ room: s.room, busy: s.calibrating }));
+// Right
+const view = useDevicesStore(useShallow((s) => ({ room: s.room, busy: s.calibrating })));
+```
+
+**An effect used to derive**
+
+```ts
+// Wrong
+const [sorted, setSorted] = useState<Device[]>([]);
+useEffect(() => { setSorted(byName(devices)); }, [devices]);
+// Right
+const sorted = byName(devices);
+```
+
+**The array index as a key**
+
+```tsx
+// Wrong: the row's own state follows the position, not the item
+{rows.map((row, i) => <DeviceRow key={i} device={row} />)}
+// Right
+{rows.map((row) => <DeviceRow key={row.id} device={row} />)}
+```
+
+**A subscription that is never torn down**
+
+```ts
+// Wrong
+useEffect(() => { api.subscribe(onBatch, signal); }, []);
+// Right
+useEffect(() => {
+  const controller = new AbortController();
+  const stop = api.subscribe(onBatch, controller.signal);
+
+  return () => { stop(); controller.abort(); };
+}, [api, onBatch]);
+```
+
+**A button in a form that should not submit**
+
+```tsx
+// Wrong: submits the form
+<button onClick={cancel}>Cancel</button>
+// Right
+<button type="button" onClick={cancel}>Cancel</button>
+```
+
+**Rendering a zero**
+
+```tsx
+// Wrong: renders "0" when there are none
+{devices.length && <p>{devices.length} reporting</p>}
+// Right
+{devices.length > 0 && <p>{devices.length} reporting</p>}
+```
+
+---
+
+## 9. Before you say you are done
+
+1. `pnpm lint` exits 0.
+2. `pnpm typecheck` exits 0.
+3. The behaviour the task asked for works in the running app.
+4. Any DOM hooks the task named are on the elements it named them for.
+5. Nothing is left behind: no unused state, no `console.log`, no commented-out
+   code, no second dev server running.
+
+
+---
+
+# The API, for the app you are building
+
+One server, already running. Everything below is stable for the whole task.
+There is no authentication step: the session already exists.
+
+Base URL: the origin this page is served from.
+
+## Resources
+
+### `GET /api/customers`
+
+Every customer, in a fixed order. `?q=<text>` filters on name and company,
+case-insensitively; an empty `q` is the same as no `q`.
+
+```json
+[{ "id": 1, "name": "Customer 1", "company": "Company 1", "country": "Netherlands" }]
+```
+
+### `GET /api/orders`
+
+```json
+[{ "id": 101, "customer": "Customer 1", "status": "pending" }]
+```
+
+`status` is one of `pending`, `packing`, `shipped`.
+
+### `POST /api/orders`
+
+Body:
+
+```json
+{ "customerId": 1, "quantity": 5, "note": "optional, 200 characters at most" }
+```
+
+`200` with `{ "id": 900 }` on success. `422` with field errors if the server
+refuses it:
+
+```json
+{ "errors": { "quantity": "Quantity must be a whole number between 1 and 1000." } }
+```
+
+The keys are field names: `customer`, `quantity`, `note`.
+
+### `PATCH /api/orders/:id`
+
+Body `{ "status": "shipped" }`. `200` with the updated order, `404` if there is
+no such order. The change persists, so a later `GET /api/orders` shows it.
+
+### `GET /api/session`
+
+```json
+{ "user": "Ada Bakker", "company": "Company 1" }
+```
+
+`401` with `{ "error": "session expired" }` once the session has ended. Every
+other route answers `401` from that point too.
+
+### `GET /api/instruments`
+
+```json
+[{ "symbol": "ACME", "name": "Acme Industries", "open": 100 }]
+```
+
+## Live prices
+
+`WS /ws/prices`. No subprotocol, no handshake message — messages start
+arriving on connect. Each is JSON:
+
+```json
+{ "type": "price", "symbol": "ACME", "price": 99.66, "ts": 1 }
+```
+
+`ts` is a tick counter, not a clock reading. One other message can arrive:
+
+```json
+{ "type": "session_expired" }
+```
+
+## Errors
+
+Every failure other than a `422` uses one shape:
+
+```json
+{ "error": "some message" }
+```
+
+Statuses you may see: `400`, `401`, `404`, `409`, `422`, `500`. Any route may
+be slow, and any route may fail — the server is deliberately unreliable, and
+handling that is part of the task.
