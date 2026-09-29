@@ -47,7 +47,16 @@ function fakeSession(): Session & { said: string[] } {
     async say(message: string): Promise<Reply> {
       said.push(message);
 
-      return { ok: true, text: 'done', turns: 1, costUSD: 1, durationMs: 1, raw: '' };
+      return {
+        ok: true,
+        text: 'done',
+        turns: 1,
+        costUSD: 1,
+        durationMs: 1,
+        timedOut: false,
+        outside: [],
+        raw: '',
+      };
     },
   };
 }

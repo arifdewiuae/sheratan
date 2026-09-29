@@ -164,10 +164,8 @@ export function verdictLineOf(stem: string, step: Step): string {
   return `${stem} · iteration ${String(step.n)}: ${checker}, ${tests}`;
 }
 
-/** Writes the snapshot another process reads, and adds `line` to the log. */
-function record(into: string, line: string, progress: Progress, startedAt: number): void {
-  appendFileSync(join(into, 'progress.log'), `${new Date().toISOString()} ${line}\n`);
-
+/** Writes the snapshot another process reads. */
+function snapshotTo(into: string, progress: Progress, startedAt: number): void {
   writeFileSync(
     join(into, 'progress.json'),
     `${JSON.stringify({ status: statusOf(progress), startedAt, ...progress }, null, INDENT)}\n`,
@@ -194,7 +192,8 @@ export interface Watcher {
 /**
  * The grid's two displays: a bar redrawn in place when `out` is a terminal
  * (plain lines otherwise), and a snapshot and log on disk that any other
- * process can read while the grid runs.
+ * process can read while the grid runs. The snapshot is rewritten on every
+ * redraw, not only on events, so its clock moves while a turn is running.
  *
  * @example
  * const watcher = watch({ total: planned.length, into, out: process.stdout });
@@ -218,21 +217,20 @@ export function watch(options: WatcherOptions): Watcher {
   });
 
   const draw = (): void => {
-    if (tty) options.out.write(`${REDRAW}${statusOf(snapshot())}`);
+    const now = snapshot();
+
+    snapshotTo(options.into, now, started);
+
+    if (tty) options.out.write(`${REDRAW}${statusOf(now)}`);
   };
 
   const note = (line: string): void => {
-    const now = snapshot();
-
-    options.out.write(tty ? `${REDRAW}${line}\n` : `${line}\n${statusOf(now)}\n`);
-    record(options.into, line, now, started);
-
+    options.out.write(tty ? `${REDRAW}${line}\n` : `${line}\n${statusOf(snapshot())}\n`);
+    appendFileSync(join(options.into, 'progress.log'), `${new Date().toISOString()} ${line}\n`);
     draw();
   };
 
-  const ticker = setInterval(draw, TICK_MS);
-
-  ticker.unref();
+  const ticker = setInterval(draw, TICK_MS).unref();
 
   return {
     begin(stem) {

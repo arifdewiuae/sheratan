@@ -4,6 +4,7 @@
   "private": true,
   "description": "The control arm of the Week 0 comparison (EVAL-TASKS §1.2): Vite + React 19 + TanStack Query v5 + Zustand, in the same app shape as the `sheratan create` template. Its own pnpm root — see pnpm-workspace.yaml.",
   "type": "module",
+  "packageManager": "pnpm@12.4.1",
   "scripts": {
     "dev": "vite",
     "lint": "eslint .",

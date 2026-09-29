@@ -9,13 +9,15 @@
 // run: a grid of thirty costs tens of dollars and hours, and a crash on the
 // twenty-fifth must not take the first twenty-four with it.
 
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { Arm } from './arm.ts';
 import type { Cell } from './analysis.ts';
+import { assertConfined, profileFor } from './confine.ts';
 import { CONTRACT_FILE, type Task } from './frozen.ts';
 import { iterate, type Step, type SuiteRun, type TaskRun } from './iterate.ts';
+import { modulesFor } from './modules.ts';
 import { openSession } from './session.ts';
 import { SUITES } from './suite.ts';
 import { setUpStage } from './stage.ts';
@@ -32,7 +34,7 @@ export const NO_SUITE: SuiteRun = { ok: true, failing: [], raw: 'no hidden suite
  * budget, identically for every arm.
  *
  * @example
- * const session = openSession({ root, model, system: await systemFor(arm) });
+ * const session = openSession({ root, realRoot, profile, model, system: await systemFor(arm) });
  */
 export async function systemFor(arm: Arm): Promise<string> {
   const [docs, contract] = await Promise.all([
@@ -72,15 +74,33 @@ function recordOf(options: CellOptions, run: TaskRun): Cell {
     costUSD: run.costUSD,
     durationMs: run.durationMs,
     tampering: run.tampering,
+    timedOut: run.log.filter((one) => one.reply.timedOut).length,
+    outside: run.log.reduce((sum, one) => sum + one.reply.outside.length, 0),
   };
 }
 
 /** The stage, the session and the loop — everything but the bookkeeping. */
 async function work(options: CellOptions): Promise<TaskRun> {
-  await using stage = await setUpStage({ arm: options.arm, seed: options.seed });
+  const modules = await modulesFor(options.arm);
+
+  await using stage = await setUpStage({ arm: options.arm, seed: options.seed, modules });
+
+  // The profile is proved on this sandbox before the agent is let into it.
+  const realRoot = await realpath(stage.root);
+  const profile = profileFor(realRoot);
+
+  await assertConfined(profile, join(stage.root, 'package.json'));
 
   const system = await systemFor(options.arm);
-  const session = openSession({ root: stage.root, model: options.model, system });
+
+  const session = openSession({
+    root: stage.root,
+    realRoot,
+    profile,
+    model: options.model,
+    system,
+  });
+
   const suite = SUITES.get(options.task.id);
 
   return await iterate({

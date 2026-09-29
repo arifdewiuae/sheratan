@@ -147,9 +147,14 @@ function lineFor(one: Planned, cell: Cell, reused: boolean): string {
   const money = reused ? 'from disk' : `$${cell.costUSD.toFixed(MONEY)}`;
   const voided = cell.tampering.length === 0 ? '' : `  VOID: reached ${cell.tampering.join(', ')}`;
 
+  const stopped =
+    (cell.timedOut ?? 0) === 0 ? '' : `  ${String(cell.timedOut)} turn(s) at the limit`;
+
+  const outside = (cell.outside ?? 0) === 0 ? '' : `  ${String(cell.outside)} refused outside`;
+
   return (
     `${one.task.id} ${one.arm.id.padEnd(ARM_WIDTH)} seed ${String(one.seed)}  ` +
-    `${how}  ${money}  ${(cell.durationMs / SECONDS).toFixed(0)}s${voided}`
+    `${how}  ${money}  ${(cell.durationMs / SECONDS).toFixed(0)}s${voided}${stopped}${outside}`
   );
 }
 
