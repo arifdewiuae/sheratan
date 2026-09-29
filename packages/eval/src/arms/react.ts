@@ -11,16 +11,18 @@
 // answer to T01/T03/T04, and the control inherits that protection only by
 // being the same app — `contamination.ts` checks both.
 //
-// Nothing here installs anything. `controls/react` is installed once by hand
-// (`pnpm install --ignore-workspace`), and a sandbox borrows that tree through
-// a symlink, so thirty runs cannot drift from one another or from the
-// committed lockfile.
+// `controls/react` is installed once by hand (`pnpm install` in that
+// directory), and the references borrow that tree. A confined eval run cannot
+// read the repository, so `install` lays the same frozen lockfile down outside
+// it (`modules.ts`) — once per run, shared by every cell, so no two cells can
+// drift from one another or from the committed lockfile.
 
-import { cp, symlink } from 'node:fs/promises';
+import { copyFile, cp, readFile, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { Arm, Command } from '../arm.ts';
+import { pinnedManifest, pnpm } from '../modules.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -64,6 +66,20 @@ export const reactArm: Arm = {
     // been installed is deliberate: `pnpm check` scaffolds every arm for the
     // contamination gate, and CI has no React in it.
     await symlink(join(CONTROL_APP, 'node_modules'), join(root, 'node_modules'), 'dir');
+  },
+
+  async install(into: string): Promise<void> {
+    const manifest = JSON.parse(
+      await readFile(join(CONTROL_APP, 'package.json'), 'utf8'),
+    ) as Record<string, unknown>;
+
+    await writeFile(join(into, 'package.json'), await pinnedManifest(manifest), 'utf8');
+    await copyFile(join(CONTROL_APP, 'pnpm-lock.yaml'), join(into, 'pnpm-lock.yaml'));
+    await copyFile(join(CONTROL_APP, 'pnpm-workspace.yaml'), join(into, 'pnpm-workspace.yaml'));
+
+    // The committed lockfile, frozen: the control a run gets is the one in
+    // the repository, and its own workspace file carries its policy.
+    await pnpm(into, ['install', '--frozen-lockfile', '--prefer-offline']);
   },
 
   serving(port: number): Command {

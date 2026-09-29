@@ -1,0 +1,590 @@
+# SHERATAN
+
+> A frontend framework with one legal way to structure an app. Signals and
+> tagged templates, no virtual DOM, no bundler. A checker enforces the module
+> rules and reports every violation as JSON with a code and a fix.
+> This is llms.txt v0: it covers what the runtime ships today.
+
+## 1. The trap — read this first
+
+A template hole is reactive only when it receives the signal itself.
+JavaScript evaluates `${…}` before `html` runs, so a *call* inside a hole
+hands the runtime a plain value that never updates.
+
+```ts
+html`<span>${s.total}</span>`          // ✓ updates
+html`<span>${s.total()}</span>`        // ✗ read once at mount (SHR-V003)
+html`<span>${s.total() * 2}</span>`    // ✗ read once; make a computed
+const t = s.total(); html`${t}`        // ✗ read once, same reason
+```
+
+This looks like every other framework and is wrong here. Any expression — maths,
+formatting, a ternary choosing markup — becomes a named `computed`, and the
+hole gets the computed.
+
+## 2. API
+
+```ts
+import { signal, computed, watch, batch, resource, mutation, stream, onDispose, flush, html, each, mount, render, location, routes, navigate, Backoff, ResourceStatus, MutationStatus, StreamStatus } from 'sheratan';
+```
+
+<!-- generated from TSDoc by packages/core/scripts/llms.ts -->
+
+| API | Meaning |
+|---|---|
+| `signal<T>(initial: T): Signal<T>` | A writable value. Read it by calling it, write it with `.set()`. Writing an equal value (`Object.is`) notifies nobody, and the value is frozen, so state can only be replaced, never mutated (SPEC §5 Immutability). |
+| `computed<T>(fn: () => T): Accessor<DeepReadonly<T>>` | A derived value: evaluated on first read, cached until a source changes. Every expression over state is a named computed — that is the one way to derive (SPEC §9 "Holes take signals by reference"). |
+| `watch(fn: () => void): Disposer` | Runs `fn` now, and again whenever something it read changes. Returns the disposer; the owning module disposes it automatically (SPEC §5b). |
+| `batch<T>(fn: () => T): T` | Writes inside `fn` commit once, when the outermost batch ends. |
+| `resource<T, K extends readonly unknown[]>(options: ResourceOptions<T, K>): Resource<T>` | Async state on a reactive key. The request is aborted when the key changes, when `abort()` is called and when the owning module unmounts; an identical key is not refetched, a superseded response is discarded, and errors are values. Legal in `*.effects.ts` only (`SHR-L004`). |
+| `mutation<I, R>(options: MutationOptions<I, R>): Mutation<I>` | A write with its optimistic update, rollback and follow-up specified rather than left to each app. Runs for one `key` are serialized and different keys run at once; `optimistic` and `rollback` are transitions, passed by reference; a failure is a value in `error()`, and a cancelled run is not a failure. Unmounting aborts every request in flight and drops the queue. Legal in `*.effects.ts` only (`SHR-L004`). |
+| `stream<T, M, K extends readonly unknown[]>(options: StreamOptions<T, M, K>): Stream<T>` | Push data on a reactive key. The subscription is torn down when the key changes and when the owning module unmounts; messages are folded as they arrive and the value is committed once per frame, so a flood coalesces instead of queueing. Legal in `*.effects.ts` only (`SHR-L004`). |
+| `onDispose(fn: () => void): void` | Registers teardown for a subscription the runtime cannot see, such as `addEventListener` or `setInterval`. Legal in `*.effects.ts` only (SHR-L004). |
+| `flush(): void` | Applies pending DOM updates now, for tests and for code that must read layout immediately after a write. |
+| `html(strings: TemplateStringsArray, ...values: unknown[]): Template` | Markup with holes. A hole is reactive only when it receives the signal itself: `${total}` updates, `${total()}` is read once (SPEC §9, SHR-V003). |
+| `each<T>(list: Accessor<readonly T[]> \| readonly T[], row: (item: Accessor<T>) => Template, window?: Accessor<EachWindow>): Each` | A keyed list. Objects key by `id`, primitives by value; the row function runs once per key. A `window` makes it positional instead: a fixed pool of rows, rewritten in place as the window moves, with spacers holding the rest open. |
+| `mount<P>(view: ModuleView<P>, props: P): Mounted` | Renders another module inside this one, with props. Props carry accessors rather than values, so the child's own holes update and nothing re-renders; the argument is omitted when the module's view takes none. Its lifetime is bound to the parent's: when the parent unmounts, the child is disposed. |
+| `render(view: () => Template, host: Element): Disposer` | Mounts `view` into `host`. It owns only the nodes it inserts, so it can live inside an app built with something else, and the disposer removes exactly those nodes. |
+| `location(): Location` | The current URL, as a signal. Reading it in a view is how a link marks itself active; changing it is what `navigate()` is for. |
+| `routes<T>(table: RouteTable<T>): Accessor<T \| undefined>` | Matches the URL against a flat table and returns the screen it names, or `undefined` when nothing matches — give the table a `'*'` row to say what happens then. |
+| `navigate(to: string, options?: NavigateOptions): void` | Goes to `to`. Legal in `*.effects.ts` only (`SHR-L004`): a view emits the intent and effects carries it out. |
+
+<!-- end generated -->
+Types: `Signal<T>` (callable + `.set`), `Accessor<T>` (`() => T`), `DeepReadonly<T>`,
+`Template`, `Each`, `Disposer` (a teardown that also works with `using`).
+
+**Scheduling.** Computeds update synchronously. DOM updates wait for the next
+animation frame; many writes in one frame produce one DOM write with the last
+value. In unit tests call `flush()` before asserting on the DOM.
+
+**Immutability.** Never mutate a value held in a signal. Write a new object or
+array: `items.set([...items(), next])`, `items.set(items().map(d => d.id === id ? { ...d, reading } : d))`.
+
+## 3. Holes
+
+| Value in the hole | Result |
+|---|---|
+| signal or computed (`${s.name}`) | reactive |
+| string, number | text, escaped — never markup |
+| `null`, `undefined`, `false` | nothing (attribute: removed) |
+| `true` in an attribute | empty attribute (`hidden=""`) |
+| `html` template | nested markup |
+| a computed returning a template or `null` | conditional markup |
+| `each(…)` | keyed list |
+
+An attribute hole must be the whole value: `class=${cls}` or `class="${cls}"`.
+`class="row ${x}"` throws — make `cls` a computed.
+
+Conditional markup is a computed in the view:
+
+```ts
+const body = computed(() => {
+  if (s.status() === 'loading') return html`<p>Loading…</p>`;
+  if (s.status() === 'failed') return html`<p class="error">${s.error}</p>`;
+  return table;
+});
+return html`<main>${body}</main>`;
+```
+
+## 4. Events and intents
+
+Views never act; they emit intents. An event hole takes a named handler —
+never an inline arrow (SHR-V001). The handler receives a payload, not the Event:
+
+| Event | Payload |
+|---|---|
+| `submit` | form fields as an object; default is prevented |
+| anything else | the element's `value`, or `checked` for a checkbox; `undefined` if it has neither |
+
+The payload is read from the **element**, not chosen by the event's name, so a
+component library's own event works like a native one: `@sl-change=${intent.filter}`
+on an `<sl-select>` delivers its `value`. A `<button value="ascending">` names
+itself the same way, which is why a `data-` attribute is never the answer.
+
+Inside an `each` row a handler also gets a **second argument: the row's
+current item** (innermost row). Every handler runs inside `batch()`.
+
+```ts
+html`<button @click=${intent.calibrate}>Calibrate</button>`   // inside a row
+// effects:  calibrate: (_payload, device: Device) => { … }
+```
+
+## 5. Lists
+
+`each(list, row)`: `list` is a signal/computed of an array (or a plain array,
+rendered once). Objects are keyed by `id` (required, unique); primitives by
+value. `row` runs **once per key** and receives an **accessor** for the item.
+A new object with the same `id` updates that row's cells in place; the row is
+not rebuilt. Read fields through computeds:
+
+```ts
+each(s.visible, (device) => {
+  const reading = computed(() => device().reading);
+  return html`<li><span>${reading}</span>
+    <button @click=${intent.calibrate}>Calibrate</button></li>`;
+})
+```
+
+`${device().reading}` inside the row is the trap again.
+
+**Long lists: `each(list, row, window)`.** A third argument renders only a
+slice. The window is yours to measure — a `scroll` listener in `*.effects.ts`
+— and `each` keeps a fixed pool of rows, rewriting their items as the window
+moves instead of creating and destroying nodes:
+
+```ts
+const rowWindow = computed(() => ({
+  start: Math.max(0, Math.floor(scrollTop() / ROW_HEIGHT) - OVERSCAN),
+  count: VISIBLE + OVERSCAN * 2,
+  rowHeight: ROW_HEIGHT,
+}));
+// view:  each(s.rows, row, s.rowWindow)
+```
+
+The scroll container needs `overflow-anchor: none`, or the list runs away:
+the spacer above the rows changes height on every step, the browser moves
+`scrollTop` to hold its anchor still, and that move fires another scroll.
+
+A windowed list is **positional, not keyed**: a slot is recycled, so a row's
+node stays with the screen position rather than with its item. An out-of-range
+window is clamped. Use the plain two-argument form unless the list is long
+enough to need this.
+
+## 5a. Async: `resource()`, `mutation()` and `stream()`
+
+Effects only. One primitive replaces a query library: it fetches on a reactive
+key, cancels what the key replaced, retries, and keeps showing the previous
+value while it revalidates.
+
+```ts
+// devices.effects.ts
+const board = resource({
+  key: () => ['devices', state.room()] as const,
+  fetch: ({ key, signal }) => api.list(key[1], signal),
+  staleAfter: 30_000,
+  retry: { attempts: 3, backoff: Backoff.Exponential },
+});
+```
+
+`status()` is `'idle' | 'loading' | 'ready' | 'error' | 'refreshing'`.
+`data()` is the value for the *current* key, or `undefined`. `error()` is why
+the last attempt failed. Narrow with `is()`, never by comparing `status()`:
+
+```ts
+if (board.is('ready')) board.data().length;   // data() is T here
+if (board.is('error')) board.error().message; // error() is Error here
+```
+
+Beyond what the table above guarantees:
+
+- **Cancellation is never failure:** an `AbortError` does not reach `error()`.
+- `staleAfter` revalidates in the background: `'refreshing'` with `data()`
+  still readable, then `'ready'`. Leave it out and a key is fetched once.
+- `retry.attempts` counts the first try, so `3` is one try and two retries.
+  Backoff starts at 100 ms; `Backoff.Exponential` doubles it each attempt and
+  `Backoff.Fixed` does not. The status constants are named the same way —
+  `ResourceStatus`, `MutationStatus`, `StreamStatus` — so nothing in an app has
+  to spell a state as a bare string.
+- A resource holds its own value and nothing else's: there is no cache shared
+  between modules. Two modules asking for the same key make two requests, and
+  `invalidate()` on one does not touch the other.
+
+A write is `mutation()`. `optimistic` and `rollback` are transitions from the
+state module, **passed by reference** — never wrapped in an arrow, never a
+direct write:
+
+```ts
+// devices.effects.ts
+const calibrate = mutation({
+  key: (device) => device.id,
+  send: ({ input, signal }) => api.calibrate(input.id, signal),
+  optimistic: state.calibrating,
+  rollback: state.calibrationReverted,
+  onSuccess: board.invalidate,
+});
+
+void calibrate.run(device);   // resolves when this run settles; never rejects
+```
+
+- `optimistic` runs the moment `run()` is called; `send` follows.
+- **Same key waits, different keys don't.** Two writes to one record are
+  serialized so they cannot land in the wrong order; two different records are
+  in flight at once. Leave `key` out and every run waits for the one before —
+  right for a form. A key is a `string | number`, usually an id.
+- A double-click is not a second write: guard with
+  `if (save.status() === 'running') return;` in the effect.
+- A failure calls `rollback`; so does a cancelled request — the write did not
+  happen — but only the failure reaches `error()`.
+- An exception from `onSuccess` lands in `error()` and rolls nothing back: the
+  write already succeeded.
+- `status()` is `'idle' | 'running' | 'done' | 'error'`, `'running'` while
+  anything is in flight or queued.
+
+`resource()` is request/response. Push data — a socket, an event source, a
+`BroadcastChannel` — is `stream()`:
+
+```ts
+// devices.effects.ts
+const live = stream({
+  key: () => ['readings', state.room()] as const,
+  subscribe: ({ emit, close }) => api.subscribe(emit, signal),
+  reduce: (latest, batch) => ({ ...latest, ...byId(batch) }),   // O(1) per message
+  initial: {},
+});
+```
+
+A stream reads like any other value — `live()` — with `live.status()`
+(`'connecting' | 'open' | 'closed'`) and `live.error()` beside it.
+
+- **`reduce` runs once per message; the value is written once per frame.** A
+  thousand messages a second cost a thousand O(1) folds and one DOM write.
+  That is why `reduce` must be O(1): an O(n) fold over a 500-row table blows
+  the frame budget no matter how good the scheduler is. `reduceMany(previous,
+  messages[])` takes the whole frame's batch when per-message work is
+  impossible; the type admits exactly one of the two reducers.
+- `subscribe` **must return a teardown** — that is how the runtime ends the
+  subscription on a key change and on unmount. A promise of one is fine; the
+  status stays `'connecting'` until it resolves.
+- A new key tears down, resubscribes, and resets the value to `initial`.
+  `close(reason?)` lets the adapter say the source ended, and the last value
+  stays readable so a view can mark it stale rather than blanking.
+
+## 5b. Debugging: the causal trace
+
+Development builds carry a trace of what caused what, off until you ask:
+
+```js
+__sheratan.start();  // … reproduce … then:
+console.log(__sheratan.format());   // write → computeds → patched node, as a tree
+__sheratan.stop();
+```
+
+`__sheratan.trace()` returns the same chains as JSON —
+`{ depth, dropped, entries: [{ at, cause, kind, source, from, to }] }` — for
+when the answer has to be parsed rather than eyeballed. Steps sharing a `cause`
+are one chain. A write the runtime makes itself (`each` rewriting a row) nests
+under the write that caused it and is attributed to `sheratan`. Past 1000
+writes a second the trace samples and reports how many entries it `dropped`.
+None of this exists in a production build.
+
+## 6. Module rules
+
+The unit of code is a module: a folder under `modules/`.
+
+```
+modules/<name>/
+  <name>.state.ts     signals, computeds, transitions. No I/O, no DOM.
+  <name>.effects.ts   everything impure: calls to services, timers, watchers.
+  <name>.view.ts      (state, intents) => html. No I/O, no writes.
+  index.ts            the module's only public surface; declares its kind.
+services/
+  api.contract.ts     interface the modules depend on
+  api.http.ts         adapter: URLs, fetch, parsing
+lib/                  pure helpers, no app knowledge
+ui/<component>/       stateless reusable components
+app.ts                composition root: builds services, mounts modules
+```
+
+`index.ts` declares `export const kind = 'full'` (all four files) or `'view'`
+(view + index only). No `shared/` folder. A component used by one module lives
+inside that module.
+
+**Import matrix** — the whole rule set for imports (SHR-L001):
+
+| From | May import |
+|---|---|
+| `lib/` | `lib/`, never in a cycle |
+| `ui/` | `lib/`, `ui/` |
+| `services/` | `lib/`, `services/` |
+| `*.state.ts` | `lib/`, own module |
+| `*.effects.ts` | `lib/`, `services/` contracts, own state, other modules' `index.ts` |
+| `*.view.ts` | `lib/`, `ui/`, own state |
+| `index.ts` | own module files |
+| `app.ts` | everything |
+
+Any module file may also `import type` from `services/*.contract.ts` — that is
+where domain types live — and from another module's `index.ts`, to type a
+module it receives as a parameter. A value import from `services/` in state,
+view or index is SHR-L001. Test files are not checked.
+
+`sheratan` itself may be imported anywhere, but `watch` and `onDispose` belong in
+effects. Data flows one way: effects → state → view.
+
+**Composing modules.** A view renders a child with `mount()` and never imports
+it. The instance is built where its dependencies exist — `app.ts`, or the
+parent's effects — and passed in as a value; props carry accessors, so the
+child updates in place: `html\`${mount(readingPanel, { deviceId: s.selectedId })}\``.
+The child's lifetime is the parent's, and one `mount()` belongs to one hole
+(SHR-R009).
+
+**Transitions.** A transition is a plain function exported from the state
+factory. It is the only thing that writes signals. One that writes several
+signals wraps them in `batch()`. An effect that gathers several results calls
+**one** transition with all of them — two calls render an in-between state.
+
+**The state surface is read-only (SHR-L010).** `create<Name>State()` declares an
+interface whose members are `Accessor` values and transitions; the `Signal`
+handles stay private to `<name>.state.ts`. `Accessor<T>` is `() => T` with no
+`.set`, so `state.rows.set(list)` from effects or a view does not compile.
+Never type a state factory as `ReturnType<typeof create…>` — that leaks the
+signals. A transition handed to `mutation()` is read off the object and called
+detached, so declare each one `(this: void, …)`.
+
+**State holds only what cannot be derived.** Filters, joins, counts, formatted
+values and "is anything selected" are computeds, never stored.
+
+**Cancellable I/O.** Every Promise-returning contract method takes an
+`AbortSignal` (SHR-L007). Effects abort in-flight work in `onDispose`.
+
+## 7. The shape of a module
+
+`sheratan create` writes this for you, filled in and passing `sheratan check` —
+read that app rather than reconstructing one from here. The shape:
+
+```ts
+// services/devices.contract.ts — the interface modules depend on
+export interface Device { readonly id: number; readonly name: string; readonly reading: number }
+export interface DeviceApi {
+  list(room: string, signal: AbortSignal): Promise<readonly Device[]>;
+}
+
+// devices.state.ts — signals private, accessors and transitions declared
+export interface DevicesState {
+  readonly status: Accessor<Status>;
+  readonly visible: Accessor<readonly Device[]>;   // derived, never stored
+  readonly count: Accessor<number>;
+  readonly loaded: (this: void, devices: readonly Device[]) => void;
+  readonly failed: (this: void, message: string) => void;
+}
+
+export const createDevicesState = (): DevicesState => {
+  const devices = signal<readonly Device[]>([]);
+  const status = signal<Status>('loading');
+  return {
+    status,
+    visible: computed(() => devices()),
+    count: computed(() => devices().length),
+    loaded: (list) => batch(() => { devices.set(list); status.set('ready'); }),
+    failed: (message) => batch(() => { … }),
+  };
+};
+
+// devices.effects.ts — the only file that touches a service
+export const createDevicesEffects = (api: DeviceApi, state: DevicesState) => ({
+  load: () => { … }, calibrate: (_payload, device: Device) => { … },
+});
+
+// devices.view.ts — (state, intents) => html, no I/O and no writes
+export const devicesView = (s: DevicesState, intent: DevicesIntents) => html`…`;
+
+// index.ts — the module's whole public surface
+export const kind = 'full';
+export const createDevices = (api: DeviceApi) => () => {
+  const state = createDevicesState();
+  const effects = createDevicesEffects(api, state);
+  effects.load();
+  return devicesView(state, effects);
+};
+
+// app.ts — the one place a contract meets an adapter
+render(createDevices(createHttpDevices('/api')), document.querySelector('#app'));
+```
+
+`index.ts` returns a function, so state and effects are created inside
+`render()` and everything they start is disposed with it. The view declares the
+intents it needs; the effects object satisfies them. `DevicesState` is declared
+rather than inferred, so effects and view hold accessors and cannot write a
+signal even by accident.
+
+## 8. Tests
+
+State is pure and needs no mocks. Effects get a fake contract object.
+
+```ts
+const s = createDevicesState();
+s.loaded([{ id: 1, name: 'Boiler', reading: 41.2 }]);
+assert.equal(s.count(), 1);
+assert.equal(s.status(), 'ready');
+```
+
+Tests are `<name>.state.test.ts` and `<name>.effects.test.ts` next to the
+module (SHR-T001 warns when missing). End-to-end tests live in `e2e/`.
+
+## 9. Wrong → right
+
+| Wrong | Right | Code |
+|---|---|---|
+| `${s.total()}` in a hole | `${s.total}` | V003 |
+| `${a() + b()}` in a hole | `const sum = computed(() => a() + b())`, then `${sum}` | V003 |
+| `@click=${() => intent.pick(id)}` | `@click=${intent.pick}` inside the row; handler reads its 2nd argument | V001 |
+| `fetch(…)` in a view or state | contract method in `services/`, called from effects | L002 / L001 |
+| `state.rows.set(list)` in effects | a transition: `state.loaded(list)` | L005 |
+| state exposes `rows: Signal<T>` | `rows: Accessor<T>` plus a transition that writes it | L010 |
+| `import { x } from '../other/other.state.ts'` | `import { … } from '../other/index.ts'` (effects only) | L001 |
+| view imports effects | the view receives intents as a parameter | L001 |
+| `state.a(x); state.b(y);` after one await | one transition taking `{ x, y }` | — |
+| storing a filtered list in a signal | `computed(() => rows().filter(…))` | — |
+| `item().field` read directly in a row hole | `computed(() => item().field)` | V003 |
+| `load(): Promise<…>` without a signal | `load(opts: { signal: AbortSignal })` | L007 |
+| `items().push(x)` | `items.set([...items(), x])` | L011 |
+| `watch`/`onDispose` in a view | move to effects | L004 |
+
+## 9b. Running and shipping an app
+
+```sh
+npx sheratan create <app>                    # a complete app, in the canonical shape
+npx sheratan check [directory] [--json]      # the architecture rules
+npx sheratan dev   [directory] [--port 5173] # serve it, types stripped on the way out
+npx sheratan build [directory] [--out dist]  # the same thing, written to a directory
+```
+
+**Start from `create` rather than from memory.** It writes a working app that
+passes `sheratan check` with no findings and exercises every rule code — a
+contract-backed service, a `resource()`, a `mutation()` with rollback, a
+`stream()`, a windowed `each`, a `mount()`, a scoped stylesheet and both test
+files. Copy its shape; do not invent one. The argument is a directory, and it
+refuses one that already has files in it.
+
+`--no-reload` keeps `dev`'s reload from landing mid-assertion in an e2e run.
+`build` writes ESM any static file server can serve — no bundler, no config.
+It strips with Node's own stripper, so it can only erase: an `enum`, a
+`namespace` or a parameter property is refused by name.
+
+## 10. Checker output
+
+`sheratan check` needs `typescript` in the project. With `--json` it prints
+`{ "version": 1, "findings": [ … ] }`:
+
+```json
+{
+  "code": "SHR-L001",
+  "severity": "error",
+  "file": "modules/todo/todo.view.ts",
+  "range": { "line": 3, "column": 1 },
+  "message": "view cannot import effects; allowed: lib, ui, own state.",
+  "fix": "Move the call into todo.effects.ts and expose the result via todo.state.ts.",
+  "docs": "https://sheratan.dev/errors/SHR-L001"
+}
+```
+
+Apply the `fix`; the `message` names the allowed set. Exit code: `0` clean, `1`
+violations, `2` the command could not run — the reason is on stderr, so stdout
+stays parseable.
+
+| Code | Rule |
+|---|---|
+| SHR-L001 | import not allowed by the matrix, including deep imports past another module's `index.ts` |
+| SHR-L002 | I/O global (`fetch`, `localStorage`, `document`, timers) in a view or state |
+| SHR-L003 | `shared/` at any depth, or a file under `ui/` outside a component folder |
+| SHR-L004 | `resource`, `mutation`, `stream`, `onDispose`, `navigate` called outside `*.effects.ts` |
+| SHR-L005 | effects write a signal directly instead of calling a transition |
+| SHR-L006 | module files don't match the `kind` its `index.ts` declares |
+| SHR-L007 | Promise-returning contract method without an `AbortSignal` |
+| SHR-L008 | circular imports between modules, or among `lib/` files |
+| SHR-L009 | module stylesheet not wrapped in its `@scope` |
+| SHR-L010 | a `*.state.ts` exposes a `Signal`; only accessors and transitions leave the file |
+| SHR-L011 | mutating a value read from a signal (`items().push(x)`) instead of `.set()` |
+| SHR-V001 | inline function in a template hole (error) |
+| SHR-V002 | `unsafeHTML` with a non-literal argument (warning) |
+| SHR-V003 | signal called inside a hole (warning) |
+| SHR-V004 | malformed template (error) |
+| SHR-T001 | a `*.state.ts` or `*.effects.ts` with no `*.test.ts` beside it (warning) |
+
+## Not in v0
+
+`unsafeHTML` is specified but not shipped. Routing ships flat tables and nested
+tables; what is still out is guards and a match tree with its own resolution
+order, which stay post-MVP (SPEC §9b).
+
+
+---
+
+# The API, for the app you are building
+
+One server, already running. Everything below is stable for the whole task.
+There is no authentication step: the session already exists.
+
+Base URL: the origin this page is served from.
+
+## Resources
+
+### `GET /api/customers`
+
+Every customer, in a fixed order. `?q=<text>` filters on name and company,
+case-insensitively; an empty `q` is the same as no `q`.
+
+```json
+[{ "id": 1, "name": "Customer 1", "company": "Company 1", "country": "Netherlands" }]
+```
+
+### `GET /api/orders`
+
+```json
+[{ "id": 101, "customer": "Customer 1", "status": "pending" }]
+```
+
+`status` is one of `pending`, `packing`, `shipped`.
+
+### `POST /api/orders`
+
+Body:
+
+```json
+{ "customerId": 1, "quantity": 5, "note": "optional, 200 characters at most" }
+```
+
+`200` with `{ "id": 900 }` on success. `422` with field errors if the server
+refuses it:
+
+```json
+{ "errors": { "quantity": "Quantity must be a whole number between 1 and 1000." } }
+```
+
+The keys are field names: `customer`, `quantity`, `note`.
+
+### `PATCH /api/orders/:id`
+
+Body `{ "status": "shipped" }`. `200` with the updated order, `404` if there is
+no such order. The change persists, so a later `GET /api/orders` shows it.
+
+### `GET /api/session`
+
+```json
+{ "user": "Ada Bakker", "company": "Company 1" }
+```
+
+`401` with `{ "error": "session expired" }` once the session has ended. Every
+other route answers `401` from that point too.
+
+### `GET /api/instruments`
+
+```json
+[{ "symbol": "ACME", "name": "Acme Industries", "open": 100 }]
+```
+
+## Live prices
+
+`WS /ws/prices`. No subprotocol, no handshake message — messages start
+arriving on connect. Each is JSON:
+
+```json
+{ "type": "price", "symbol": "ACME", "price": 99.66, "ts": 1 }
+```
+
+`ts` is a tick counter, not a clock reading. One other message can arrive:
+
+```json
+{ "type": "session_expired" }
+```
+
+## Errors
+
+Every failure other than a `422` uses one shape:
+
+```json
+{ "error": "some message" }
+```
+
+Statuses you may see: `400`, `401`, `404`, `409`, `422`, `500`. Any route may
+be slow, and any route may fail — the server is deliberately unreliable, and
+handling that is part of the task.

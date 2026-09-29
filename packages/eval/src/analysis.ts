@@ -32,6 +32,10 @@ export interface Cell {
   readonly durationMs: number;
   /** Non-empty voids the run (EVAL-TASKS §1.3). */
   readonly tampering: readonly string[];
+  /** Turns stopped at the time limit. Absent from cells recorded before it was counted. */
+  readonly timedOut?: number;
+  /** Tool calls that named a path outside the sandbox, refused by the profile. */
+  readonly outside?: number;
 }
 
 /** What §1.4 step 5 asks a task-arm pair to be reported as. */

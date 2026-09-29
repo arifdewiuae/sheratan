@@ -1,0 +1,10 @@
+{
+  "note": "Corrections to cells as the harness recorded them. The cell files are unchanged; see VOID.md.",
+  "costUSD": {
+    "T03-sheratan-seed1": {
+      "recorded": 0,
+      "actual": 2.5934334000000008,
+      "source": "cost-state line of Claude Code session bb899f1f-303a-4f49-b6d2-11c8eabf1705; the turn was stopped at the 15-minute limit before it replied"
+    }
+  }
+}
