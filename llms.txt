@@ -25,7 +25,7 @@ hole gets the computed.
 ## 2. API
 
 ```ts
-import { signal, computed, watch, batch, resource, mutation, stream, onDispose, flush, html, each, mount, render, location, routes, navigate, Backoff, ResourceStatus, MutationStatus, StreamStatus } from 'sheratan';
+import { signal, computed, watch, batch, resource, mutation, stream, onDispose, flush, html, each, mount, render, location, routes, navigate, scope, Backoff, ResourceStatus, MutationStatus, StreamStatus } from 'sheratan';
 ```
 
 <!-- generated from TSDoc by packages/core/scripts/llms.ts -->
@@ -48,6 +48,7 @@ import { signal, computed, watch, batch, resource, mutation, stream, onDispose, 
 | `location(): Location` | The current URL, as a signal. Reading it in a view is how a link marks itself active; changing it is what `navigate()` is for. |
 | `routes<T>(table: RouteTable<T>): Accessor<T \| undefined>` | Matches the URL against a flat table and returns the screen it names, or `undefined` when nothing matches — give the table a `'*'` row to say what happens then. |
 | `navigate(to: string, options?: NavigateOptions): void` | Goes to `to`. Legal in `*.effects.ts` only (`SHR-L004`): a view emits the intent and effects carries it out. |
+| `scope<T>(fn: () => T): Scoped<T>` | Runs `fn` under an owner of its own, with no DOM, and returns its result and the disposer. For tests: effects need an owner, and `dispose()` tears them down as an unmount would. App code is owned by being mounted (SPEC §5b). |
 
 <!-- end generated -->
 Types: `Signal<T>` (callable + `.set`), `Accessor<T>` (`() => T`), `DeepReadonly<T>`,
@@ -398,17 +399,24 @@ signal even by accident.
 
 ## 8. Tests
 
-State is pure and needs no mocks. Effects get a fake contract object.
+State is pure and needs no mocks. Effects get a fake contract object and an
+owner from `scope()`: no DOM, nothing rendered.
 
 ```ts
 const s = createDevicesState();
 s.loaded([{ id: 1, name: 'Boiler', reading: 41.2 }]);
 assert.equal(s.count(), 1);
+
+const { value: fx, dispose } = scope(() => createDevicesEffects(fakeApi, s));
+fx.start();
+await new Promise((resolve) => setTimeout(resolve));   // the fake's promise lands
 assert.equal(s.status(), 'ready');
+dispose();   // aborts what is in flight, as an unmount does
 ```
 
 Tests are `<name>.state.test.ts` and `<name>.effects.test.ts` next to the
-module (SHR-T001 warns when missing). End-to-end tests live in `e2e/`.
+module (SHR-T001 warns when missing). A view is not unit-tested: it is a
+snapshot of state, and `e2e/` covers it.
 
 ## 9. Wrong → right
 

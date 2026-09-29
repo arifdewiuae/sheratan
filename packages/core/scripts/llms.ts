@@ -33,6 +33,7 @@ const ORDER = [
   'location',
   'routes',
   'navigate',
+  'scope',
 ];
 
 const DECLARATION =

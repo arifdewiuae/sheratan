@@ -2,10 +2,10 @@
 // contract is an interface, so the fake is an object literal rather than a
 // mocking framework.
 import assert from 'node:assert/strict';
-import { beforeEach, test } from 'node:test';
+import { test } from 'node:test';
 
 import { Window } from 'happy-dom';
-import { flush, html, render, type Disposer } from 'sheratan';
+import { flush, scope, type Disposer } from 'sheratan';
 
 import type {
   Device,
@@ -17,17 +17,9 @@ import type {
 import { createDevicesEffects, type DevicesEffects } from './devices.effects.ts';
 import { createDevicesState, Status, type DevicesState } from './devices.state.ts';
 
-const window = new Window();
-
-globalThis.document = window.document as unknown as Document;
-
-let host: Element;
-
-beforeEach(() => {
-  document.body.innerHTML = '';
-  host = document.createElement('div');
-  document.body.append(host);
-});
+// The module listens for scroll on `document`, and that is the only reason a
+// DOM is here: `scope()` gives the effects their owner without rendering.
+globalThis.document = new Window().document as unknown as Document;
 
 /** Lets the microtask queue and one timer turn, which is when a fetch lands. */
 const settled = (after = 0): Promise<void> =>
@@ -120,21 +112,16 @@ interface Mounted {
 }
 
 function mountModule(api: DeviceApi): Mounted {
-  let state: DevicesState | undefined;
-  let effects: DevicesEffects | undefined;
-
-  const dispose = render(() => {
-    state = createDevicesState();
-    effects = createDevicesEffects(api, state);
+  const { value, dispose } = scope(() => {
+    const state = createDevicesState();
+    const effects = createDevicesEffects(api, state);
 
     effects.start();
 
-    return html`<div></div>`;
-  }, host);
+    return { state, effects };
+  });
 
-  if (state === undefined || effects === undefined) throw new Error('the module did not mount');
-
-  return { state, effects, dispose };
+  return { ...value, dispose };
 }
 
 test('one load commits the devices and the limits together', async () => {
