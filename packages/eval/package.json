@@ -2,7 +2,7 @@
   "name": "@sheratan/eval",
   "version": "0.0.0",
   "private": true,
-  "description": "The Week 0 falsification harness (EVAL §2.3) and evalkit, the deterministic fake backend every task runs against (EVAL-TASKS §1.3). Not part of pnpm check, except evalkit’s own suite, which is.",
+  "description": "The Week 0 falsification harness (EVAL \u00a72.3) and evalkit, the deterministic fake backend every task runs against (EVAL-TASKS \u00a71.3). Not part of pnpm check, except evalkit\u2019s own suite, which is.",
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
@@ -12,6 +12,7 @@
     "check:cases": "node scripts/check-cases.ts",
     "evalkit": "node evalkit/src/main.ts",
     "task": "node scripts/task.ts",
+    "matrix": "node scripts/matrix.ts",
     "suites": "node scripts/suites.ts"
   },
   "devDependencies": {

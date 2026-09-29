@@ -149,7 +149,7 @@ instrument: an agent with a shell, iterating against a hidden suite until it
 converges or runs out of tries (EVAL-TASKS §1.4).
 
 ```sh
-pnpm --filter @sheratan/eval task -- --task T01 --arm sheratan --smoke
+pnpm --filter @sheratan/eval task -- --task T01 --arm sheratan
 pnpm --filter @sheratan/eval task -- --task T01 --arm react --seeds 5
 ```
 
@@ -175,15 +175,71 @@ Three properties are worth knowing before reading a number from it:
   run rather than warning. Sheratan is at 9,593 tokens and the control at
   9,689, against 10,000.
 
-**This build has no hidden suites yet**, which is why `--smoke` exists and why
-it prints a banner saying so. A smoke run measures cost and wall-clock and
-nothing else; convergence in it means the arm called itself done and the
-project was clean, not that the task was met.
+`--smoke` survives for a task this build has no suite for: it measures cost
+and wall-clock and nothing else, prints a banner saying so, and convergence in
+it means only that the arm called itself done and the project was clean. The
+three Week 0 tasks all have suites, so the gate never needs it — and a task
+without one refuses to run rather than quietly producing a number.
 
-Smoke runs are **not** kept in `results/`. That directory is the evidence
-behind published numbers, and a run that scores nothing sitting beside runs
-that do is an invitation to quote it. Their cost and wall-clock go in TASKS,
-with the command that reproduces them.
+## The matrix, which is what the gate is decided on
+
+One task against one arm is a probe. The gate is the grid:
+
+```sh
+pnpm --filter @sheratan/eval matrix                        # 3 tasks x 5 seeds x 2 arms
+pnpm --filter @sheratan/eval matrix -- --tasks T01 --seeds 1  # the smoke: 2 cells
+pnpm --filter @sheratan/eval matrix -- --resume <dir>         # finish it, or reprint it
+```
+
+Three things about how it runs, each of which changes what the number means.
+
+- **The two arms of a seed run next to each other.** A grid that did all of
+  one arm and then all of the other would put hours between the halves of
+  every comparison, and any drift in the model or the service over those hours
+  would land entirely on one arm. Paired in time, drift hits both.
+- **A run that reached the cap counts as the cap.** Not converging is a
+  recorded outcome (§1.4 step 4), and the recording has to reach the number.
+  Dropping those runs and taking the median of what is left would reward the
+  arm that fails more often: an arm converging twice in five seeds, quickly,
+  would read better than one converging five times out of five. The sample is
+  censored at ten, which understates a gap rather than inventing one — and
+  that makes the single criterion the gate states enough on its own.
+- **A voided run is not a slow run.** Tampering means the arm reached for a
+  test-only surface; it is excluded, counted and named, because a seed missing
+  from a median is something a reader has to be told about.
+
+The arithmetic lives in `src/analysis.ts`, apart from the script that spends
+the money, and `test/analysis.test.ts` proves it for nothing — including that
+censoring is what decides the verdict rather than how it is presented, and
+that a task missing one arm is never read as a tie.
+
+Every cell is written to disk as it finishes, so `--resume` re-runs only what
+is missing and a crash on the twenty-fifth run costs one cell rather than
+twenty-five. A directory with every cell already in it prints the table and
+spends nothing, which is also how a published result is re-read later — and a
+resume with a **larger** `--seeds` runs only the seeds that are not there yet.
+
+That last property is the one to be careful with, and the care is not
+technical. Widening a grid after looking at it is optional stopping: buy more
+seeds only when the answer is unwelcome and the number stops meaning anything.
+So the rule is fixed **before** a grid runs and applied whichever way it
+leans. For the Week 0 matrix, decided 2026-09-25 with nothing measured but the
+smoke: **three** seeds per task per arm is the answer, and a task is widened to
+five only if its two medians come out **equal**, because a tie is the one
+outcome three seeds genuinely cannot resolve.
+
+Three rather than the five EVAL-TASKS §1.4 asked for, and the reason is cost
+rather than method — a cell is a whole agent session, and thirty of them is
+four to five hours of one account's usage. The amendment is in §1.4 itself.
+What it costs is precision: the median of three moves on a single unlucky run,
+so **a margin inside one iteration is a tie at this sample size**, and any
+number published from this grid has to say so beside itself.
+
+A probe that scores nothing — `--smoke` on a task with no suite — is **not**
+kept in `results/`. That directory is the evidence behind published numbers,
+and a run that scores nothing sitting beside runs that do is an invitation to
+quote it. Its cost and wall-clock go in TASKS, with the command that
+reproduces it.
 
 ## What is in here
 
@@ -206,12 +262,16 @@ with the command that reproduces them.
 | `src/arm.ts`, `src/arms/` | What the harness knows about a stack. An arm is data, so a third one is a directory and a row — `sheratan.ts` and `react.ts` are both about seventy lines, most of it comment |
 | `src/session.ts` | A conversation with a shell, resumed across iterations |
 | `src/iterate.ts` | EVAL-TASKS §1.4, and nothing else |
+| `src/cell.ts` | One cell — one task, one arm, one seed — start to finish, and both files it leaves behind. Shared by `task.ts` and `matrix.ts`, so a probe prices what the matrix runs |
+| `src/analysis.ts` | The arithmetic the gate is decided with: median, IQR, censoring at the cap, and the verdict |
+| `src/results.ts` | Where a run's logs go, and what the directory is called |
 | `src/stage.ts`, `src/proxy.ts` | One run stood up: sandbox, backend, dev server, one origin |
 | `src/budget.ts` | EVAL-TASKS §1.5, counted with the model's own counter and refused rather than warned |
 | `src/contamination.ts` | The check that no arm is handed a task's DOM hooks, in its docs or its scaffold |
 | `test/hosts.test.ts` | The behaviour suite. **The agent never sees this** |
 | `test/detect.test.ts` | Proof each rule fires, and does not fire on what merely looks like it |
 | `test/neutral.test.ts` | Proof no suite names a framework, and only the harness names a hidden surface |
+| `test/analysis.test.ts` | Proof of the sums the gate turns on, for nothing |
 | `results/` | Every prompt, reply and diff. Committed (EVAL §2.5) |
 
 ## The method, exactly

@@ -9,7 +9,9 @@ import {
   feedbackFor,
   iterate,
   ITERATION_CAP,
+  Phase,
   type CleanRun,
+  type Step,
   type SuiteRun,
 } from '../src/iterate.ts';
 import type { Reply, Session } from '../src/session.ts';
@@ -187,4 +189,51 @@ test('a suite that fails without naming anything says so rather than saying noth
 
   assert.match(message, /none of them reported a name/);
   assert.ok(!message.includes('the runner crashed'));
+});
+
+test('a watcher is told each turn and each verdict, in order', async () => {
+  const session = fakeSession();
+  const seen: string[] = [];
+
+  await iterate({
+    session,
+    judge: scripted([
+      [DIRTY, RED],
+      [CLEAN, GREEN],
+    ]),
+    prompt: PROMPT,
+    onStep: (step) => seen.push(`${step.phase} ${String(step.n)}/${String(step.cap)}`),
+  });
+
+  assert.deepEqual(seen, [
+    `working 1/${String(ITERATION_CAP)}`,
+    `judging 1/${String(ITERATION_CAP)}`,
+    `judged 1/${String(ITERATION_CAP)}`,
+    `working 2/${String(ITERATION_CAP)}`,
+    `judging 2/${String(ITERATION_CAP)}`,
+    `judged 2/${String(ITERATION_CAP)}`,
+  ]);
+});
+
+test('a verdict carries what was judged and what it has cost so far', async () => {
+  const session = fakeSession();
+  const judged: Step[] = [];
+
+  await iterate({
+    session,
+    judge: scripted([[CLEAN, RED]]),
+    prompt: PROMPT,
+    cap: 1,
+    onStep: (step) => {
+      if (step.phase === Phase.Judged) judged.push(step);
+    },
+  });
+
+  const [only, ...rest] = judged;
+
+  assert.equal(rest.length, 0);
+  assert.ok(only?.result !== undefined);
+  assert.equal(only.result.pass, false);
+  assert.deepEqual(only.result.suite.failing, RED.failing);
+  assert.equal(only.spentUSD, 1);
 });

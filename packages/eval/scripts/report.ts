@@ -36,13 +36,19 @@ interface Summary {
   readonly costUSD: number;
 }
 
+/**
+ * Whether this directory holds a finished **self-repair** run. Both halves
+ * matter: a run still in progress has no summary yet, and a task or matrix
+ * run has a summary of an entirely different shape. `runs.jsonl` is what only
+ * this eval writes, so it is what the newest run is recognised by — otherwise
+ * `pnpm report` would pick up the newest task run and fail reading it.
+ */
 async function finished(results: string, name: string): Promise<boolean> {
   try {
-    await readFile(join(results, name, 'summary.json'), 'utf8');
+    await readFile(join(results, name, 'runs.jsonl'), 'utf8');
 
     return true;
   } catch {
-    // A run still in progress has no summary yet, and is not a result.
     return false;
   }
 }
