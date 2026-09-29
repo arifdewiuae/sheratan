@@ -6,7 +6,7 @@
 // this repository, against `origin` — so ten iterations of an agent with a
 // shell cannot read it, because it was never in the directory the agent has.
 
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, symlink } from 'node:fs/promises';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -201,6 +201,21 @@ export interface StageOptions {
   readonly arm: Arm;
   /** Fixes the backend's fixture data, so a seed means the same thing twice. */
   readonly seed?: number;
+  /**
+   * An installed tree outside the repository to use in place of the one the
+   * scaffold links (`modules.ts`). An agent run passes one; a reference proof
+   * or a test, with no agent in it, keeps the scaffold's.
+   */
+  readonly modules?: string;
+}
+
+/** Points the sandbox's `node_modules` at `modules` instead of the scaffold's link. */
+async function relink(root: string, modules: string): Promise<void> {
+  const link = join(root, 'node_modules');
+
+  // `rm` on a link removes the link, never what it points at.
+  await rm(link, { force: true });
+  await symlink(modules, link, 'dir');
 }
 
 /**
@@ -231,6 +246,8 @@ export async function setUpStage(options: StageOptions): Promise<Stage> {
 
   try {
     await options.arm.scaffold(root);
+
+    if (options.modules !== undefined) await relink(root, options.modules);
 
     kit = await startEvalkit(options.seed === undefined ? {} : { seed: options.seed });
     serving = await startServing(root, options.arm);

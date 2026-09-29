@@ -1,0 +1,10 @@
+{
+  "task": "T04",
+  "arm": "react",
+  "seed": 3,
+  "converged": true,
+  "iterations": 2,
+  "costUSD": 2.432698,
+  "durationMs": 507787,
+  "tampering": []
+}

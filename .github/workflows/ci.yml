@@ -167,7 +167,7 @@ jobs:
         run: pnpm build
 
       - name: Install the React arm (its own pnpm root, committed lockfile)
-        run: pnpm --dir packages/eval/controls/react install --frozen-lockfile --ignore-workspace
+        run: pnpm --dir packages/eval/controls/react install --frozen-lockfile
 
       - name: Resolve the Playwright version
         id: playwright

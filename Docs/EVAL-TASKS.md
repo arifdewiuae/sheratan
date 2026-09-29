@@ -85,6 +85,26 @@ control or inspection API, or the tests.
 > the number matters enough to pay for it, and `--resume` will widen this one
 > into it without re-running a cell.
 
+6. **The agent is confined to its sandbox by the operating system.** It may
+   read and write its own working directory and nothing that could carry an
+   answer: not this repository (the hidden suites, the references, `evalkit`,
+   earlier results), not another run's transcript, not shared `/tmp`, not
+   another sandbox. Its tools are a fixed list — shell, file reads, edits and
+   search, no web — that it is given rather than merely pre-approved for, and
+   its packages are installed outside the repository.
+   A run whose confinement cannot be proved before it starts does not start.
+
+> **Added 2026-09-29, after the first matrix was voided.** That grid confined
+> the agent by convention only: the sandbox's `node_modules` was a link into
+> this repository, and agents followed it. Nine of nine Sheratan sessions and
+> one of nine React sessions touched the repository; one read
+> `suites/T01.spec.ts` before its second iteration, another read
+> `examples/hello`, documentation outside the §1.5 budget. The harness
+> watched the network for test-only surfaces and never the file system. The
+> grid's numbers are kept as a record, in
+> `packages/eval/results/2026-09-29T08-27-38-matrix/`, and no gate is decided
+> on them.
+
 ### 1.5 Prompt budget — fixed now
 
 - **10,000 tokens of documentation per arm**, counted with the evaluated

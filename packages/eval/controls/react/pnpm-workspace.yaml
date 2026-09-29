@@ -5,8 +5,10 @@
 # stops pnpm walking up to find them. Same arrangement as `Docs/comparison/`,
 # for the same reason.
 #
-# Install it with `pnpm install --ignore-workspace` from this directory. No
-# eval run installs anything: `src/arms/react.ts` symlinks what is here.
+# Install it with `pnpm install` from this directory, and never with
+# `--ignore-workspace`: that flag ignores this file too, so the overrides and
+# the policy below silently stop applying. It did, from the arm's first
+# install until 2026-09-29, and the lockfile it wrote had to be re-resolved.
 
 packages: []
 

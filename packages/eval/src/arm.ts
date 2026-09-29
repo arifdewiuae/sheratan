@@ -33,6 +33,11 @@ export interface Arm {
   readonly docs: string;
   /** Writes a fresh, empty-of-task app into `root`. */
   scaffold(root: string): Promise<void>;
+  /**
+   * Installs the packages the app needs into `into`, a directory outside the
+   * repository, so a confined agent has a tree it may read (`modules.ts`).
+   */
+  install(into: string): Promise<void>;
   /** Serves the app on `port`. The harness owns the process, not the agent. */
   serving(port: number): Command;
   /** Every command that must exit 0 before the arm counts as clean. */
