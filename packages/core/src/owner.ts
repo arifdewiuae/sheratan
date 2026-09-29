@@ -136,6 +136,19 @@ export function setActiveOwner(next: OwnerNode | undefined): OwnerNode | undefin
   return previous;
 }
 
+/** Runs `fn` with `node` as the active scope and tracking off, and restores both. */
+function within<T>(node: OwnerNode, fn: () => T): T {
+  const previousSub = setActiveSub(undefined);
+  const previousOwner = setActiveOwner(node);
+
+  try {
+    return fn();
+  } finally {
+    setActiveSub(previousSub);
+    setActiveOwner(previousOwner);
+  }
+}
+
 /**
  * Runs `fn` in a fresh scope with tracking off, and returns its disposer.
  * `parent` defaults to the active scope; keyed rows pass a longer-lived one so
@@ -143,19 +156,43 @@ export function setActiveOwner(next: OwnerNode | undefined): OwnerNode | undefin
  */
 export function root(fn: () => void, parent: OwnerNode | undefined = activeOwner): Disposer {
   const node = new OwnerNode(parent);
-  const previousSub = setActiveSub(undefined);
-  const previousOwner = setActiveOwner(node);
 
-  try {
-    fn();
-  } finally {
-    setActiveSub(previousSub);
-    setActiveOwner(previousOwner);
-  }
+  within(node, fn);
 
   return asDisposer(() => {
     node.dispose();
   });
+}
+
+/** What `scope()` hands back: what its function returned, and how to end it. */
+export interface Scoped<T> {
+  readonly value: T;
+  readonly dispose: Disposer;
+}
+
+/**
+ * Runs `fn` under an owner of its own, with no DOM, and returns its result
+ * and the disposer. For tests: effects need an owner, and `dispose()` tears
+ * them down as an unmount would. App code is owned by being mounted (SPEC §5b).
+ *
+ * Detached from whatever owner is active, so only the returned disposer ends
+ * it.
+ *
+ * @example
+ * const { value: effects, dispose } = scope(() => createDevicesEffects(fake, createDevicesState()));
+ * effects.start();
+ * dispose(); // aborts what is in flight, as an unmount does
+ */
+export function scope<T>(fn: () => T): Scoped<T> {
+  const node = new OwnerNode(undefined);
+  const value = within(node, fn);
+
+  return {
+    value,
+    dispose: asDisposer(() => {
+      node.dispose();
+    }),
+  };
 }
 
 /**

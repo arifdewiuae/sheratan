@@ -377,7 +377,8 @@ untested would be reporting the build configuration.
 
 The architecture is what makes this cheap: `*.state.ts` is a pure function and
 needs no mocks; `*.view.ts` is a snapshot of state; `*.effects.ts` is the only
-place a fake transport is needed, because it is the only place I/O can exist.
+place a fake transport is needed, because it is the only place I/O can exist,
+and `scope()` (§5b) gives it an owner without a DOM.
 
 E2E lives at `e2e/` at the app level, never inside a module. Sheratan ships no
 test runner (a dependency, and not our problem) but provides two things:
@@ -558,6 +559,26 @@ onDispose(() => window.removeEventListener('resize', onResize));
 ```
 
 Legal in `*.effects.ts` only (`SHR-L004`).
+
+### `scope()`
+
+An owner that is not a mount, for tests. Effects create `resource()`,
+`mutation()` and `stream()`, and all three need an owner to tear down with, so
+before `scope()` the only way to test effects was to `render()` an empty
+template into a fake DOM and pull the module back out of the callback. Every
+effects test did, the `create` template's included, and every agent copied it.
+
+```ts
+const { value: effects, dispose } = scope(() => createDevicesEffects(fake, state));
+effects.start();
+dispose(); // tears down what the effects started, as an unmount does
+```
+
+It returns what its function returned, is detached from any active owner so
+only its own disposer ends it, and runs untracked, like a mount. App code does
+not call it: a module is owned by being mounted. Nothing enforces that yet —
+test files are outside the checker, and `SHR-L004` sends APIs to the effects
+file, which is the wrong fix for this one (TASKS "Spec gaps").
 
 ### Three rules that prevent leaks
 

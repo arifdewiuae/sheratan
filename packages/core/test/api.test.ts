@@ -46,6 +46,7 @@ test('the package exports exactly its documented names', () => {
     'render',
     'resource',
     'routes',
+    'scope',
     'signal',
     'stream',
     'watch',

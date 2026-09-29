@@ -15,7 +15,7 @@ export { batch, flush } from './scheduler.ts';
 export { signal } from './signal.ts';
 export { stream, StreamStatus } from './stream.ts';
 export { html } from './template.ts';
-export { onDispose } from './owner.ts';
+export { onDispose, scope } from './owner.ts';
 export { watch } from './watch.ts';
 
 export type { Disposer } from './disposer.ts';
@@ -23,6 +23,7 @@ export type { Each, EachWindow, Key } from './each.ts';
 export type { Location, NavigateOptions } from './location.ts';
 export type { RouteParams, RouteTable } from './match.ts';
 export type { ModuleView, Mounted } from './mount.ts';
+export type { Scoped } from './owner.ts';
 export type { Mutation, MutationContext, MutationOptions } from './mutation.ts';
 export type { FetchContext, Resource, ResourceOptions } from './resource.ts';
 export type { Stream, StreamContext, StreamOptions, Teardown } from './stream.ts';
