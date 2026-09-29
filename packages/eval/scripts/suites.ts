@@ -149,7 +149,7 @@ function installed(id: string): boolean {
 function announceSkip(id: string): void {
   console.log(`SKIP  ${id} — nothing installed at ${String(INSTALLED.get(id))}`);
   console.log('      The suites are NOT proved against this arm.');
-  console.log(`      pnpm --dir ${INSTALL_IN} install --ignore-workspace\n`);
+  console.log(`      pnpm --dir ${INSTALL_IN} install --frozen-lockfile\n`);
 }
 
 /** One arm's reference, both halves. */
