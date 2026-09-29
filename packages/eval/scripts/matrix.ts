@@ -41,6 +41,7 @@ import { ITERATION_CAP } from '../src/iterate.ts';
 import { readTaskSet, type TaskSet, taskNamed, type Task } from '../src/frozen.ts';
 import { SUITES, WEEK_0 } from '../src/suite.ts';
 import { TOOLS } from '../src/session.ts';
+import { watch } from '../src/progress.ts';
 import { stampedInto } from '../src/results.ts';
 
 const MODEL = 'claude-sonnet-5';
@@ -141,14 +142,14 @@ async function alreadyRun(into: string, one: Planned): Promise<Cell | undefined>
 }
 
 /** One line per cell as it lands, because a grid is watched, not awaited. */
-function say(one: Planned, cell: Cell, reused: boolean): void {
+function lineFor(one: Planned, cell: Cell, reused: boolean): string {
   const how = cell.converged ? `converged in ${String(cell.iterations)}` : 'did not converge';
   const money = reused ? 'from disk' : `$${cell.costUSD.toFixed(MONEY)}`;
   const voided = cell.tampering.length === 0 ? '' : `  VOID: reached ${cell.tampering.join(', ')}`;
 
-  console.log(
+  return (
     `${one.task.id} ${one.arm.id.padEnd(ARM_WIDTH)} seed ${String(one.seed)}  ` +
-      `${how}  ${money}  ${(cell.durationMs / SECONDS).toFixed(0)}s${voided}`,
+    `${how}  ${money}  ${(cell.durationMs / SECONDS).toFixed(0)}s${voided}`
   );
 }
 
@@ -259,6 +260,7 @@ for (const arm of arms) {
 
 const planned = plan(tasks, arms, opts.seeds);
 const cells: Cell[] = [];
+const watcher = watch({ total: planned.length, into, out: process.stdout });
 
 /** Everything known so far, rewritten after every cell so a kill costs nothing. */
 async function record(): Promise<Verdict> {
@@ -298,10 +300,26 @@ async function record(): Promise<Verdict> {
 /** One cell, from disk if it is already there. */
 async function fill(one: Planned): Promise<void> {
   const reused = await alreadyRun(into, one);
-  const cell = reused ?? (await runCell({ ...one, model: opts.model, cap: opts.cap, into }));
+
+  if (reused === undefined) watcher.begin(stemOf(one.task.id, one.arm.id, one.seed));
+
+  const cell =
+    reused ??
+    (await runCell({
+      ...one,
+      model: opts.model,
+      cap: opts.cap,
+      into,
+      onStep: (step) => watcher.step(step),
+    }));
 
   cells.push(cell);
-  say(one, cell, reused !== undefined);
+
+  watcher.finish(
+    lineFor(one, cell, reused !== undefined),
+    cell.costUSD,
+    reused === undefined ? cell.durationMs : undefined,
+  );
 
   await record();
 }
@@ -311,6 +329,8 @@ for (const one of planned) {
     // eslint-disable-next-line no-await-in-loop -- each cell owns two servers and a port
     await fill(one);
   } catch (error) {
+    watcher.stop();
+
     // Everything before this cell is on disk and costs nothing to keep. Said
     // here rather than left to a stack trace, because the alternative a reader
     // reaches for is starting the grid again.
@@ -321,6 +341,8 @@ for (const one of planned) {
     throw error;
   }
 }
+
+watcher.stop();
 
 const labels = new Map(arms.map((arm) => [arm.id, arm.label]));
 

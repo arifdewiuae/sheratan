@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import type { Arm } from './arm.ts';
 import type { Cell } from './analysis.ts';
 import { CONTRACT_FILE, type Task } from './frozen.ts';
-import { iterate, type SuiteRun, type TaskRun } from './iterate.ts';
+import { iterate, type Step, type SuiteRun, type TaskRun } from './iterate.ts';
 import { openSession } from './session.ts';
 import { SUITES } from './suite.ts';
 import { setUpStage } from './stage.ts';
@@ -52,6 +52,8 @@ export interface CellOptions {
   readonly cap: number;
   /** The results directory this cell's log and record are written into. */
   readonly into: string;
+  /** Told as the cell moves, for a watcher; the measurement never sees it. */
+  readonly onStep?: (step: Step) => void;
 }
 
 /** How one cell's files are named, and how a resumed run recognises it. */
@@ -90,6 +92,7 @@ async function work(options: CellOptions): Promise<TaskRun> {
     prompt: `${options.task.prompt}\n\nThe app is served at ${stage.origin}.`,
     cap: options.cap,
     tampering: () => stage.tampering(),
+    ...(options.onStep === undefined ? {} : { onStep: options.onStep }),
   });
 }
 

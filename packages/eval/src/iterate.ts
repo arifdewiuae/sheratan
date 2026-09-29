@@ -59,6 +59,26 @@ export interface TaskRun {
   readonly tampering: readonly string[];
 }
 
+/** Where a run is, as `onStep` reports it. */
+export const Phase = { Working: 'working', Judging: 'judging', Judged: 'judged' } as const;
+/** One of `Phase`'s values. */
+export type Phase = (typeof Phase)[keyof typeof Phase];
+
+/**
+ * One moment in a run, for a watcher. Nothing in it reaches the agent: it is
+ * the harness talking to whoever is waiting on a cell that takes minutes.
+ */
+export interface Step {
+  readonly phase: Phase;
+  /** The iteration this step belongs to, 1-based. */
+  readonly n: number;
+  readonly cap: number;
+  /** What the session has cost so far. */
+  readonly spentUSD: number;
+  /** Set once the iteration is judged. */
+  readonly result?: Pick<Iteration, 'pass' | 'clean' | 'suite'>;
+}
+
 /** What one run is given. */
 export interface IterateOptions {
   readonly session: Session;
@@ -68,6 +88,8 @@ export interface IterateOptions {
   readonly cap?: number;
   /** Asked after every iteration, so a run that cheated is caught as it happens. */
   tampering?(): readonly string[];
+  /** Told at each turn and each verdict, so a watcher sees more than the end. */
+  onStep?(step: Step): void;
 }
 
 const DONE = 'Tell me when it is done.';
@@ -101,10 +123,32 @@ export function feedbackFor(clean: CleanRun, suite: SuiteRun): string {
 }
 
 async function judge(options: IterateOptions, n: number, reply: Reply): Promise<Iteration> {
+  const cap = options.cap ?? ITERATION_CAP;
+
+  options.onStep?.({ phase: Phase.Judging, n, cap, spentUSD: options.session.spent() });
+
   const clean = await options.judge.clean();
   const suite = await options.judge.suite();
+  const iteration = { n, clean, suite, pass: clean.ok && suite.ok, reply };
 
-  return { n, clean, suite, pass: clean.ok && suite.ok, reply };
+  options.onStep?.({
+    phase: Phase.Judged,
+    n,
+    cap,
+    spentUSD: options.session.spent(),
+    result: iteration,
+  });
+
+  return iteration;
+}
+
+/** Says `message` to the agent, telling the watcher that iteration `n` has begun. */
+function turn(options: IterateOptions, n: number, message: string): Promise<Reply> {
+  const cap = options.cap ?? ITERATION_CAP;
+
+  options.onStep?.({ phase: Phase.Working, n, cap, spentUSD: options.session.spent() });
+
+  return options.session.say(message);
 }
 
 /**
@@ -120,7 +164,7 @@ export async function iterate(options: IterateOptions): Promise<TaskRun> {
   const started = Date.now();
   const log: Iteration[] = [];
 
-  let reply = await options.session.say(options.prompt);
+  let reply = await turn(options, 1, options.prompt);
 
   for (let n = 1; n <= cap; n++) {
     // eslint-disable-next-line no-await-in-loop -- an iteration is defined by the one before it
@@ -131,7 +175,7 @@ export async function iterate(options: IterateOptions): Promise<TaskRun> {
     if (iteration.pass || n === cap) break;
 
     // eslint-disable-next-line no-await-in-loop -- the agent is resumed, not restarted
-    reply = await options.session.say(feedbackFor(iteration.clean, iteration.suite));
+    reply = await turn(options, n + 1, feedbackFor(iteration.clean, iteration.suite));
   }
 
   const last = log.at(-1);
