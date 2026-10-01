@@ -46,3 +46,11 @@ hijacked release.
 
 `pnpm audit signatures` becomes reliable (or gains a way to verify only the
 packages installed for this platform), in which case it returns to `check`.
+
+## Amended 2026-10-01
+
+The daily scheduled run is gone: its failure emails, for advisories nobody had
+pushed, were unwanted. `pnpm audit signatures` now runs only when CI is started
+by hand (`gh workflow run ci.yml --ref develop`), and a newly published
+advisory surfaces on the next push or PR instead of within a day. The
+preventive settings above are unchanged and still carry the realistic attack.
