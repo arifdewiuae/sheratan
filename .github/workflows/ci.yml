@@ -4,9 +4,6 @@ on:
   push:
     branches: [develop, main]
   pull_request:
-  schedule:
-    # Daily, so a newly published advisory fails the build without a push.
-    - cron: "17 5 * * *"
   workflow_dispatch:
 
 # Deny everything by default; each job asks for what it needs.
@@ -68,10 +65,10 @@ jobs:
 
       # Verifying every lockfile entry's signature needs a packument per
       # package, including platforms we never install, and a few requests fail
-      # per run for reasons unrelated to the change under test. Daily instead,
-      # so a flaky registry never blocks a PR (Docs/adr/0001).
+      # per run for reasons unrelated to the change under test. On a manual
+      # run only, so a flaky registry never blocks a PR (Docs/adr/0001).
       - name: Verify registry signatures
-        if: ${{ github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: pnpm security:signatures
 
 

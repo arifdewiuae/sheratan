@@ -82,7 +82,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `Docs/adr/` | Decisions with a real trade-off, written up once instead of re-argued |
 | `llms.txt` | The API as an agent should learn it. Updated with every public API change |
 | `site/` | Static landing page, served at **sheratan.dev** (GitHub Pages, deployed from `main`; `site/CNAME` holds the domain and must not be deleted — Pages rewrites the setting from it on every deploy). Fonts are self-hosted in `site/fonts/`, so the page loads nothing from a third party; editing the one inline `<script>` means recomputing the CSP hash in `<head>` |
-| `.github/workflows/` | `ci.yml` (every push/PR, daily audit), `pages.yml` (site deploy) |
+| `.github/workflows/` | `ci.yml` (every push/PR; registry signatures on a manual run), `pages.yml` (site deploy) |
 
 ## Git and PRs
 
@@ -366,7 +366,7 @@ for LLM apps. For a framework, this is what applies.
 | §12 unit testing | Applies | Tests section above |
 | §15 observability | Remapped | The causal trace (SPEC §7) is the framework's observability story |
 | §16 evals | Remapped | `Docs/EVAL.md` performance and agent-authoring evals, with go/no-go gates |
-| §17 CI/CD | Applies | `ci.yml`: SHA-pinned actions, frozen lockfile, lint → typecheck → build → coverage → audit, dependency review on PRs, daily audit |
+| §17 CI/CD | Applies | `ci.yml`: SHA-pinned actions, frozen lockfile, lint → typecheck → build → coverage → audit, dependency review on PRs; no scheduled run |
 | §17a package hygiene | Applies (pnpm) | Toolchain decisions above |
 | §17b / §17c clean code | Applies | Code rules above, enforced by `.oxlintrc.json` and `.oxfmtrc.json` |
 | §18 Vercel | N/A | Site is on GitHub Pages |
