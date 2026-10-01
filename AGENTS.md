@@ -82,7 +82,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `Docs/adr/` | Decisions with a real trade-off, written up once instead of re-argued |
 | `llms.txt` | The API as an agent should learn it. Updated with every public API change |
 | `site/` | Static landing page, served at **sheratan.dev** (GitHub Pages, deployed from `main`; `site/CNAME` holds the domain and must not be deleted — Pages rewrites the setting from it on every deploy). Fonts are self-hosted in `site/fonts/`, so the page loads nothing from a third party; editing the one inline `<script>` means recomputing the CSP hash in `<head>` |
-| `.github/workflows/` | `ci.yml` (every push/PR; registry signatures on a manual run), `pages.yml` (site deploy) |
+| `.github/workflows/` | `ci.yml` (every push/PR; registry signatures on a manual run), `suites.yml` (the hidden suites, only when `packages/**` or the toolchain changes), `pages.yml` (site deploy) |
 
 ## Git and PRs
 
