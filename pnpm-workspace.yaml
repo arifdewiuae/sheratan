@@ -27,3 +27,11 @@ allowBuilds:
   esbuild: false
 
 engineStrict: true
+
+# Advisory floors for transitive dev dependencies, scoped to the vulnerable
+# range so an unaffected major is never forced. Drop an entry once every
+# parent resolves past it unaided.
+overrides:
+  # GHSA-q2hr-2g5m-vwhr and two DoS advisories; reached only through
+  # eslint-plugin-jsdoc → minimatch.
+  "brace-expansion@>=4.0.0 <5.0.12": "5.0.12"
