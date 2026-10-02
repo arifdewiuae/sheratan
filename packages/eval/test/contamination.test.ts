@@ -9,6 +9,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
+import { explanations } from '../../cli/src/explain/explain.ts';
 import { ARMS } from '../src/arms/index.ts';
 import { describe, givenTo, hooksOf, leaksIn, type Given } from '../src/contamination.ts';
 import { readTaskSet, taskNamed } from '../src/frozen.ts';
@@ -54,6 +55,23 @@ test('nothing an arm is handed contains a task hook', async () => {
       `${arm.label} is handed the answer to a task it is measured on:\n${describe(leaks)}`,
     );
   }
+});
+
+// `sheratan explain` ships in the tarball the Sheratan arm installs, so an
+// agent can print every explanation without it counting against §1.5 (TASKS
+// decisions log, 2026-10-02). What is not counted is still handed over, and is
+// held to the same rule as the document.
+test('nothing `sheratan explain` prints contains a task hook', async () => {
+  const set = await readTaskSet();
+
+  const given = explanations().map((entry) => ({
+    what: `sheratan explain ${entry.code}`,
+    text: JSON.stringify(entry),
+  }));
+
+  const leaks = leaksIn(given, set.tasks.values());
+
+  assert.deepEqual(leaks, [], `sheratan explain hands over a task's answer:\n${describe(leaks)}`);
 });
 
 test('the gate fires: a hook in a document is found and named', () => {
