@@ -45,7 +45,7 @@ The comparison has two arms, and the second one is a committed application:
 
 ```sh
 cd packages/eval/controls/react
-pnpm install --ignore-workspace     # once, by hand. No eval run installs anything.
+pnpm install                        # once, by hand. Never --ignore-workspace: it skips this directory's own policy.
 ```
 
 It is its own pnpm root, so React never enters Sheratan's dependency graph,
@@ -136,7 +136,7 @@ Sheratan look better for a reason that has nothing to do with framework design.
 No suite was changed to accommodate any of it.
 
 `references/react/` borrows `controls/react`'s installed tree, so it needs that
-one-time `pnpm install --ignore-workspace` and installs nothing itself. Without
+one-time `pnpm install` and installs nothing itself. Without
 it the proof **says so loudly and names the command** rather than quietly
 proving one arm; CI installs it, so the parity claim is checked by something
 other than a laptop.
