@@ -11,6 +11,14 @@ import { parseArgs } from 'node:util';
 // TypeScript compiler with it and that is an optional peer dependency.
 import { Severity } from '../../check/src/finding.ts';
 import { buildProject } from './build.ts';
+import {
+  explain,
+  explainJson,
+  explainText,
+  explanations,
+  listJson,
+  listText,
+} from './explain/explain.ts';
 import { FALLBACK_FILE, RUNTIME } from './project.ts';
 import { INSTALL_TYPESCRIPT, isMissingTypescript, MISSING_TYPESCRIPT } from './peer.ts';
 import { report, reportJson } from './report.ts';
@@ -28,20 +36,22 @@ const HERE = '.';
 const OUT = 'dist';
 
 /** What this build of the command can actually do, named once. */
-const SHIPPED = 'create, check, build and dev';
+const SHIPPED = 'create, check, explain, build and dev';
 
 /** The port `dev` asks for first; a busy one moves it up, it does not stop it. */
 const PORT = 5173;
 
 /** Specified in SPEC §10, not built yet. Naming them beats "unknown command". */
-const PLANNED: readonly string[] = ['generate', 'explain', 'trace'];
+const PLANNED: readonly string[] = ['generate', 'trace'];
 
 const USAGE = `sheratan create <app>
 sheratan check [directory] [--json]
+sheratan explain [code] [--json]
 sheratan build [directory] [--out ${OUT}]
 sheratan dev   [directory] [--port ${String(PORT)}] [--no-reload]
 
   app          the directory a new app is written into; it must not already exist
+  code         a code a finding or an error printed, as SHR-L001; without one, every code is listed
   directory    the project, the folder holding ${TSCONFIG} and index.html; defaults to ${HERE}
   --json       print one versioned JSON object, for an agent or an editor
   --out        where build writes, emptied first; defaults to ${OUT}
@@ -56,6 +66,9 @@ correct one.
 dev serves the project with types stripped on the way out, and build writes the
 same thing to a directory. No bundler, no config, no plugin pipeline, and
 neither needs TypeScript installed; check does.
+
+explain says why a rule exists and shows code that is caught beside code that
+is not, for every code the checker reports and the runtime throws.
 
 Exit codes: 0 nothing to fix, 1 violations, 2 the command could not run.
 
@@ -114,6 +127,29 @@ async function create(terminal: Terminal, target: string): Promise<Exit> {
   return Exit.Clean;
 }
 
+/**
+ * One code in full, or every code in a line when none is named. A code that
+ * is not one — or is reserved and not checked yet — cannot be explained, and
+ * says so on stderr like any other reason the command could not run.
+ */
+function explained(terminal: Terminal, code: string | undefined, json: boolean): Exit {
+  if (code === undefined) {
+    const all = explanations();
+
+    terminal.out(json ? listJson(all) : listText(terminal, all));
+
+    return Exit.Clean;
+  }
+
+  const found = explain(code);
+
+  if (typeof found === 'string') return fail(terminal, found);
+
+  terminal.out(json ? explainJson(found) : explainText(terminal, found));
+
+  return Exit.Clean;
+}
+
 /** Strips the project into a directory, and says what it wrote. */
 async function build(terminal: Terminal, directory: string, out: string): Promise<Exit> {
   const root = resolve(directory);
@@ -164,6 +200,17 @@ async function created(terminal: Terminal, positionals: readonly string[]): Prom
   return create(terminal, target);
 }
 
+/** Why a command is not one this build runs: none given, not built yet, or not a command at all. */
+function unknown(command: string): string {
+  if (command === '') return `sheratan needs a command; this build ships ${SHIPPED}.`;
+
+  if (PLANNED.includes(command)) {
+    return `sheratan ${command} is specified but not built yet; this build ships ${SHIPPED}.`;
+  }
+
+  return `sheratan has no command \`${command}\`; this build ships ${SHIPPED}.`;
+}
+
 async function dispatch(
   argv: readonly string[],
   terminal: Terminal,
@@ -193,6 +240,8 @@ async function dispatch(
 
   if (command === 'check') return check(terminal, directory, values.json);
 
+  if (command === 'explain') return explained(terminal, positionals[1], values.json);
+
   if (command === 'build') return build(terminal, directory, values.out);
 
   if (command === 'dev') {
@@ -203,18 +252,7 @@ async function dispatch(
     );
   }
 
-  const missing = `sheratan needs a command; this build ships ${SHIPPED}.`;
-
-  if (command === '') return fail(terminal, missing);
-
-  if (PLANNED.includes(command)) {
-    return fail(
-      terminal,
-      `sheratan ${command} is specified but not built yet; this build ships ${SHIPPED}.`,
-    );
-  }
-
-  return fail(terminal, `sheratan has no command \`${command}\`; this build ships ${SHIPPED}.`);
+  return fail(terminal, unknown(command));
 }
 
 /**

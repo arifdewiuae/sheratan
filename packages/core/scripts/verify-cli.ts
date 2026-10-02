@@ -94,6 +94,21 @@ const helped = sheratan(alone, ['--help'], bare);
 expect(helped.status === CLEAN, `--help needs no compiler, but exited ${String(helped.status)}`);
 expect(helped.stdout.includes('sheratan check [directory]'), '--help printed no usage');
 
+// `explain` answers from a table bundled into the command, so it is proved
+// where no compiler can resolve: an agent asking about a code it was just
+// given must not be told to install TypeScript first.
+const explained = sheratan(alone, ['explain', 'SHR-L001', '--json'], bare);
+
+expect(
+  explained.status === CLEAN,
+  `explain needs no compiler, but exited ${String(explained.status)}: ${explained.stderr}`,
+);
+
+expect(
+  (JSON.parse(explained.stdout) as { code?: string }).code === 'SHR-L001',
+  `explain printed something other than SHR-L001: ${explained.stdout}`,
+);
+
 const unchecked = sheratan(alone, ['check', '.'], bare);
 
 expect(
@@ -162,5 +177,5 @@ expect(emitted.includes("'./modules/todo/index.js'"), `build left a .ts import: 
 expect(!emitted.includes(': string'), `build left a type annotation behind: ${emitted}`);
 
 process.stdout.write(
-  'the built command creates, checks, builds, helps and asks for the compiler it needs\n',
+  'the built command creates, checks, explains, builds, helps and asks for the compiler it needs\n',
 );

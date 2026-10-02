@@ -1434,7 +1434,7 @@ a resource whose key depends on the URL.
 Treated as part of the product, not as marketing.
 
 **One interface: the CLI.** Logic lives in the `check` and `cli` packages as
-ordinary functions (`checkProject()`, `scaffoldModule()`, `explainError()`);
+ordinary functions (`checkProject()`, `scaffoldModule()`, `explain()`);
 the CLI is a thin wrapper that parses arguments and prints. `--json` on every
 command is the machine surface.
 
@@ -1464,11 +1464,27 @@ sheratan generate module <name>
 sheratan generate resource <name> --in <module>
 sheratan generate stream <name> --in <module>
 sheratan check [directory] [--json]
-sheratan explain <error-code> [--json]
+sheratan explain [code] [--json]
 sheratan trace [--json]        # pulls the causal trace from the dev server
 sheratan dev
 sheratan build                 # strips types into a deployable directory
 ```
+
+**`sheratan explain`** answers for every code the runtime throws and the
+checker reports, and only those: the table is keyed by `ErrorCode` and
+`RuleCode`, so a code added without an explanation does not compile. One code
+prints what it is, its severity, whether the checker or the runtime catches
+it, why the rule exists, a **wrong** example beside a **right** one, and its
+`sheratan.dev/errors/<code>` page. An example is a set of files with their
+paths, because half the rules are about paths, and each one is executed rather
+than trusted: a wrong checker example must be reported with its code and a
+wrong runtime example must throw it, while the right one must not —
+`packages/cli/test/explain.test.ts`. With no code it lists every code in a
+line, for an agent that does not know which to ask about yet. `--json` is the
+same envelope `check` prints, `{ "version": 1, … }` around the explanation, or
+around `codes` for the list. A code SPEC §4 has numbered but nothing checks
+yet is reserved, and says so; anything else is not a code. Both exit 2, with
+the reason on stderr.
 
 - **`llms.txt`** at the repo and docs root: full API surface, the import
   matrix, canonical module example, error-code index, and — first item — the
