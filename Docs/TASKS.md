@@ -13,6 +13,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | `[stretch]` | "If time remains" in PLAN's cut list — first to go |
 | *(no tag)* | Planned for the week; cut before `[must]`, after `[stretch]` |
 | `[gate]` | Go/no-go checkpoint with a pre-agreed failure action |
+| `[later]` | Deferred past 0.1.0 by decision (2026-10-04). Stays where it is, so the week it belongs to still reads whole; does not block the launch |
 
 ## Status
 
@@ -24,13 +25,62 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ · modules compose with `mount()` ✅ · effects testable without a DOM (`scope()`) ✅ 2026-09-29 |
 | 3 | Checker, CLI, template | 🟡 In progress | Checker 9 of 16 codes (L001, L002, L003, L004, L006, L007, L008, L010, T001) · CLI: `create`, `check`, `explain`, `build` and `dev` ship in the tarball and serve deep links, 3 commands to go · **`[gate]` `sheratan create` yields a working app ✅** 2026-09-24 — the template is a workspace member, checked clean, and every rule code is proved exercised by breaking it once per code · `ui/` primitives still `[stretch]` |
 | 4 | Agent surface, reference app | 🟡 In progress | Routing in core ✅ — `location`, `routes()` with nested layouts, `navigate()`, on the Navigation API; 558 B brotli · `examples/hello` is multi-screen and proved in Chromium, with style scoping proved on Chromium, Firefox and WebKit |
-| 5 | Re-measure, package, launch | 🟡 In progress | — |
+| 5 | Re-measure, package, launch | 🟡 In progress | **Road to 0.1.0 fixed** 2026-10-04 — ten steps, in order, below; step 1 next |
 | +8 wks | Outside production use | ⬜ Not started | — |
 
 Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · ⛔ Stopped
 
 Last audited against the code on **2026-09-24**. A tick names where the work
 landed, so the claim can be checked without reading the diff.
+
+---
+
+## Road to 0.1.0
+
+The critical path, in order, decided 2026-10-04. Each step points at the items
+below that it closes; a step is done when they are ticked. **A launch is solid
+when every claim on its page is backed by a test or a measured number** — so
+what the README, the post and the site may claim is exactly what these steps
+prove, and nothing they don't.
+
+**Freeze until 0.1.0:** no new work on the eval instrument unless it blocks
+step 8, and no new feature that is not on this list. A new idea goes into
+Post-launch with where it came from, not into this path.
+
+1. **Error index on the site** — `site/errors/<code>/index.html` generated from
+   `explain`'s tables, `--check` in `pnpm verify`. Every `sheratan.dev/errors/SHR-…`
+   URL a shipped error prints resolves (Week 4 Docs). Live when `develop` reaches `main`
+2. **Post-disposal no-op, designed now** — ADR 0007 first, closing the two spec
+   gaps "Recognising a transition at run time" and "Runtime enforcement of
+   post-disposal no-ops"; then the runtime, then `SHR-L005`'s static half on the
+   same mechanism (Week 2 Ownership, Week 3 Checker). Before forms and `generate`,
+   because what a transition *is* decides what both of them emit
+3. **Forms in core** — ADR 0006 + SPEC first, no code before review: `form()` /
+   field state, `<form>` reports its fields for any event, 422 → field errors,
+   interdependent fields as `computed` (Week 2 Forms). The example goes into `examples/hello`,
+   never the eval domain. `llms.txt` had 166 tokens of headroom at the last
+   count (2026-09-29), so something is cut to make room. The void matrix showed agents grepping core source for
+   `submit|FormData` — `llms.txt` does not answer forms today
+4. **Widget mode** — the runtime sets the scope class and `data-module` /
+   `data-ui` on roots at mount; tokens scoped to `[data-sheratan-root]`;
+   `SHR-L009` over `.css` (Week 1 Rendering, Week 3 Checker)
+5. **The rest of SPEC §12's checker bar** — `SHR-V001` and `SHR-V004`
+   (`SHR-V002`, `SHR-V003` and `SHR-L011` are `[later]`)
+6. **`sheratan generate module` and `generate resource`** — after steps 2–4, so
+   the generators emit the final shape once. `llms.txt` already tells agents to
+   call them (Week 3 CLI)
+7. **`examples/dashboard` and the 60fps gate** — scaffolded by `create`, `sheratan`
+   from the registry, streams + 500-row windowed table + errors + a form;
+   then the `[gate]` 1000 msg/sec into 500 rows. No number, no performance claim
+   (Week 4 Reference app, Performance eval)
+8. **Eval re-run** — Week 0's T01/T03/T04 plus held-out T02/T05/T12, on the
+   confined harness. **Quote cost and hours first** (~$43 and ~3 h at the last
+   grid's prices). Published whatever it says; the README states model, date and
+   the training-data confound (Week 0, Week 5 Measure)
+9. **Package and release** — README, MIT, trusted publishing on npmjs.com
+   (environment blank), Enforce HTTPS, domain verified at account level, size
+   check, `develop → main`, tag `v0.1.0`, clear the 0.0.1 deprecation (Week 5 Package, Site)
+10. **Launch** — 5-minute demo, post with reproducible numbers, CFPs (Week 5 Launch)
 
 ---
 
@@ -56,7 +106,7 @@ Goal: test the central hypothesis while it costs three days. Harness timebox: 2 
 - [x] Split: 6 headline tasks + 6 held-out (EVAL-TASKS §2)
 - [x] Fix the documentation token budget for both arms **and write it down** before the first run — **10,000 tokens** (EVAL-TASKS §1.5), amended 2026-09-25 from 8,000 with the reasoning recorded in §1.5 itself. Cross-checked against `DOC_BUDGET` in `packages/eval/src/budget.ts` by `test/budget.test.ts`, so the document and the code cannot drift apart
 - [~] Eval harness skeleton — `packages/eval` runs the self-repair sub-eval (5 seeds, raw logs, seeded case list); **`evalkit` is built and frozen** (`packages/eval/evalkit`, 45 tests inside `pnpm check`): `/api`, `/ws/prices`, the seven control commands and the six inspection reports, with a test asserting every one of them is exercised; and the **iteration loop is built** (2026-09-24, `src/iterate.ts`) with its ten-iteration cap, non-convergence as a recorded outcome, and the §1.4 feedback asymmetry — the checker in full, failing tests by name only. Beside it: `src/arm.ts` (an arm is data, so a third one is a directory and a row), `src/stage.ts` (sandbox, backend, dev server, teardown), `src/proxy.ts` (one origin for every arm) and `src/frozen.ts` (the task set read from the frozen document, digest-checked). Both now exist: the React arm landed 2026-09-25, and the hidden Playwright suites (`suites/`, proved by `src/mutations.ts`) with it
-- [ ] Check what exactly Lit does *not* cover for `resource` and trace (PLAN risks)
+- [ ] `[later]` Check what exactly Lit does *not* cover for `resource` and trace (PLAN risks)
 
 **Self-repair sub-eval** (EVAL §2.3) — run 2026-09-16, [results](EVAL-RESULTS.md)
 - [x] Host app: four modules in the canonical shape (T01, T03, T04 and the toast T04 asks for) — `packages/eval/hosts`, 15 behaviour assertions taken from the hidden-test bullets
@@ -147,12 +197,17 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [x] `[stretch]` The opt-out from serializing SPEC §6 promised — built as `key`, not as a flag: same key serialized, different keys concurrent. EVAL-TASKS T04 ships two orders at once, and a flag would have made "parallel" mean "lost updates on one record" too
 - [ ] `[stretch]` Anything further — nothing is asked for yet
 
+**Forms** (SPEC §6, ADR 0006 — added 2026-10-04, Road step 3)
+- [ ] ADR 0006 and the SPEC section, reviewed before any code: field state, validation, `<form>` reporting its fields for any event, a 422 mapped to field errors, interdependent fields as `computed`, submit through `mutation()`
+- [ ] Runtime and tests, every error path asserting its code
+- [ ] `examples/hello` gains a form (not the eval domain); `llms.txt` answers forms within the §1.5 budget
+
 **Ownership & lifecycle** (SPEC §5b)
 - [x] `[must]` Owner tree; children from `mount()` disposed recursively — `OwnerNode` in `packages/core/src/owner.ts`, an intrusive linked list with O(1) add and remove
 - [x] `[must]` `mount()`: a view renders another module without importing it (SPEC §9a) — `packages/core/src/mount.ts`, two overloads so the props argument exists only where the module declares props. The child gets a scope of its own with tracking off, so its lifetime is the parent's and what it reads while mounting is not the parent's dependency — without that, one write rebuilds the whole child. Props carry accessors, so the child's view runs once. `SHR-R009` when one placement is put in two holes. `commit()` now handles anything that mounts itself, so a module (or a list) can live in a **reactive** hole and be swapped for another, which is how a screen changes. `test/mount.test.ts`; proven to fail four ways
 - [x] `[must]` `onDispose()` — `packages/core/src/owner.ts`; `SHR-R001` when there is no owner
 - [x] `[must]` Disposal order: watchers → subscriptions → nodes — `OwnerNode.dispose()` runs `teardown()` (a watcher drops its sources) before `reset()` (children, then owned subscribers, then cleanups last-registered-first)
-- [ ] `[must]` Post-disposal async is a no-op (owner flag on transitions) — **blocked:** nothing marks a transition at run time (see the spec gap below). `examples/hello` checks `signal.aborted` by hand instead, which is the pattern but not the enforcement
+- [ ] `[must]` Post-disposal async is a no-op (owner flag on transitions) — **designed before launch** (decided 2026-10-04, Road step 2): ADR 0007 resolves the two spec gaps below, then the runtime enforces it. Until then nothing marks a transition at run time. `examples/hello` checks `signal.aborted` by hand instead, which is the pattern but not the enforcement
 - [x] `[must]` Leak test: 1000 mount/unmount cycles → live subscription count returns to 0 — `reactive.test.ts:465` ('leak: 1000 root mount/dispose cycles…') and `html.test.ts:680` ('render: dispose removes its nodes…'); `resource.test.ts:552` and `stream.test.ts:495` each have one, and the windowed list has its own at `window.test.ts:304`
 
 **Streams & windowing**
@@ -181,17 +236,18 @@ publishes, and it is `sheratan`. See the spec gap on package count below.
 - [x] `[must]` Messages state the allowed set, not a rule number — *"view cannot import modules/todo/todo.effects.ts; allowed: lib, ui, own state."*, with a `fix` per kind of mistake, each pinned by a test
 - [x] `SHR-L002` I/O globals in `*.view.ts` — and in `*.state.ts` and a module's own helpers, which the lint rule it replaces already covered: `packages/check/src/rules/io.ts`. 22 globals in four kinds (network, storage, timers, page), each kind with its own fix. Resolved by the type checker (`globalsOf` in the adapter), so a shadowing local, a member named `fetch`, `typeof window` and a package's own `fetch` are not reported, and `{ document }` is. Proven to fail four ways through the adapter
 - [x] `[must]` `SHR-L010` a `*.state.ts` public surface exposes only `Accessor` values and transitions — read the declared (or inferred) member types of the state factory's return, report each `Signal` member with the accessor-plus-transition fix; failing-case test (SPEC §4) — `packages/check/src/rules/surface.ts`. "Writable" is structural — callable, with a callable `set` — so a look-alike is caught and a `Map` is not. Declared, inferred, module-level and mapped-type surfaces each have a test
-- [ ] `SHR-L005` direct state mutation from effects (static, backstop to L010) + dev-build runtime assertion via write provenance (SPEC §13)
+- [ ] `SHR-L005` (Road step 2, on ADR 0007's mechanism) direct state mutation from effects (static, backstop to L010) + dev-build runtime assertion via write provenance (SPEC §13)
 - [x] `SHR-L006` file set matches declared module kind (`view` / `full`) — `packages/check/src/rules/shape.ts`. The kind is read as the *type* of the exported `kind`, so `export const kind = 'full'` is a literal the compiler already knows and `kind: string` declares nothing; no new adapter surface was needed. Five failures, each with its own fix: no `index.ts`, no `kind`, a `kind` that is not one of the two literals, a kind's file missing, a file the kind excludes, and a layer suffix under another name (`row.view.ts`), which is reported as the rename rather than twice. `test/shape.test.ts`; proven to fail four ways
 - [x] `SHR-L008` acyclic module import graph, and acyclic `lib/` — `packages/check/src/rules/cycles.ts`: one graph builder where a node is a module or a `lib/` file, Tarjan's algorithm in O(files + imports), one finding per cycle printed as its shortest loop and anchored at its first import. `import type` counts. Proven to fail by dropping modules from the graph and by counting a module's own imports as edges
-- [ ] `SHR-L011` statically visible mutation of a value read from a signal — `items().push(x)`, `order().status = 'shipped'` — `fix` names the replacement write (SPEC §4, ADR 0002 layer 3)
+- [ ] `[later]` `SHR-L011` statically visible mutation of a value read from a signal — `items().push(x)`, `order().status = 'shipped'` — `fix` names the replacement write (SPEC §4, ADR 0002 layer 3)
 - [ ] `SHR-L009` style scoping over `.css`: single `@scope` with lower boundary, root is the file's own `.module-<name>` / `.ui-<name>` class and never an attribute selector, no `@layer` rule in a module sheet, `global.css` only `tokens`/`base`, no `:root` tokens in module sheets, no `!important` outside `base` — **and the `@import` list in `global.css` matches the sheets on disk both ways**, which is the only thing making a forgotten sheet loud rather than silent. Failing-case test per violation (SPEC §9a)
 - [x] `SHR-T001` missing state/effects tests — **warning only** — `packages/check/src/rules/tested.ts`. Per file rather than per module: a `view` module has no state or effects and is never asked, and the test must sit beside the file it covers under that file's own name, so `dashboard.state.spec.ts` and a top-level `test/` folder are both reported. The fix differs by layer, because the architecture is what makes each cheap: state is a pure function, effects needs one fake contract. The only rule that reads the directory rather than the program. `test/tested.test.ts`; proven to fail four ways, and the first finding to exit 0
 - [x] `SHR-L003` banned `shared/` directory; `ui/` nesting max one level — `packages/check/src/rules/structure.ts`: paths only, no type checker. A `shared/` segment at any depth is reported per file with the "move it by what it is" fix, and every file under `ui/` must sit in exactly one component folder — loose in `ui/` (including a barrel `index.ts`) and nested below the component each get their own message. `test/structure.test.ts`; proven to fail three ways
 - [x] `SHR-L004` `resource` / `mutation` / `stream` / `onDispose` outside `*.effects.ts` — `packages/check/src/rules/effects-only.ts`, on a new adapter surface `callsOf(file)` that hands out every call to an imported value as plain data: the name the *exporting* module uses, the specifier it came from, and where the call is. So `import { stream as subscribe }` is reported as `stream`, a local function of the same name is not reported at all, and neither is a same-named export of another package. Shadowing is settled by the symbol being an alias, the same way `io.ts` settles it for ambient globals. `navigate` is the fifth name SPEC §4 lists and joins the map when the router exports it — a rule cannot resolve an import that does not exist. `test/effects-only.test.ts`; proven to fail four ways, plus one injected violation in `examples/hello`
-- [ ] `SHR-V001` inline arrow function in template → error; `SHR-V002` `unsafeHTML` with non-literal argument → warning
+- [ ] `SHR-V001` inline arrow function in template → error
+- [ ] `[later]` `SHR-V002` `unsafeHTML` with non-literal argument → warning
 - [x] `SHR-L007` contract method returning a Promise without `AbortSignal` → error (SPEC §5b) — `packages/check/src/rules/cancellable.ts`, on a new adapter surface `methodsOf(file)` that hands out each contract method as plain data: owner, name, where it is declared, the printed return type, whether it is awaited, and each parameter's type followed by its members'. So the rule needs no type of its own to decide either question. "Returns a promise" is structural — a callable `then`, not the name `Promise` — and a signal counts as its own parameter or inside an options object. Re-exported types are followed to their declaration, and a package's type is reported against the contract that exports it. `test/cancellable.test.ts`; proven to fail four ways
-- [ ] `SHR-V003` reactivity-trap warning where detectable (SPEC §9)
+- [ ] `[later]` `SHR-V003` reactivity-trap warning where detectable (SPEC §9)
 - [ ] `SHR-V004` malformed template errors in the same JSON shape (SPEC §13)
 
 **CLI** (SPEC §10)
@@ -205,7 +261,7 @@ publishes, and it is `sheratan`. See the spec gap on package count below.
 - [x] `[must]` `sheratan build` — strips types into a deployable directory of plain ESM; no bundler (SPEC §10c) — `packages/cli/src/build.ts` and `strip.ts`. **Node's own stripper** (`node:module`), so the command needs nothing installed, not even the compiler `check` asks for: `scripts/verify-cli.ts` builds an app with the packaged command in a directory where `typescript` cannot resolve at all. It erases and never compiles, so an `enum`, a `namespace` or a parameter property is refused by name with the one-line alternative. The tree is copied minus `node_modules`, `e2e/`, dot-entries, tests and configs; relative `./x.ts` imports become `./x.js`; the runtime is vendored into `<out>/sheratan/` and the page's import map pointed at it, because a browser cannot resolve a bare specifier. Proven end to end: `examples/hello` built, served by `python3 -m http.server`, rendered in Chromium at 60 fps with no page errors
 - [ ] Logic as plain functions (`checkProject()`, `scaffoldModule()`…); CLI is a thin wrapper — holds for `check` and now `create`: `run(argv, terminal)` takes its streams and returns an exit code, `scaffoldApp()` is an ordinary exported function, and nothing under `src/` touches `process`. Ticked when `generate` follows the same shape
 - [ ] Retire the layer rules in `.oxlintrc.json` (`no-restricted-imports` / `no-restricted-globals` for view, state and effects) **once the checker gives feedback while editing** — `sheratan check --watch`, checking on save in `sheratan dev`, or the VS Code extension. Proven redundant on 2026-09-19: each of the 24 violations they catch, injected into `examples/hello`, is reported by `SHR-L001` or `SHR-L002`. Until then a matrix change updates them in the same PR (AGENTS.md "Layers")
-- [ ] **Incremental checking** for `sheratan check --watch`, `sheratan dev` and the editor plugin. A full check is already linear (every rule O(files + imports) or better, and cycles cannot be found in less), so the target is an edit, not the project: cache findings per file by content hash and re-run only the changed file's per-file rules (L001, L002, L004, L010, V-rules); re-run cycles only when a file's set of imports changed; let TypeScript's `updateSnapshot` re-check the program. **Measure first**, on `examples/dashboard`: loading the program is expected to dominate the rules, and if it does, the cache is the wrong optimisation
+- [ ] `[later]` **Incremental checking** for `sheratan check --watch`, `sheratan dev` and the editor plugin. A full check is already linear (every rule O(files + imports) or better, and cycles cannot be found in less), so the target is an edit, not the project: cache findings per file by content hash and re-run only the changed file's per-file rules (L001, L002, L004, L010, V-rules); re-run cycles only when a file's set of imports changed; let TypeScript's `updateSnapshot` re-check the program. **Measure first**, on `examples/dashboard`: loading the program is expected to dominate the rules, and if it does, the cache is the wrong optimisation
 - [ ] `sheratan/check` as an `exports` subpath with its own declarations, for the editor extension that reads findings in-process rather than by spawning the command. The `bin` half shipped 2026-09-23; this half waits on a declaration emit for `packages/check/src` and on having a consumer
 - [ ] Bun and Deno in the CI matrix alongside Node — they make `dev`/`build`'s type-stripping step a no-op, which is the case worth testing (SPEC §10c)
 
@@ -225,9 +281,9 @@ publishes, and it is `sheratan`. See the spec gap on package count below.
 
 **Agent surface** (SPEC §10) — CLI only, no MCP server
 - [x] `sheratan explain <code> [--json]` with contrastive right/wrong examples — `packages/cli/src/explain/`, 2026-10-02. All 18 shipped codes, in a table keyed by `ErrorCode` and `RuleCode` so a missing entry does not compile; every example executed by `packages/cli/test/explain.test.ts` — a wrong checker example must be reported with its code and a wrong runtime example must throw it, the right ones must not — and proved by breaking one of each. Bare `sheratan explain` lists every code; a reserved code (L005, L009, L011, V001–V004) says it is not checked yet. SPEC §10 amended
-- [ ] `sheratan trace [--json]` pulls trace from the dev server
+- [ ] `[later]` `sheratan trace [--json]` pulls trace from the dev server — **first in line after launch**: "why did this update?" is the one answer no other framework gives, and the data already exists
 - [ ] `--json` on every command
-- [ ] `SKILL.md`: when to use, scaffolding, reading checker output, reading a trace, "one way" table
+- [ ] `[later]` `SKILL.md`: when to use, scaffolding, reading checker output, reading a trace, "one way" table
 - [ ] Final `llms.txt` ≤ ~8k tokens
 
 **Routing in core** (SPEC §9b)
@@ -258,7 +314,7 @@ publishes, and it is `sheratan`. See the spec gap on package count below.
 **Docs**
 - [ ] Getting started page
 - [ ] Rules page
-- [ ] Error code index (served at `sheratan.dev/errors/<code>`)
+- [ ] Error code index (served at `sheratan.dev/errors/<code>`) — half done: the content ships as `sheratan explain` (#72). Still open is the site half, Road step 1: one page per code generated from the same tables, and `--check` in `pnpm verify` so a page cannot go stale
 
 - [ ] `[gate]` scaffold → check → fix loop works live from Claude Code using the CLI alone
 - [ ] `[gate]` 60fps under 1000 msg/sec into a 500-row table (only after keyed reconciliation is real) → otherwise scheduler/renderer is wrong, headline claim dies
@@ -271,7 +327,7 @@ publishes, and it is `sheratan`. See the spec gap on package count below.
 - [ ] Re-run Week 0 agent eval unchanged on the real runtime — same tasks, same budget
 - [ ] Commit raw logs of every run
 - [ ] `sheratan-eval agent --arm react` reproducible by a stranger
-- [ ] `--arm svelte` on the held-out 6 tasks, reported beside React and gating nothing (EVAL §2.1)
+- [ ] `[later]` `--arm svelte` on the held-out 6 tasks, reported beside React and gating nothing (EVAL §2.1)
 - [ ] Size: `core` < 10 KB gzipped, 0 runtime deps, 1 package in user `package.json` (EVAL §1.3)
 - [ ] Video: app served as plain files with empty `node_modules`
 
@@ -313,7 +369,35 @@ publishes, and it is `sheratan`. See the spec gap on package count below.
 
 **Editor** (post-MVP — extends the 2026-09-16 decision, which deferred this to Week 3)
 - [ ] VS Code extension surfacing `sheratan check` diagnostics inline, with the checker's `fix` as a code action — the rule set's whole premise is a machine-readable repair, and an editor is where a human collects one. Blocked on the checker existing (Week 3); before that an extension would only re-highlight what the recommended lit-html extension already does, which is why workspace recommendations were chosen instead
-- [ ] Decide LSP or direct `--json` invocation once `sheratan check`'s schema is versioned — an LSP is also what a JetBrains plugin would need, so it is the choice that decides whether there is ever a second editor
+- [ ] Decide LSP or direct `--json` invocation once `sheratan check`'s schema is versioned — an LSP is also what a JetBrains plugin would need, so it is the choice that decides whether there is ever a second editor. **Leaning LSP (2026-10-04):** coding agents increasingly read diagnostics through one, so it would put the checker in front of an agent while it edits, not only when it runs `check` — and it is what lets `.oxlintrc.json`'s layer rules retire
+
+**Ideas from the 2026-10-04 design discussion** — recorded so they are not lost and not started early. None is decided; each needs its ADR or EVAL amendment before code.
+
+*Record and replay* (SPEC §4, §7)
+- [ ] Record a session as (contract responses + intents + timestamps) and replay it exactly — in a test, in a bug report, in an agent's sandbox. The layering is what makes this possible: every I/O call goes through a contract, every write is a transition, views are pure. Redux promised replay and could not deliver it because effects ran anywhere; here they cannot. Builds on the trace's write provenance
+
+*Accessibility as checker rules* (SPEC §8)
+- [ ] Static a11y rules over the parsed template: a `<button>` with no accessible name, a click intent on a non-interactive element, an `<input>` with no label. No mainstream framework fails the build on these. Codes from a new family; each with a failing case and a `create` template mutation (AGENTS.md). T12 (accessible dialog) is the eval task it would move
+
+*Upgrades as checker fixes*
+- [ ] Every breaking change ships a codemod, run as a checker fix: errors are already machine-readable, so a migration can be too. Before 1.0, not before 0.1.0 — there is nothing to migrate from yet
+
+*Plan first: a checked plan* (SPEC §10, `generate`)
+- [ ] ADR: a structured plan file — modules, their signals, transitions, intents, and the contract methods they call; SPEC §4's module contract written down before code. Prose ADRs and plans were considered and rejected for this: a model drifts from a prose plan by the fourth file, and nothing notices
+- [ ] `sheratan generate` takes the plan as input and writes the files; the agent fills function bodies, one file in context at a time
+- [ ] A checker rule for drift from the plan: an intent planned and never implemented, a transition implemented and never planned. Drift becomes a code, so a model cannot drift silently
+- [ ] Measured with ablations, because planning helps any framework: Sheratan with the plan step, Sheratan without it, and React with "plan first" in the prompt. If React-with-a-plan closes the gap, the gain was the planning; if the checked plan beats a prose one, it is something only an enforced shape can offer
+
+*Local models* (extends the multi-model study below; same harness, same confinement)
+- [ ] The claim to test: **Sheratan's advantage over React grows as the model gets weaker** — an interaction, so it needs a grid (Claude, a ~30B and a ~8–14B open-weights model × Sheratan, React), not one cell. If the gap is flat, Sheratan is simply better, and the laptop pitch is not supported
+- [ ] Probe first (~1 h): the same `claude` binary pointed at a local runtime through `ANTHROPIC_BASE_URL`, one tool-using turn inside `confine.ts`, usage tokens reported (`budget.ts` needs them). If it works, only the model varies; another agent harness would change two variables at once. Unverified as of 2026-10-04
+- [ ] Pre-register in EVAL before the first run: model, weights digest, quantization, context length, sampler, runtime version, **the laptop** (chip, RAM), the margin that counts as a win
+- [ ] A guard, not a note: **silent context truncation**. Local runtimes ship small default contexts and drop prompt tokens without a word, which would quietly penalise whichever arm has the longer documentation. Assert prompt tokens < context on every turn; a truncated turn voids the cell
+- [ ] Pick model sizes on a pilot task **outside** the Week 0 subset (T02), so the model is not chosen by looking at the tasks it is scored on, and so both arms are not at 0% (the floor twin of the self-repair ceiling)
+- [ ] Classify every failing iteration as structural (checker or linter) or behavioural (hidden test). The thesis predicts Sheratan cuts the first kind; a win made of the second kind does not support it
+- [ ] Any change to `llms.txt` or a checker message prompted by a pilot failure is re-measured on tasks it was not fixed against
+- [ ] Ten seeds instead of three: no API bill, and a fixed sampler seed makes a local cell re-runnable exactly. Wall-clock is reported beside pass rate — "works, an hour per task" is part of the result. Roughly 80 cells, so days of overnight runs
+- [ ] Positioning if it holds: "runs on the model you already have — offline, private, free", never "works even with weak models"
 
 **Multi-model study** (post-launch — planned 2026-10-02, not decided; EVAL's "Scope discipline" currently rules it out, see Spec gaps)
 - [ ] Amend EVAL "Scope discipline" and log the decision before any code: the Week 0 comparison answers the gate with one model, and a matrix of models from several vendors is a separate research question that starts after it
@@ -541,3 +625,4 @@ Contradictions found between SPEC, PLAN and EVAL. Resolve by amending the docs, 
 | 2026-09-29 | Effects are testable without a DOM: `scope()` joins the public API, and `SHR-T001` stays | Measured in the void matrix: every Sheratan effects test, and the `create` template's, rendered an empty template into happy-dom only to get an owner for `resource()`, `mutation()` and `stream()`, and agents copied that setup into every module. Tests were kept rather than the warning dropped, because they are what a production app needs; the fix is to make the one expensive kind cheap. `scope()` is `root()` made public, detached and value-returning, in the main entry rather than a `sheratan/testing` subpath, because the production build is one bundle and a second entry would carry its own copy of the owner state. Cost: one export (A5) and 13 B brotli. Honest scale: the template's effects test goes from 271 lines to 258; the gain is that an effects test no longer renders anything, not that tests got short |
 | 2026-10-02 | `sheratan explain` is part of the Sheratan arm, like the checker's own output, and is **not** counted against the §1.5 documentation budget | A confined agent installs the packed tarball, so it can run `explain` and read text outside the 10,000 tokens; the React arm has no equivalent. Counted like checker output because that is what it is — the checker's `message` and `fix` already reach the agent uncounted, every finding already names the code to ask about, and the checker is the hypothesis under test. Keeping it out of the eval's build was the cleaner instrument and the worse one: the arm would measure a product nobody ships. Decided before the re-run, not after it; its entries run through the same contamination rule as `llms.txt` |
 | 2026-10-02 | Bare `sheratan explain` lists every code, one line each, rather than failing for want of one (SPEC §10 amended) | An agent that has a symptom and not a code needs the list before it can ask; SPEC's `<error-code>` was required only because nobody had written the list. The list is the same table, so it costs no second source |
+| 2026-10-04 | **Road to 0.1.0 fixed** (top of this file): ten steps in order, a freeze on new eval-instrument work and new features until the tag, and `[later]` for what is deferred: `SHR-L011`, `SHR-V002`, `SHR-V003` (SPEC §12 amended), the `sheratan trace` CLI, `SKILL.md`, incremental checking, the Svelte arm and the Lit check. Post-disposal no-op is **designed before launch**, not amended to the hand-written pattern; widget mode **stays** in 0.1.0 | Since 2026-09-25 nearly all the work went into the eval instrument — necessary, it caught real leaks, but it is not the product, and PLAN's musts (`generate`, the dashboard, widget mode) did not move. A launch is solid when every claim on its page is backed by a test or a number, so the path is exactly what the claims need. For the disposal no-op, enforcement was chosen over documenting the hand-written `signal.aborted` pattern, which nothing can check; widget mode stays because it is the adoption path (SPEC §10d). Ideas from the same discussion — record/replay, a11y rules, codemods, a checked plan, local models — went to Post-launch, written down rather than started |

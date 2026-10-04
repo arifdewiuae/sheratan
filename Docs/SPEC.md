@@ -1712,9 +1712,10 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
 
 - `examples/dashboard` runs from a plain `index.html` on a static file server with no build step and
   holds 60fps under a synthetic 1000 msg/sec feed into a 500-row table.
-- Every cell of the import matrix is enforced (`SHR-L001`), plus L002–L009 and
-  V001–V004, each with a failing-case test; `SHR-V002`, `SHR-V003` and
-  `SHR-T001` report as warnings only.
+- Every cell of the import matrix is enforced (`SHR-L001`), plus L002–L010,
+  `SHR-V001` and `SHR-V004`, each with a failing-case test; `SHR-T001` reports
+  as a warning only. `SHR-V002` and `SHR-V003` (warnings) and `SHR-L011` follow
+  after 0.1.0 (TASKS decisions log, 2026-10-04).
 - Error messages state the allowed import set, not a rule number.
 - `resource()` passes tests for: abort on key change, dedup, out-of-order
   discard, stale-while-revalidate, retry with backoff.
