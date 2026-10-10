@@ -25,7 +25,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ · modules compose with `mount()` ✅ · effects testable without a DOM (`scope()`) ✅ 2026-09-29 |
 | 3 | Checker, CLI, template | 🟡 In progress | Checker 9 of 16 codes (L001, L002, L003, L004, L006, L007, L008, L010, T001) · CLI: `create`, `check`, `explain`, `build` and `dev` ship in the tarball and serve deep links, 3 commands to go · **`[gate]` `sheratan create` yields a working app ✅** 2026-09-24 — the template is a workspace member, checked clean, and every rule code is proved exercised by breaking it once per code · `ui/` primitives still `[stretch]` |
 | 4 | Agent surface, reference app | 🟡 In progress | Routing in core ✅ — `location`, `routes()` with nested layouts, `navigate()`, on the Navigation API; 558 B brotli · `examples/hello` is multi-screen and proved in Chromium, with style scoping proved on Chromium, Firefox and WebKit |
-| 5 | Re-measure, package, launch | 🟡 In progress | **Road to 0.1.0 fixed** 2026-10-04 — ten steps, in order, below; step 1 next |
+| 5 | Re-measure, package, launch | 🟡 In progress | **Road to 0.1.0 fixed** 2026-10-04 — ten steps, in order, below · **step 1 ✅** 2026-10-10, error index generated into `site/errors/`; step 2 next |
 | +8 wks | Outside production use | ⬜ Not started | — |
 
 Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · ⛔ Stopped
@@ -47,7 +47,7 @@ prove, and nothing they don't.
 step 8, and no new feature that is not on this list. A new idea goes into
 Post-launch with where it came from, not into this path.
 
-1. **Error index on the site** — `site/errors/<code>/index.html` generated from
+1. ✅ **Error index on the site** (2026-10-10) — `site/errors/<code>/index.html` generated from
    `explain`'s tables, `--check` in `pnpm verify`. Every `sheratan.dev/errors/SHR-…`
    URL a shipped error prints resolves (Week 4 Docs). Live when `develop` reaches `main`
 2. **Post-disposal no-op, designed now** — ADR 0007 first, closing the two spec
@@ -314,7 +314,7 @@ publishes, and it is `sheratan`. See the spec gap on package count below.
 **Docs**
 - [ ] Getting started page
 - [ ] Rules page
-- [ ] Error code index (served at `sheratan.dev/errors/<code>`) — half done: the content ships as `sheratan explain` (#72). Still open is the site half, Road step 1: one page per code generated from the same tables, and `--check` in `pnpm verify` so a page cannot go stale
+- [x] Error code index (served at `sheratan.dev/errors/<code>`) — 2026-10-10. The content is `sheratan explain`'s table (#72); the site half is `packages/cli/scripts/errors.ts`, which writes `site/errors/<code>/index.html` for all 18 codes, an index at `site/errors/` that also names the reserved codes, and the generated part of `site/sitemap.xml`. Committed like `llms.txt`, and `--check` in `pnpm verify` fails on a page that is missing, stale, or left over from a code that no longer exists. `test/error-page.test.ts` proves every URL a shipped error prints (`docsFor` and `DOCS_BASE_URL + ErrorCode`) lands on a generated page, that examples render as text, and that no page carries a script; each test broken once. Checked in Chrome: no CSP violations, both fonts load, nothing overflows at 375 px. **One check left for the release:** after `develop → main`, curl the live URLs with and without the trailing slash (Pages redirects the second to the first)
 
 - [ ] `[gate]` scaffold → check → fix loop works live from Claude Code using the CLI alone
 - [ ] `[gate]` 60fps under 1000 msg/sec into a 500-row table (only after keyed reconciliation is real) → otherwise scheduler/renderer is wrong, headline claim dies
