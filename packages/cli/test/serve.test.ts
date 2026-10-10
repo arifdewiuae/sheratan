@@ -277,7 +277,9 @@ test('a busy port moves the server up rather than stopping it', async () => {
     using made = project(SITE);
     await using server = await serve({ root: made.root, port: taken, reload: false });
 
-    assert.equal(server.port, taken + 1);
+    // Above, not exactly one above: on a shared runner another process can
+    // hold the next port too, and moving past it is the behaviour under test.
+    assert.ok(server.port > taken, `expected a port above ${taken}, got ${server.port}`);
   } finally {
     await new Promise<void>((closed) => {
       blocker.close(() => {
