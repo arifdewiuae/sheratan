@@ -19,12 +19,13 @@ export function orderTableView(props: OrderTableProps): Template {
   // instead of rewriting them, and the row runs once per order.
   const rows = each(
     props.rows,
-    (row) => html`<li class="order-row">
-      <a href=${() => `/orders/${String(row().id)}`} data-order=${() => String(row().id)}>
-        ${() => row().name}
-      </a>
-      <span class="order-value">${() => money(row().value)}</span>
-    </li>`,
+    (row) =>
+      html`<li class="order-row">
+        <a href=${() => `/orders/${String(row().id)}`} data-order=${() => String(row().id)}>
+          ${() => row().name}
+        </a>
+        <span class="order-value">${() => money(row().value)}</span>
+      </li>`,
   );
 
   return html`<ul class="order-table" data-screen="table">

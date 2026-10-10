@@ -55,9 +55,10 @@ function port(start: number, count = POOL): Accessor<EachWindow> {
 
 test('a window renders the slice it names, in order', () => {
   render(
-    () => html`<ul>
-      ${each(seed(TOTAL), (item) => html`<li>${cell(item)}</li>`, port(300))}
-    </ul>`,
+    () =>
+      html`<ul>
+        ${each(seed(TOTAL), (item) => html`<li>${cell(item)}</li>`, port(300))}
+      </ul>`,
     host,
   );
 
@@ -105,9 +106,10 @@ test('spacers hold open the rows that are not in the DOM', () => {
   const view = computed(() => ({ start: start(), count: POOL, rowHeight: ROW_HEIGHT }));
 
   render(
-    () => html`<ul>
-      ${each(seed(TOTAL), (item) => html`<li>${cell(item)}</li>`, view)}
-    </ul>`,
+    () =>
+      html`<ul>
+        ${each(seed(TOTAL), (item) => html`<li>${cell(item)}</li>`, view)}
+      </ul>`,
     host,
   );
 
@@ -209,9 +211,10 @@ test('a window past the end of the list shows the last rows there are', () => {
   const view = computed(() => ({ start: start(), count: POOL, rowHeight: ROW_HEIGHT }));
 
   render(
-    () => html`<ul>
-      ${each(seed(TOTAL), (item) => html`<li>${cell(item)}</li>`, view)}
-    </ul>`,
+    () =>
+      html`<ul>
+        ${each(seed(TOTAL), (item) => html`<li>${cell(item)}</li>`, view)}
+      </ul>`,
     host,
   );
 
@@ -229,9 +232,10 @@ test('a window bigger than the list renders the list, and a count of zero render
   const view = computed(() => ({ start: 0, count: count(), rowHeight: ROW_HEIGHT }));
 
   render(
-    () => html`<ul>
-      ${each(seed(10), (item) => html`<li>${cell(item)}</li>`, view)}
-    </ul>`,
+    () =>
+      html`<ul>
+        ${each(seed(10), (item) => html`<li>${cell(item)}</li>`, view)}
+      </ul>`,
     host,
   );
 
@@ -250,9 +254,10 @@ test('an empty list renders no rows and no spacers', () => {
   const items = signal<Item[]>([]);
 
   render(
-    () => html`<ul>
-      ${each(items, (item) => html`<li>${cell(item)}</li>`, port(0))}
-    </ul>`,
+    () =>
+      html`<ul>
+        ${each(items, (item) => html`<li>${cell(item)}</li>`, port(0))}
+      </ul>`,
     host,
   );
 

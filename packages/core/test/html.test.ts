@@ -191,11 +191,12 @@ test('events: handler gets a payload, never the raw Event', () => {
   };
 
   render(
-    () => html` <form @submit=${submitted}>
-      <input name="qty" value="3" @input=${typed} />
-      <input type="checkbox" name="gift" @change=${toggled} />
-      <button type="button" @click=${clicked}>go</button>
-    </form>`,
+    () =>
+      html` <form @submit=${submitted}>
+        <input name="qty" value="3" @input=${typed} />
+        <input type="checkbox" name="gift" @change=${toggled} />
+        <button type="button" @click=${clicked}>go</button>
+      </form>`,
     host,
   );
 
@@ -235,10 +236,11 @@ test('events: a button names itself with its value, without a data attribute', (
   };
 
   render(
-    () => html` <div>
-      <button type="button" value="ascending" @click=${sort}>up</button>
-      <button type="button" value="descending" @click=${sort}>down</button>
-    </div>`,
+    () =>
+      html` <div>
+        <button type="button" value="ascending" @click=${sort}>up</button>
+        <button type="button" value="descending" @click=${sort}>down</button>
+      </div>`,
     host,
   );
 
@@ -367,11 +369,12 @@ test('holes resolve at any depth, in document order, including several per eleme
   const third = signal('3');
 
   render(
-    () => html`<article>
-      <header id=${first} class=${second}><h1>${first}</h1></header>
-      <p><span>${second}</span><span>${third}</span></p>
-      <footer>${third}</footer>
-    </article>`,
+    () =>
+      html`<article>
+        <header id=${first} class=${second}><h1>${first}</h1></header>
+        <p><span>${second}</span><span>${third}</span></p>
+        <footer>${third}</footer>
+      </article>`,
     host,
   );
 
