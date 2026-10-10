@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",
-    "eslint-plugin-jsdoc": "65.1.0",
+    "eslint-plugin-jsdoc": "65.2.0",
     "oxfmt": "0.67.0",
     "oxlint": "1.82.0",
     "oxlint-tsgolint": "7.0.2003",
