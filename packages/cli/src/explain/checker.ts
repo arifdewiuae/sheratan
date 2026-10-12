@@ -142,6 +142,53 @@ export function startClock(): void {
     },
   },
 
+  [RuleCode.DirectWrite]: {
+    ...ERROR,
+    title: 'A `*.effects.ts` writes a signal instead of calling a transition',
+    why:
+      'Effects decide when; state decides what. A write in effects is a change no transition names, so the ' +
+      'state file stops being the one place that says how state can change.',
+    wrong: {
+      'modules/devices/devices.state.ts': `import { signal, type Signal } from 'sheratan';
+
+export interface DevicesState {
+  readonly room: Signal<string>;
+}
+
+export function createDevicesState(): DevicesState {
+  return { room: signal('Lab') };
+}
+`,
+      'modules/devices/devices.effects.ts': `import type { DevicesState } from './devices.state.ts';
+
+export function filterBy(state: DevicesState, room: string): void {
+  state.room.set(room);
+}
+`,
+    },
+    right: {
+      'modules/devices/devices.state.ts': `import { signal, type Accessor } from 'sheratan';
+
+export interface DevicesState {
+  readonly room: Accessor<string>;
+  filtered(this: void, room: string): void;
+}
+
+export function createDevicesState(): DevicesState {
+  const room = signal('Lab');
+
+  return { room, filtered: (next) => room.set(next) };
+}
+`,
+      'modules/devices/devices.effects.ts': `import type { DevicesState } from './devices.state.ts';
+
+export function filterBy(state: DevicesState, room: string): void {
+  state.filtered(room);
+}
+`,
+    },
+  },
+
   [RuleCode.Shape]: {
     ...ERROR,
     title: "A module's files do not match the kind its `index.ts` declares",

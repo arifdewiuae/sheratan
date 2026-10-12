@@ -15,6 +15,8 @@ export const RuleCode = {
   Structure: 'SHR-L003',
   /** An effects-only API — `resource`, `mutation`, `stream`, `onDispose`, `navigate` — called outside `*.effects.ts`. */
   EffectsOnly: 'SHR-L004',
+  /** A `*.effects.ts` writes a signal directly instead of calling a transition. */
+  DirectWrite: 'SHR-L005',
   /** A module's files do not match the kind its `index.ts` declares. */
   Shape: 'SHR-L006',
   /** A promise-returning method on a service contract takes no `AbortSignal`. */

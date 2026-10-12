@@ -151,6 +151,25 @@ const MUTATIONS: readonly Mutation[] = [
     },
   },
   {
+    code: RuleCode.DirectWrite,
+    what: 'effects writes the room filter instead of calling its transition',
+    mutate: (root) => {
+      edit(
+        root,
+        'modules/devices/devices.state.ts',
+        'readonly room: Accessor<string>;',
+        'readonly room: Signal<string>;',
+      );
+
+      edit(
+        root,
+        'modules/devices/devices.effects.ts',
+        'state.filtered(room);',
+        'state.room.set(room);',
+      );
+    },
+  },
+  {
     code: RuleCode.Shape,
     what: 'a `full` module loses its effects file',
     mutate: (root) => rmSync(join(root, 'modules/devices/devices.effects.ts')),
