@@ -79,7 +79,7 @@
       <p class="lead">Each page shows code that triggers the error beside code that doesn't. The examples are run by the test suite, so none of them can go out of date.</p>
     </header>
     <section aria-labelledby="codes">
-      <h2 id="codes">18 codes</h2>
+      <h2 id="codes">19 codes</h2>
       <table>
         <thead><tr><th scope="col">Code</th><th scope="col">What it means</th><th scope="col" class="hide-narrow">Kind</th></tr></thead>
         <tbody>
@@ -87,6 +87,7 @@
         <tr><td class="code"><a href="/errors/SHR-L002/">SHR-L002</a></td><td>A view or a state file does I/O, reads the page or schedules work</td><td class="muted hide-narrow">error · caught by sheratan check</td></tr>
         <tr><td class="code"><a href="/errors/SHR-L003/">SHR-L003</a></td><td>A file the layout has no place for</td><td class="muted hide-narrow">error · caught by sheratan check</td></tr>
         <tr><td class="code"><a href="/errors/SHR-L004/">SHR-L004</a></td><td>An effects-only API called outside <code>*.effects.ts</code></td><td class="muted hide-narrow">error · caught by sheratan check</td></tr>
+        <tr><td class="code"><a href="/errors/SHR-L005/">SHR-L005</a></td><td>A <code>*.effects.ts</code> writes a signal instead of calling a transition</td><td class="muted hide-narrow">error · caught by sheratan check</td></tr>
         <tr><td class="code"><a href="/errors/SHR-L006/">SHR-L006</a></td><td>A module&#39;s files do not match the kind its <code>index.ts</code> declares</td><td class="muted hide-narrow">error · caught by sheratan check</td></tr>
         <tr><td class="code"><a href="/errors/SHR-L007/">SHR-L007</a></td><td>A promise-returning contract method takes no <code>AbortSignal</code></td><td class="muted hide-narrow">error · caught by sheratan check</td></tr>
         <tr><td class="code"><a href="/errors/SHR-L008/">SHR-L008</a></td><td>Modules, or <code>lib/</code> files, import each other in a loop</td><td class="muted hide-narrow">error · caught by sheratan check</td></tr>
@@ -106,7 +107,7 @@
     </section>
     <section aria-labelledby="reserved">
       <h2 id="reserved">Numbered, not checked yet</h2>
-      <p class="caption"><code>SHR-L005</code>, <code>SHR-L009</code>, <code>SHR-L011</code>, <code>SHR-V001</code>, <code>SHR-V002</code>, <code>SHR-V003</code>, <code>SHR-V004</code>: reserved by the spec, and given a page in the release that starts checking them.</p>
+      <p class="caption"><code>SHR-L009</code>, <code>SHR-L011</code>, <code>SHR-V001</code>, <code>SHR-V002</code>, <code>SHR-V003</code>, <code>SHR-V004</code>: reserved by the spec, and given a page in the release that starts checking them.</p>
     </section>
   </main>
   <footer>Every example here is run by Sheratan's test suite: the wrong one must be caught with its code, the right one must not.</footer>

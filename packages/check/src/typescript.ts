@@ -93,6 +93,13 @@ export interface CallUse {
   readonly at: Position;
 }
 
+/** A `.set()` call on something shaped like a `Signal`. */
+export interface WriteUse {
+  /** The receiver as written: `state.rows`. */
+  readonly target: string;
+  readonly at: Position;
+}
+
 /** A type-checked program, queried in the terms the rules think in. */
 export interface Program extends Disposable {
   /** Every source file of the project: no libraries, no declaration files. */
@@ -123,9 +130,18 @@ export interface Program extends Disposable {
    * to a local function that happens to share a name with an export.
    */
   callsOf(file: string): readonly CallUse[];
+  /**
+   * Every `.set()` call whose receiver is writable in the sense `SurfaceMember`
+   * means — callable, with a callable `set` — decided by its type, so a
+   * signal reached through a variable or a destructuring is still one.
+   */
+  writesOf(file: string): readonly WriteUse[];
 }
 
 const DECLARATION_FILE = '.d.ts';
+
+/** The one method a `Signal` is written through. */
+const SET = 'set';
 
 /** The first character of a file, for something that has no declaration of its own. */
 const FILE_START: Position = { line: 1, column: 1 };
@@ -184,11 +200,14 @@ function isValueReference(node: Identifier): boolean {
   return !(isPropertyAccessExpression(parent) && parent.name === node) && !isTypeQueryNode(parent);
 }
 
-function referencesIn(source: SourceFile): Identifier[] {
-  const found: Identifier[] = [];
+/** Every node in the file that `pick` maps to something, in source order. */
+function collect<T extends Node>(source: SourceFile, pick: (node: Node) => T | undefined): T[] {
+  const found: T[] = [];
 
   const visit = (node: Node): void => {
-    if (isIdentifier(node) && isValueReference(node)) found.push(node);
+    const picked = pick(node);
+
+    if (picked !== undefined) found.push(picked);
 
     node.forEachChild(visit);
   };
@@ -196,6 +215,12 @@ function referencesIn(source: SourceFile): Identifier[] {
   source.forEachChild(visit);
 
   return found;
+}
+
+function referencesIn(source: SourceFile): Identifier[] {
+  return collect(source, (node) =>
+    isIdentifier(node) && isValueReference(node) ? node : undefined,
+  );
 }
 
 /** What a local name was imported as, and from where. */
@@ -232,17 +257,20 @@ function valueImportsIn(source: SourceFile): Map<string, Imported> {
 
 /** Every identifier in callee position, which is the only place a call names. */
 function calleesIn(source: SourceFile): Identifier[] {
-  const found: Identifier[] = [];
+  return collect(source, (node) =>
+    isCallExpression(node) && isIdentifier(node.expression) ? node.expression : undefined,
+  );
+}
 
-  const visit = (node: Node): void => {
-    if (isCallExpression(node) && isIdentifier(node.expression)) found.push(node.expression);
-
-    node.forEachChild(visit);
-  };
-
-  source.forEachChild(visit);
-
-  return found;
+/** The receivers of every `x.set(…)` call, which is the only way a signal is written. */
+function setReceiversIn(source: SourceFile): Node[] {
+  return collect(source, (node) =>
+    isCallExpression(node) &&
+    isPropertyAccessExpression(node.expression) &&
+    node.expression.name.text === SET
+      ? node.expression.expression
+      : undefined,
+  );
 }
 
 /**
@@ -257,7 +285,7 @@ function isAmbientGlobal(symbol: TsSymbol): boolean {
 function isWritable(checker: Checker, type: Type): boolean {
   if (checker.getSignaturesOfType(type, SignatureKind.Call).length === 0) return false;
 
-  const set = checker.getPropertyOfType(type, 'set');
+  const set = checker.getPropertyOfType(type, SET);
 
   // A property always has a type; only a symbol that is not a value can lack one.
   return (
@@ -409,6 +437,26 @@ class TypeScriptProgram implements Program {
 
       return aliased !== undefined && (aliased & SymbolFlags.Alias) !== 0
         ? [{ name: origin.name, from: origin.from, at: positionIn(source, callee) }]
+        : [];
+    });
+  }
+
+  writesOf(file: string): readonly WriteUse[] {
+    const { checker } = this.project;
+    const source = this.sourceFile(file);
+    const receivers = setReceiversIn(source);
+
+    if (receivers.length === 0) return [];
+
+    const types = checker.getTypeAtLocation(receivers);
+
+    return receivers.flatMap((receiver, index) => {
+      const type = types[index];
+      // As written, without the trivia before it: `state.rows`.
+      const target = source.text.slice(skipTrivia(source.text, receiver.pos), receiver.end);
+
+      return type !== undefined && isWritable(checker, type)
+        ? [{ target, at: positionIn(source, receiver) }]
         : [];
     });
   }

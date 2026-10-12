@@ -19,7 +19,6 @@ export const EXPLAIN_VERSION = 1;
  * that enforces it and gains an entry in `checker.ts`.
  */
 export const RESERVED: readonly string[] = [
-  'SHR-L005',
   'SHR-L009',
   'SHR-L011',
   'SHR-V001',
