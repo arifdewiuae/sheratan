@@ -93,8 +93,11 @@ function bindValue(element: Element, part: Part, value: unknown): void {
   });
 }
 
-/** The one event whose payload is the form rather than the element. */
+/** The one event a form's handler also prevents the default of. */
 const SUBMIT_EVENT = 'submit';
+
+/** A handler on this element is handed its fields, whatever the event. */
+const FORM_TAG = 'FORM';
 
 const CHECKBOX_TYPE = 'checkbox';
 
@@ -111,10 +114,21 @@ function readControl(element: Element): unknown {
   return control.type === CHECKBOX_TYPE ? control.checked : control.value;
 }
 
-function submitted(element: Element, event: Event): unknown {
-  event.preventDefault();
+/**
+ * One string per name, or a loud failure: a repeated name or a file would
+ * otherwise be dropped or mangled without a word (SPEC §9 Intents, A2).
+ */
+function fieldsOf(form: HTMLFormElement): Readonly<Record<string, string>> {
+  const entries = [...new FormData(form)];
+  const names = new Set<string>();
 
-  return Object.fromEntries(new FormData(element as HTMLFormElement));
+  for (const [name, value] of entries) {
+    if (typeof value !== 'string' || names.has(name)) fail(ErrorCode.FormFieldNotText, name);
+
+    names.add(name);
+  }
+
+  return Object.fromEntries(entries) as Record<string, string>;
 }
 
 /**
@@ -128,9 +142,11 @@ function submitted(element: Element, event: Event): unknown {
 function payloadOf(event: Event): unknown {
   const element = event.currentTarget as Element;
 
-  if (event.type === SUBMIT_EVENT) return submitted(element, event);
+  if (element.nodeName !== FORM_TAG) return readControl(element);
 
-  return readControl(element);
+  if (event.type === SUBMIT_EVENT) event.preventDefault();
+
+  return fieldsOf(element as HTMLFormElement);
 }
 
 function bindEvent(element: Element, name: string, value: unknown): void {

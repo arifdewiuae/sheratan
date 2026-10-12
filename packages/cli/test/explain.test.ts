@@ -27,6 +27,8 @@ const ALL = explanations();
 const window = new Window();
 
 globalThis.document = window.document as unknown as Document;
+// Node's own FormData cannot read a happy-dom form.
+globalThis.FormData = window.FormData as unknown as typeof FormData;
 
 /** Writes a runtime example to disk with `sheratan` pointed at the runtime's source, and imports its `app.ts`. */
 async function runApp(files: ExampleFiles): Promise<void> {
@@ -40,7 +42,23 @@ async function runApp(files: ExampleFiles): Promise<void> {
 
     document.body.innerHTML = '';
 
-    await import(pathToFileURL(join(root, 'app.ts')).href);
+    // A handler's error goes to the window, as in a browser, not to the code
+    // that dispatched the event; an example that throws in one still throws.
+    let reported: Error | undefined;
+
+    const report = (event: Event): void => {
+      reported ??= (event as ErrorEvent).error as Error;
+    };
+
+    window.addEventListener('error', report as never);
+
+    try {
+      await import(pathToFileURL(join(root, 'app.ts')).href);
+    } finally {
+      window.removeEventListener('error', report as never);
+    }
+
+    if (reported !== undefined) throw reported;
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
