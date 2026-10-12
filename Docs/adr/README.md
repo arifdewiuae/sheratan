@@ -15,4 +15,5 @@ revisit it. Numbered, never renumbered, superseded rather than edited.
 | [0003](0003-windowed-each-recycles-rows.md) | A windowed `each` recycles rows, and the caller supplies the window |
 | [0004](0004-resource-has-no-shared-cache.md) | `resource()` owns its value; `staleAfter` revalidates on a timer |
 | [0005](0005-checker-on-typescript-7.md) | The checker targets TypeScript 7's unstable API rather than a second compiler |
+| [0006](0006-forms-are-state.md) | A form is state: `form()` in `*.state.ts`, submitted through `mutation()` |
 | [0007](0007-signals-die-with-their-owner.md) | A signal belongs to the owner it was created under, so a late write is a no-op |
