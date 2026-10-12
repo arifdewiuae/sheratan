@@ -1,10 +1,14 @@
 // Behaviour that depends on what the host provides (SPEC §9, §10d): the
-// scheduler's frame source, and the DOM's state-preserving move.
+// scheduler's frame source, the DOM's state-preserving move, and the mark
+// `global.css` scopes to (SPEC §9a, ADR 0008).
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { freshHost } from './dom.ts';
-import { each, html, render, signal } from '../src/index.ts';
+import { each, flush, html, render, signal } from '../src/index.ts';
+import { liveSubscriptions } from '../src/internal.ts';
+
+const ROOT_MARK = 'data-sheratan-root';
 
 let host: Element;
 
@@ -73,4 +77,43 @@ test('a row moves with moveBefore where the browser has it, so state survives', 
     [...list.querySelectorAll('li')].map((li) => li.textContent.trim()),
     ['2', '3', '1'],
   );
+});
+
+test('render() marks the element it mounts into, and dispose removes the mark', () => {
+  const dispose = render(() => html`<p>widget</p>`, host);
+
+  assert.equal(host.getAttribute(ROOT_MARK), '', 'global.css styles under this mark');
+
+  dispose();
+
+  assert.equal(host.hasAttribute(ROOT_MARK), false, "the host page's element is as it was");
+});
+
+test('a host already marked keeps its mark after dispose', () => {
+  // index.html writes <body data-sheratan-root>, so the first paint is styled.
+  host.setAttribute(ROOT_MARK, '');
+
+  const dispose = render(() => html`<p>page</p>`, host);
+
+  dispose();
+
+  assert.equal(host.hasAttribute(ROOT_MARK), true);
+});
+
+test('1000 widgets mounted and disposed on one host leave no mark and no subscription', () => {
+  const before = liveSubscriptions();
+  const value = signal('a');
+
+  for (let i = 0; i < 1000; i++) {
+    const dispose = render(() => html`<p>${value}</p>`, host);
+
+    dispose();
+  }
+
+  value.set('b');
+  flush();
+
+  assert.equal(liveSubscriptions(), before);
+  assert.equal(host.hasAttribute(ROOT_MARK), false);
+  assert.equal(host.childNodes.length, 0);
 });

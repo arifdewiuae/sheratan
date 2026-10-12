@@ -25,7 +25,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ · modules compose with `mount()` ✅ · effects testable without a DOM (`scope()`) ✅ 2026-09-29 |
 | 3 | Checker, CLI, template | 🟡 In progress | Checker 10 of 16 codes (L001, L002, L003, L004, L005, L006, L007, L008, L010, T001) · CLI: `create`, `check`, `explain`, `build` and `dev` ship in the tarball and serve deep links, 3 commands to go · **`[gate]` `sheratan create` yields a working app ✅** 2026-09-24 — the template is a workspace member, checked clean, and every rule code is proved exercised by breaking it once per code · `ui/` primitives still `[stretch]` |
 | 4 | Agent surface, reference app | 🟡 In progress | Routing in core ✅ — `location`, `routes()` with nested layouts, `navigate()`, on the Navigation API; 558 B brotli · `examples/hello` is multi-screen and proved in Chromium, with style scoping proved on Chromium, Firefox and WebKit |
-| 5 | Re-measure, package, launch | 🟡 In progress | **Road to 0.1.0 fixed** 2026-10-04 — ten steps, in order, below · **step 1 ✅** 2026-10-10, error index generated into `site/errors/` · **step 2 ✅** 2026-10-12 — ADR 0007, the runtime (a signal dies with its owner, a late write is a no-op) and `SHR-L005`; **step 3 ✅** 2026-10-12 — ADR 0006 (a form is state, `form()` in `*.state.ts`, submitted through `mutation()`) · `<form>` payload for any event · `form()` · hello `/alerts` · `llms.txt` answers forms at 9,927 of 10,000 tokens; **step 4** in progress — ADR 0008 + SPEC: a module's root markers are written in its view and checked (`SHR-V005`), `global.css` scoped to `[data-sheratan-root]` for apps and widgets alike |
+| 5 | Re-measure, package, launch | 🟡 In progress | **Road to 0.1.0 fixed** 2026-10-04 — ten steps, in order, below · **step 1 ✅** 2026-10-10, error index generated into `site/errors/` · **step 2 ✅** 2026-10-12 — ADR 0007, the runtime (a signal dies with its owner, a late write is a no-op) and `SHR-L005`; **step 3 ✅** 2026-10-12 — ADR 0006 (a form is state, `form()` in `*.state.ts`, submitted through `mutation()`) · `<form>` payload for any event · `form()` · hello `/alerts` · `llms.txt` answers forms at 9,927 of 10,000 tokens; **step 4** in progress — ADR 0008 + SPEC: a module's root markers are written in its view and checked (`SHR-V005`), `global.css` scoped to `[data-sheratan-root]` for apps and widgets alike · `render()` marks the element it mounts into, and unmarks it on dispose if it marked it |
 | +8 wks | Outside production use | ⬜ Not started | — |
 
 Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · ⛔ Stopped
@@ -67,8 +67,9 @@ Post-launch with where it came from, not into this path.
 4. **Widget mode** — ADR 0008 + SPEC first ✅ (2026-10-12: the root markers
    are written in the view and checked by `SHR-V005`, not set by the runtime,
    which never learns a module's name; one `global.css`, scoped to
-   `[data-sheratan-root]`, which `render()` sets on its host); then `render()`
-   marks its host; `SHR-L009` over `.css`, with undeclared tokens;
+   `[data-sheratan-root]`, which `render()` sets on its host); `render()`
+   marks its host ✅ (2026-10-12, `packages/core/src/render.ts`, tests in
+   `test/host.test.ts`); then `SHR-L009` over `.css`, with undeclared tokens;
    `SHR-V005`; `llms.txt` (Week 1 Rendering, Week 3 Checker)
 5. **The rest of SPEC §12's checker bar** — `SHR-V001` and `SHR-V004`
    (`SHR-V002`, `SHR-V003` and `SHR-L011` are `[later]`)
