@@ -212,7 +212,10 @@ export function dashboardView(state: DashboardState, intents: DashboardIntents):
   return html` <section class="module-dashboard" data-module="dashboard">
     <header class="head">
       ${lockup()} ${intro()}
-      <nav class="head-nav"><a href="/orders" data-link="orders">Orders</a></nav>
+      <nav class="head-nav">
+        <a href="/orders" data-link="orders">Orders</a>
+        <a href="/alerts" data-link="alerts">Alerts</a>
+      </nav>
     </header>
 
     <section class="demo">

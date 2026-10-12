@@ -17,6 +17,8 @@
 
   .head-nav {
     margin-left: auto;
+    display: flex;
+    gap: calc(var(--space) * 1.5);
   }
 
   .head-nav a {

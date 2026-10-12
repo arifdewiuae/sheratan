@@ -13,6 +13,7 @@
    sheet is named, and `SHR-L009` checks it against the directories on disk, so
    a module added without its sheet fails `sheratan check` instead of rendering
    slightly wrong. */
+@import url('/modules/alerts/alerts.css') layer(modules);
 @import url('/modules/dashboard/dashboard.css') layer(modules);
 @import url('/modules/orders/orders.css') layer(modules);
 
