@@ -223,7 +223,7 @@ Constraints the matrix cannot express:
 | `SHR-L006` | Module file set matches its declared kind: `index.ts` exists and declares `kind` as the literal `'view'` or `'full'`, the kind's files are present, none that the kind excludes are, and a layer suffix is used only under the module's own name (below) |
 | `SHR-L007` | Every `Promise`-returning method in a `*.contract.ts` takes an `AbortSignal` (§5b). "Promise-returning" is structural — a return type with a callable `then` — and the signal counts wherever it sits: a parameter of its own, or a member of an options object |
 | `SHR-L008` | The module import graph must be acyclic, and so must imports among `lib/` files |
-| `SHR-L009` | Module and `ui/` stylesheets are wrapped in one `@scope` with a lower boundary; `global.css` holds only `tokens` and `base` (§9a) |
+| `SHR-L009` | Module and `ui/` stylesheets are wrapped in one `@scope` with a lower boundary and use only declared tokens; `global.css` holds only `tokens` and `base`, scoped to `[data-sheratan-root]` (§9a) |
 | `SHR-L010` | A `*.state.ts` public surface exposes only `Accessor` values and transitions; a `Signal` never leaves the file (below) |
 | `SHR-L011` | Statically visible mutation of a value read from a signal — `items().push(x)`, `order().status = 'shipped'` (§5 Immutability, ADR 0002 layer 3) |
 
@@ -235,6 +235,7 @@ Template rules, checked off the AST of `html` literals (§9, §13):
 | `SHR-V002` | warning | `unsafeHTML()` with a non-literal argument |
 | `SHR-V003` | warning | Reactivity trap: a signal or computed *called* inside a template hole (`${s.total()}`) instead of passed (`${s.total}`) (§9) |
 | `SHR-V004` | error | Malformed template: unclosed tag, unknown attribute or binding |
+| `SHR-V005` | error | The template a module's or `ui/` component's view returns has one root element carrying `class="module-<name>"` and `data-module="<name>"` (`ui-` and `data-ui` for a component), `<name>` being its directory (§9a, ADR 0008) |
 
 | Code | Severity | Rule |
 |------|----------|------|
@@ -1162,9 +1163,12 @@ Rejected, with reasons:
 
 ### The rule
 
-Every module and `ui/` component root carries its name **twice**, set by the
-runtime at mount, never written by hand — as a class, which is what CSS scopes
-to, and as an attribute, which is what everything else selects on:
+Every module and `ui/` component root carries its name **twice** — as a
+class, which is what CSS scopes to, and as an attribute, which is what
+everything else selects on. Both are written in the view, on the root element
+of the template it returns, and `SHR-V005` holds both to the directory's name
+(ADR 0008). The runtime does not set them: `mount()` receives a view function,
+and a module's name is not a value it ever sees:
 
 ```html
 <section class="module-orders" data-module="orders"> … </section>
@@ -1211,8 +1215,10 @@ The attribute stays for everything that is not scoping — the lower boundary
 needs one generic selector for "any module", which per-module class names
 cannot give, and tests and devtools already read it.
 
-`sheratan generate module` and `sheratan create` write both; nobody types them
-from memory.
+`sheratan generate module` and `sheratan create` write both, and `SHR-V005`
+reports a root without them, with the markup to write. A view therefore has
+one root element: two siblings, or a bare text hole, leave nowhere to put the
+name.
 
 ### How a module stylesheet is loaded
 
@@ -1259,16 +1265,32 @@ layers:
 
 @import url('/modules/orders/orders.css') layer(modules);
 
-@layer tokens { :root { --space-3: 12px; --color-hairline: rgb(0 0 0 / .12); } }
-@layer base   { *, *::before, *::after { box-sizing: border-box; } body { margin: 0; } }
+@layer tokens {
+  @scope ([data-sheratan-root]) {
+    :scope { --space-3: 12px; --color-hairline: rgb(0 0 0 / .12); }
+  }
+}
+
+@layer base {
+  @scope ([data-sheratan-root]) {
+    :scope { margin: 0; }
+    :scope, * { box-sizing: border-box; }
+  }
+}
 ```
 
-- **`tokens`**: custom properties on `:root` only, plus their
-  `prefers-color-scheme` overrides. Custom properties inherit, so they are the
-  single channel by which global design reaches scoped styles, and they cross
-  widget-mode boundaries too.
-- **`base`**: reset and element defaults (`body`, `a`, form controls). No class
-  selectors.
+Both layers style the app's root and what is under it, never the page above
+it: `[data-sheratan-root]` is the element `render()` mounted into (§10d), and
+`:root`, `html` and `body` do not appear in `global.css`. A whole-page app
+mounts on `document.body`, so `:scope` *is* the body there, and one stylesheet
+serves an app and a widget alike (ADR 0008).
+
+- **`tokens`**: custom properties on `:scope` only, plus their
+  `prefers-color-scheme` overrides, each layer's rules in one
+  `@scope ([data-sheratan-root])`. Custom properties inherit, so they are the
+  single channel by which global design reaches scoped styles.
+- **`base`**: reset and element defaults (`:scope`, `a`, form controls), in
+  the same `@scope`. No class selectors.
 - **`ui`** and **`modules`**: never written in `global.css`. They are filled
   by the scoped component and module sheets, so a module rule always beats a
   `ui/` rule, and both beat `base`, regardless of load order or specificity.
@@ -1279,9 +1301,16 @@ mirrors "there are no shared effects" in §4.
 
 ### Widget mode
 
-A mounted widget ships its `global.css` tokens scoped to its own root instead of
-`:root` (`@scope ([data-sheratan-root])`), so it never restyles the host page.
-The host's own global CSS can still reach in. If that proves a problem in
+There is no separate stylesheet for a widget: the `global.css` above already
+styles only the element the app is mounted into. `render()` puts
+`data-sheratan-root` on its host unless it is already there, and removes it on
+dispose if it put it there. A whole-page app's `index.html` writes
+`<body data-sheratan-root>` as well, so the first paint is styled before the
+script runs.
+
+The host's own global CSS can still reach in. Two Sheratan widgets from
+different apps on one page share the attribute, so both stylesheets apply to
+both roots and the one loaded last wins; 0.1.0 does not solve that (ADR 0008). If that proves a problem in
 practice, the escape hatch is mounting the widget root in a shadow root. That is
 a mount option, not a second styling model.
 
@@ -1300,6 +1329,8 @@ Checked over `.css` files by the checker:
 | An `@import` in `global.css` naming a sheet that does not exist | the file, and the module it belonged to |
 | `global.css` contains a layer other than `tokens` / `base`, or a class selector in `base` | allowed layers |
 | A module sheet declares a custom property on `:root` | "tokens live in global.css" |
+| A module / `ui/` sheet uses `var(--x)` without a fallback, and neither `global.css`'s tokens nor that sheet declares `--x` | the tokens that do exist |
+| A `tokens` or `base` rule in `global.css` outside `@scope ([data-sheratan-root])`, or `:root`, `html` or `body` anywhere in it | "the app styles only the element it mounts into: use `:scope`" |
 | `!important` anywhere outside `base` | "layers already decide precedence" |
 
 ### Browser support
@@ -1762,7 +1793,10 @@ whole app rewritten.
 
 Constraint it places on the design: no assumption of owning `document`, no
 global listeners beyond the delegated `<a>` handler (which must be opt-in in
-widget mode, since the host app owns routing).
+widget mode, since the host app owns routing), and no style that reaches past
+the element it mounts into. `render()` marks its host `data-sheratan-root`, and
+`global.css` styles only under that mark (§9a), so the same app is a whole page
+when mounted on `body` and a widget when mounted anywhere else.
 
 ## 11. Repository layout
 
@@ -1797,7 +1831,7 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
 - `examples/dashboard` runs from a plain `index.html` on a static file server with no build step and
   holds 60fps under a synthetic 1000 msg/sec feed into a 500-row table.
 - Every cell of the import matrix is enforced (`SHR-L001`), plus L002–L010,
-  `SHR-V001` and `SHR-V004`, each with a failing-case test; `SHR-T001` reports
+  `SHR-V001`, `SHR-V004` and `SHR-V005`, each with a failing-case test; `SHR-T001` reports
   as a warning only. `SHR-V002` and `SHR-V003` (warnings) and `SHR-L011` follow
   after 0.1.0 (TASKS decisions log, 2026-10-04).
 - Error messages state the allowed import set, not a rule number.
