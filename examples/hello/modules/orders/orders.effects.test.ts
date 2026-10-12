@@ -39,17 +39,22 @@ function feedThat(answer: (signal: AbortSignal) => Promise<readonly Metric[]>): 
   };
 }
 
-/** Mounts the effects so they have an owner, and hands back both halves. */
+/**
+ * Mounts state and effects as `index.ts` does, and hands back both halves.
+ * The state is created inside the mount so it dies with it, which is what
+ * makes a late write a no-op (SPEC §5b rule 1).
+ */
 function mounted(feed: FeedApi): { readonly state: OrdersState; readonly stop: Disposer } {
-  const state = createOrdersState();
+  let state: OrdersState | undefined;
 
   const stop = render(() => {
+    state = createOrdersState();
     createOrdersEffects(feed, state).start();
 
     return html`<p>orders</p>`;
   }, host);
 
-  return { state, stop };
+  return { state: state as OrdersState, stop };
 }
 
 test('a snapshot reaches state through one transition', async () => {

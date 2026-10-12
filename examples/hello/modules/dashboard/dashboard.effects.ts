@@ -138,22 +138,22 @@ export function createDashboardEffects(feed: FeedApi, state: DashboardState): Da
         try {
           const metrics = await feed.snapshot(signal);
 
+          // Not to guard the write, which the runtime drops after unmount
+          // (SPEC §5b rule 1): to not open a subscription for a dead mount.
           if (signal.aborted) return;
 
           state.seeded(metrics);
 
           feed.subscribe((ticks) => {
-            // Two reasons to drop a batch, and they are not the same thing:
-            // the mount is gone (a write then reaches discarded state, SPEC
-            // §5b rule 1 — an adapter that ignores its signal must not be able
-            // to corrupt us), or the user paused, which stops applying without
-            // dropping the subscription.
-            if (signal.aborted || !state.live()) return;
+            // Paused stops applying without dropping the subscription. A batch
+            // after unmount needs no check: an adapter that ignores its signal
+            // writes into state the runtime has already discarded (SPEC §5b).
+            if (!state.live()) return;
 
             state.applyBatch(ticks);
           }, signal);
         } catch (error: unknown) {
-          if (!signal.aborted) state.failed(messageOf(error));
+          state.failed(messageOf(error));
         }
       })();
     },

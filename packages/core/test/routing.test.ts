@@ -241,6 +241,29 @@ test('location is the URL as a signal, and a view reads it to mark a link active
   assert.equal(text(), 'home any');
 });
 
+// The URL signal is created the first time anything reads it, which is
+// usually inside a screen. It is app-wide state, so it must not die with that
+// screen (SPEC §5b rule 1, ADR 0007).
+test('the URL outlives the screen that read it first', async () => {
+  const page = pageAt('https://app.test/orders');
+  const first = render(() => html`<p>${location().pathname}</p>`, host);
+
+  first();
+
+  const shown = routes({
+    '/': () => mount(screen('home', [])),
+    '/orders': () => mount(screen('orders', [])),
+  });
+
+  render(() => html`<main>${shown}</main>`, host);
+
+  await page.go({ url: '/' });
+  flush();
+
+  assert.equal(location().pathname, '/');
+  assert.equal(text(), 'home');
+});
+
 test('a navigation to the URL already shown changes nothing downstream', async () => {
   const page = pageAt('https://app.test/orders/1');
   let reads = 0;

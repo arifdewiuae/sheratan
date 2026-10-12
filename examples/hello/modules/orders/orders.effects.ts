@@ -38,9 +38,8 @@ export function createOrdersEffects(feed: FeedApi, state: OrdersState): OrdersEf
     try {
       state.loaded(await feed.snapshot(controller.signal));
     } catch (error: unknown) {
-      // An abort is the module unmounting, not a failure to report.
-      if (controller.signal.aborted) return;
-
+      // An abort is the module unmounting, and the runtime drops this write
+      // then (SPEC §5b rule 1), so it is never reported as a failure.
       state.failed(messageOf(error));
     }
   };

@@ -3,6 +3,7 @@
 // because nothing in the runtime may touch the page while it is being
 // constructed (SPEC §13, the SSR door).
 
+import { setActiveOwner } from './owner.ts';
 import { signal } from './signal.ts';
 import type { Signal } from './types.ts';
 
@@ -43,8 +44,16 @@ export function navigationApi(): Navigation | undefined {
 
 let current: Signal<Location> | undefined;
 
+// Created on first read, which is usually inside a screen. Detached from it,
+// because the URL is app-wide state and must not die with whichever screen
+// happened to ask first (SPEC §5b rule 1).
 function source(): Signal<Location> {
-  current ??= signal(partsOf(globalThis.location.href));
+  if (current !== undefined) return current;
+
+  const previous = setActiveOwner(undefined);
+
+  current = signal(partsOf(globalThis.location.href));
+  setActiveOwner(previous);
 
   return current;
 }

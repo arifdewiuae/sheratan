@@ -42,6 +42,11 @@ export const TraceKind = {
   Compute: 'compute',
   /** The DOM was written. */
   Patch: 'patch',
+  /**
+   * A write to a signal whose owner is disposed, which did nothing (SPEC §5b
+   * rule 1). Not the report's `dropped` count, which is entries the buffer lost.
+   */
+  Dropped: 'dropped',
 } as const;
 
 /** One of {@link TraceKind}. */
@@ -189,6 +194,27 @@ export function traceWrite(from: unknown, to: unknown): void {
     at: now - started,
     cause: current,
     kind: TraceKind.Write,
+    source: callSite(),
+    from: render(from),
+    to: render(to),
+  });
+}
+
+/**
+ * A write refused because its signal's owner is disposed. It joins a chain
+ * that is draining but never opens one, because nothing follows from it.
+ */
+export function traceDropped(from: unknown, to: unknown): void {
+  if (!recording) return;
+
+  const now = Date.now();
+
+  if (!admits(now)) return;
+
+  push({
+    at: now - started,
+    cause: current,
+    kind: TraceKind.Dropped,
     source: callSite(),
     from: render(from),
     to: render(to),
