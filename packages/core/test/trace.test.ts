@@ -5,7 +5,7 @@ import { test, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { freshHost } from './dom.ts';
-import { computed, each, flush, html, render, signal } from '../src/index.ts';
+import { computed, each, flush, html, render, signal, type Signal } from '../src/index.ts';
 
 /** The dev-build debugging surface (SPEC §7). Not a package export. */
 interface Sheratan {
@@ -25,7 +25,7 @@ interface TraceReport {
 interface TraceEntry {
   readonly at: number;
   readonly cause: number;
-  readonly kind: 'write' | 'compute' | 'patch';
+  readonly kind: 'write' | 'compute' | 'patch' | 'dropped';
   readonly source: string;
   readonly from?: string;
   readonly to?: string;
@@ -232,6 +232,33 @@ test('a write the runtime makes itself continues the chain it is part of', () =>
   dev().stop();
 });
 
+test('a write after unmount is recorded as dropped, and nothing follows from it', () => {
+  let count: Signal<number> | undefined;
+
+  const dispose = render(() => {
+    count = signal(0);
+
+    return html`<p>${count}</p>`;
+  }, host);
+
+  flush();
+  dispose();
+  dev().clear();
+  dev().start();
+
+  count?.set(4);
+  flush();
+
+  const { entries } = dev().trace();
+
+  assert.deepEqual(kinds(dev().trace()), ['dropped'], 'no write, no recompute, no patch');
+  assert.equal(entries[0]!.from, '0');
+  assert.equal(entries[0]!.to, '4');
+  assert.match(entries[0]!.source, /trace\.test\.ts/, 'it names the late caller');
+
+  dev().stop();
+});
+
 test('a flood is sampled, so the trace cannot make the problem it is watching worse', () => {
   const count = signal(0);
 
@@ -247,6 +274,31 @@ test('a flood is sampled, so the trace cannot make the problem it is watching wo
   const writes = report.entries.filter((entry) => entry.kind === 'write').length;
 
   assert.ok(writes < 2000, 'not every write was recorded');
+  assert.ok(report.dropped > 0, 'and the ones skipped are counted');
+
+  dev().stop();
+});
+
+test('a flood of late writes is sampled like any other', () => {
+  let feed: Signal<number> | undefined;
+
+  const dispose = render(() => {
+    feed = signal(0);
+
+    return html`<p>${feed}</p>`;
+  }, host);
+
+  dispose();
+  dev().clear();
+  dev().start();
+
+  // A stream whose adapter ignored its abort signal keeps delivering into the
+  // dead state. Tracing each refusal would cost what tracing each write would.
+  for (let index = 1; index <= 2000; index++) feed?.set(index);
+
+  const report = dev().trace();
+
+  assert.ok(report.entries.length < 2000, 'not every refusal was recorded');
   assert.ok(report.dropped > 0, 'and the ones skipped are counted');
 
   dev().stop();

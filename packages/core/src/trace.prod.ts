@@ -10,6 +10,9 @@
 export function traceWrite(_from: unknown, _to: unknown): void {}
 
 /** No-op: a production build records nothing. */
+export function traceDropped(_from: unknown, _to: unknown): void {}
+
+/** No-op: a production build records nothing. */
 export function traceCompute(_node: object): void {}
 
 /** No-op: a production build records nothing. */

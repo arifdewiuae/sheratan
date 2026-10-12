@@ -25,7 +25,7 @@ This file tracks *progress* only. If a task here disagrees with SPEC, SPEC wins 
 | 2 | Async, ownership, trace | 🟡 In progress | Correct and leak-free ✅ · trace readable ✅ · modules compose with `mount()` ✅ · effects testable without a DOM (`scope()`) ✅ 2026-09-29 |
 | 3 | Checker, CLI, template | 🟡 In progress | Checker 9 of 16 codes (L001, L002, L003, L004, L006, L007, L008, L010, T001) · CLI: `create`, `check`, `explain`, `build` and `dev` ship in the tarball and serve deep links, 3 commands to go · **`[gate]` `sheratan create` yields a working app ✅** 2026-09-24 — the template is a workspace member, checked clean, and every rule code is proved exercised by breaking it once per code · `ui/` primitives still `[stretch]` |
 | 4 | Agent surface, reference app | 🟡 In progress | Routing in core ✅ — `location`, `routes()` with nested layouts, `navigate()`, on the Navigation API; 558 B brotli · `examples/hello` is multi-screen and proved in Chromium, with style scoping proved on Chromium, Firefox and WebKit |
-| 5 | Re-measure, package, launch | 🟡 In progress | **Road to 0.1.0 fixed** 2026-10-04 — ten steps, in order, below · **step 1 ✅** 2026-10-10, error index generated into `site/errors/` · **step 2 designed** 2026-10-12 — ADR 0007: a signal dies with its owner; runtime next, then `SHR-L005` |
+| 5 | Re-measure, package, launch | 🟡 In progress | **Road to 0.1.0 fixed** 2026-10-04 — ten steps, in order, below · **step 1 ✅** 2026-10-10, error index generated into `site/errors/` · **step 2** 2026-10-12 — ADR 0007 ✅, runtime ✅ (a signal dies with its owner, a late write is a no-op); `SHR-L005` next |
 | +8 wks | Outside production use | ⬜ Not started | — |
 
 Status values: ⬜ Not started · 🟡 In progress · ✅ Done · ✂️ Cut · ⛔ Stopped
@@ -54,7 +54,7 @@ Post-launch with where it came from, not into this path.
    signal is stamped with the owner it was created under, and a write after
    that owner is disposed does nothing), closing the two spec
    gaps "Recognising a transition at run time" and "Runtime enforcement of
-   post-disposal no-ops"; then the runtime, then `SHR-L005`'s static half on the
+   post-disposal no-ops"; then the runtime ✅ (2026-10-12), then `SHR-L005`'s static half on the
    same mechanism (Week 2 Ownership, Week 3 Checker). Before forms and `generate`,
    because what a transition *is* decides what both of them emit
 3. **Forms in core** — ADR 0006 + SPEC first, no code before review: `form()` /
@@ -209,7 +209,7 @@ All of the below in `packages/core/src/resource.ts`, specified by
 - [x] `[must]` `mount()`: a view renders another module without importing it (SPEC §9a) — `packages/core/src/mount.ts`, two overloads so the props argument exists only where the module declares props. The child gets a scope of its own with tracking off, so its lifetime is the parent's and what it reads while mounting is not the parent's dependency — without that, one write rebuilds the whole child. Props carry accessors, so the child's view runs once. `SHR-R009` when one placement is put in two holes. `commit()` now handles anything that mounts itself, so a module (or a list) can live in a **reactive** hole and be swapped for another, which is how a screen changes. `test/mount.test.ts`; proven to fail four ways
 - [x] `[must]` `onDispose()` — `packages/core/src/owner.ts`; `SHR-R001` when there is no owner
 - [x] `[must]` Disposal order: watchers → subscriptions → nodes — `OwnerNode.dispose()` runs `teardown()` (a watcher drops its sources) before `reset()` (children, then owned subscribers, then cleanups last-registered-first)
-- [ ] `[must]` Post-disposal async is a no-op — **designed** 2026-10-12 in ADR 0007: the owner flag lives on the signal, not the transition. A signal records the owner active at its creation, and `.set()` on a signal of a disposed owner does nothing; dev builds trace it as `dropped`. Still to land: the runtime, a leak-loop test for it, the size budget, and the redundant `signal.aborted` checks out of `examples/hello`
+- [x] `[must]` Post-disposal async is a no-op — ADR 0007, 2026-10-12: the owner flag lives on the signal, not the transition. `SignalNode.owner` in `packages/core/src/signal.ts` is the owner active at creation, and `.set()` on a signal of a disposed owner returns before the equality check; dev builds trace it as `dropped` (`traceDropped` in `trace.ts`, sampled like a write). `test/disposal.test.ts`: unmount, a late promise with no check in the effect, a swapped-out child, `scope()`, an ownerless signal that must survive, and 1000 late writes leaking nothing; `trace.test.ts` for the entry. It found one trap at once: the URL signal is created on first read, usually inside a screen, so `location.ts` now creates it detached — `routing.test.ts` "the URL outlives the screen that read it first". `examples/hello` lost three write-only `signal.aborted` checks, and its orders effects test now creates state inside the mount, as `index.ts` does. +30–50 B brotli per scenario
 - [x] `[must]` Leak test: 1000 mount/unmount cycles → live subscription count returns to 0 — `reactive.test.ts:465` ('leak: 1000 root mount/dispose cycles…') and `html.test.ts:680` ('render: dispose removes its nodes…'); `resource.test.ts:552` and `stream.test.ts:495` each have one, and the windowed list has its own at `window.test.ts:304`
 
 **Streams & windowing**
