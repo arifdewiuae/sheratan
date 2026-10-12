@@ -42,12 +42,13 @@ pnpm typecheck                   # tsc (TypeScript 7) per package
 pnpm build                       # dist/dev (tsc) + dist/prod (esbuild) per package
 pnpm test                        # node:test
 pnpm coverage                    # tests + coverage gate (fails below threshold)
-pnpm verify                      # consumer types, publint, attw, size budget, llms.txt freshness
+pnpm verify                      # consumer types, publint, attw, size budget, llms.txt and error-page freshness
 pnpm security                    # pnpm audit + registry signature verification
 pnpm sheratan create <dir>       # write a new app from packages/cli/template
 pnpm sheratan check <dir>        # the CLI on an app, from source; --json for the machine shape
 pnpm sheratan build <dir>        # strip types into <dir>/dist, with a 404.html deep-link fallback; --out picks another directory
 pnpm sheratan dev <dir>          # serve it with types stripped; --port, --no-reload
+pnpm --filter @sheratan/cli errors   # regenerate site/errors/ after changing explain's table
 ```
 
 Example app: `pnpm --filter example-hello dev` (http://localhost:5173), and
@@ -69,6 +70,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `packages/check/src/` | The checker (`sheratan check`): `typescript` (the one adapter over `typescript/unstable/*`), `layout` (path → layer), `matrix` (SPEC §4's table as data), `rules/` (one file per code), `check` (`checkProject()`). A folder, not a package: it folds into the `sheratan` tarball |
 | `packages/check/test/` | Real TypeScript programs on disk: the whole import matrix as one project, a failing case per rule, both apps in this repo checked clean, and `template.test.ts` — the `create` template broken once per rule code, which is how SPEC §10b's "every rule is exercised" stops being a claim |
 | `packages/cli/src/` | The `sheratan` command (SPEC §10): `run()` returns an exit code and writes through an injected `Terminal`, `report` holds both output formats, `strip`, `build` and `serve` turn a project into plain ESM, written to a directory or served. A folder, not a package: it folds into the same tarball |
+| `packages/cli/scripts/` | `errors.ts` writes the error index into `site/` from `explain`'s table, and with `--check` (in `pnpm verify`) fails when it is stale; `error-page.ts` is the pure rendering it uses, tested in `test/error-page.test.ts`. Not in the tarball |
 | `packages/cli/bin/` | The one file that owns a process: it hands `run()` the real streams and sets `process.exitCode` |
 | `packages/cli/template/` | The app `sheratan create` writes (SPEC §10b). A workspace member, so `pnpm check` typechecks, lints, tests and `sheratan check`s it — a template that is not live code is a template that rots. `build-cli.ts` copies it to `dist/template`, beside the bundle, which is why `scaffold.ts` finds it with one relative URL in both layouts. Its `dev`, `build` and `check` scripts are written by the scaffolder, not carried in the file: a `build` script here would make `pnpm -r build` build the template |
 | `packages/eval/` | The Week 0 falsification gates (EVAL §2.3), and the only package that spends money. Two instruments: **self-repair** — one restricted turn, no shell, `scripts/run.ts` — and the **task eval**, an agent with a shell iterating against a hidden suite (EVAL-TASKS §1.4) — `scripts/task.ts` for one cell, `scripts/matrix.ts` for the grid the gate is decided on, both through the one `src/cell.ts` so a probe prices what the matrix runs. `src/analysis.ts` holds the arithmetic that turns the grid into a verdict, apart from the script that spends the money, and `test/analysis.test.ts` proves it for nothing. An arm is a record in `src/arms/`, never a branch, so a third stack is a directory and a row. `src/frozen.ts` reads the task set out of `Docs/EVAL-TASKS.md` and refuses to run if §2 onward has moved; `src/budget.ts` counts an arm's documentation with the evaluated model's own counter and refuses a run over §1.5's budget; `src/contamination.ts` refuses an arm that has been handed a task's DOM hooks. `src/confine.ts` runs the agent under `sandbox-exec`, denied this repository, other runs' transcripts, `/tmp` and other sandboxes, and proves it on each sandbox before the agent starts; `src/modules.ts` installs each arm's packages outside the repository so a confined agent has a tree to read. The task eval therefore runs on macOS only, on purpose. Deliberately outside `pnpm check` except its own unit tests and `evalkit`'s — the hidden suites are their own CI job, because they need a browser |
@@ -81,7 +83,7 @@ Toolchain: Node from `.nvmrc`; pnpm from `packageManager` in `package.json`.
 | `Docs/` | SPEC, EVAL, EVAL-TASKS, TASKS, brand identity |
 | `Docs/adr/` | Decisions with a real trade-off, written up once instead of re-argued |
 | `llms.txt` | The API as an agent should learn it. Updated with every public API change |
-| `site/` | Static landing page, served at **sheratan.dev** (GitHub Pages, deployed from `main`; `site/CNAME` holds the domain and must not be deleted — Pages rewrites the setting from it on every deploy). Fonts are self-hosted in `site/fonts/`, so the page loads nothing from a third party; editing the one inline `<script>` means recomputing the CSP hash in `<head>` |
+| `site/` | Static landing page and the error index, served at **sheratan.dev** (GitHub Pages, deployed from `main`; `site/CNAME` holds the domain and must not be deleted — Pages rewrites the setting from it on every deploy). Fonts are self-hosted in `site/fonts/`, so the page loads nothing from a third party; editing the one inline `<script>` means recomputing the CSP hash in `<head>`. **`site/errors/` and the marked part of `sitemap.xml` are generated** by `packages/cli/scripts/errors.ts` from `sheratan explain`'s table — never edit them by hand; change the table and run `pnpm --filter @sheratan/cli errors` |
 | `.github/workflows/` | `ci.yml` (every push/PR; registry signatures on a manual run), `pages.yml` (site deploy) |
 
 ## Git and PRs
