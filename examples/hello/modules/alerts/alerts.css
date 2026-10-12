@@ -1,0 +1,101 @@
+/* The alerts module's styles (SPEC §9a), scoped like every module sheet: one
+   @scope block keyed to the root's class, stopping at any nested module.
+   Tokens come from styles/global.css; the layer from its `@import`. */
+
+@scope (.module-alerts) to ([data-module], [data-ui]) {
+  :scope {
+    max-width: 36rem;
+    margin: 0 auto;
+    display: grid;
+    gap: calc(var(--space) * 2);
+  }
+
+  .alerts-nav {
+    display: flex;
+    align-items: baseline;
+    gap: calc(var(--space) * 2);
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: var(--space);
+  }
+
+  .alerts-nav a {
+    color: var(--ink);
+  }
+
+  .alerts-count {
+    margin-left: auto;
+    color: var(--t55);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+  }
+
+  .alerts-title {
+    margin: 0;
+    font-weight: 400;
+    font-size: 1.5rem;
+  }
+
+  .rules {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--hair);
+  }
+
+  .rule {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space);
+    padding: calc(var(--space) * 0.75) 0;
+    border-bottom: 1px solid var(--hair);
+  }
+
+  .rule-levels {
+    color: var(--t66);
+    font-family: var(--mono);
+    font-size: 0.9rem;
+  }
+
+  .rule-form {
+    display: grid;
+    gap: var(--space);
+  }
+
+  .field {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .field-label {
+    color: var(--t66);
+  }
+
+  .field input,
+  .field select {
+    padding: 0.5rem;
+    border: 1px solid var(--construct);
+    background: var(--ground);
+  }
+
+  .field-message {
+    font-size: 0.875rem;
+  }
+
+  button {
+    justify-self: start;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--ground);
+    cursor: pointer;
+  }
+
+  button:disabled {
+    opacity: 0.55;
+    cursor: progress;
+  }
+
+  .note.error {
+    margin: 0;
+  }
+}
