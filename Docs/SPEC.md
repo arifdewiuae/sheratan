@@ -1475,7 +1475,7 @@ checker reports, and only those: the table is keyed by `ErrorCode` and
 `RuleCode`, so a code added without an explanation does not compile. One code
 prints what it is, its severity, whether the checker or the runtime catches
 it, why the rule exists, a **wrong** example beside a **right** one, and its
-`sheratan.dev/errors/<code>` page. An example is a set of files with their
+`sheratan.dev/errors/<code>` page — generated from the same table into `site/errors/`, so the page and the command cannot disagree. An example is a set of files with their
 paths, because half the rules are about paths, and each one is executed rather
 than trusted: a wrong checker example must be reported with its code and a
 wrong runtime example must throw it, while the right one must not —

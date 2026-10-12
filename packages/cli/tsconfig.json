@@ -4,5 +4,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["bin", "src", "test"]
+  "include": ["bin", "scripts", "src", "test"]
 }
