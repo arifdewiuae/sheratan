@@ -23,7 +23,7 @@ overclaim: **the import matrix is enforced statically**, and a write to state
 from outside `*.state.ts` is a **type** error, because the state surface exposes
 no `Signal` to write through (`SHR-L010`, §4). What is not a guarantee:
 `SHR-L005`, which has to find the writes the type system can no longer see, and
-falls back to a dev-time runtime assertion (§13). Never write "all
+is best-effort (§13). Never write "all
 architectural violations are compile errors."
 
 Why this needs a framework rather than an ESLint plugin: React's problem for a
@@ -243,8 +243,8 @@ Template rules, checked off the AST of `html` literals (§9, §13):
 **Code scheme.** The letter is the family: `L` structure and layers, `V` view
 templates, `T` tests; `R` is reserved for structured runtime errors. Numbers
 are stable — never renumbered, never reused; a retired code stays reserved.
-A violation caught at run time by a dev-build assertion reports under the same
-code as its static check (`SHR-L005`, §13). The docs URL is the whole code,
+A violation caught at run time by a dev-build assertion would report under the
+same code as its static check; none does today (ADR 0007). The docs URL is the whole code,
 exactly as the error prints it: `sheratan.dev/errors/SHR-L001`. Nothing has to
 translate between the two, and the runtime already ships it that way
 (`DOCS_BASE_URL + code` in `env.prod.ts`), so the prefix-less form this section
@@ -583,11 +583,17 @@ file, which is the wrong fix for this one (TASKS "Spec gaps").
 ### Three rules that prevent leaks
 
 1. **Post-disposal async is a no-op.** A response arriving after unmount must
-   not throw and must not write to a discarded state. Watchers and template
-   holes of a disposed owner are unlinked, so a late write reaches nothing and
-   renders nothing. Making the write itself a no-op needs a way to recognise a
-   transition, which plain-function transitions (§4) do not give — open, see
-   TASKS "Spec gaps".
+   not throw and must not write to a discarded state. A signal belongs to the
+   owner that was active when it was created — for a module's state, the
+   module, because its state factory runs inside its view function — and a
+   write to a signal whose owner is disposed does nothing: no new value, no
+   propagation, no error. So a late transition is a no-op however many plain
+   functions it passes through, and effects need no `signal.aborted` check
+   before committing. A signal created outside any owner (module evaluation,
+   `app.ts` before `render()`, a `lib/` singleton) is never dropped: app-wide
+   state is not discarded state. Reads still return the last value. Dev builds
+   record each dropped write in the trace as `kind: 'dropped'` (§7), and never
+   warn: a late response is normal operation (ADR 0007).
 2. **Disposal order:** stop watchers → tear down subscriptions → remove nodes.
    Any other order lets a final stream message write into detached DOM.
 3. **Cancellation is not failure.** `AbortError` must not become
@@ -739,8 +745,8 @@ rejects, so an effect can sequence on it without a `try`: the outcome is in
 
 Unmounting aborts every request in flight and releases every queue unrun. No
 rollback, no `onSuccess` and no status change happens afterwards, and `run()`
-on a disposed mutation does nothing — §5b rule 1, enforced for this primitive
-because it owns the transitions it calls.
+on a disposed mutation does nothing. A late write would be dropped anyway
+(§5b rule 1); the mutation also skips the callbacks, which are not all writes.
 
 ### `stream()` — subscriptions in the core
 
@@ -823,7 +829,10 @@ frame happened to be innermost.
 
 An entry is `{ at, cause, kind, source, from?, to? }`, where `cause` is the
 write the step follows from — steps sharing one are one chain — and `source` is
-a write's call site, a derivation's id, or the element a patch wrote.
+a write's call site, a derivation's id, or the element a patch wrote. `kind`
+is `write`, `compute` or `patch`, or `dropped` for a write to a signal whose
+owner is disposed (§5b rule 1): it carries the same call site and values as a
+write, and starts no chain, because nothing propagated.
 `__sheratan.trace()` returns them; `__sheratan.format()` renders the same
 chains as the tree above, for eyes rather than for a program.
 
@@ -1761,15 +1770,16 @@ Read together with the pre-committed cut list in PLAN.md — items below marked
   signal held in a variable, passed to a `lib/` helper, destructured. That is a
   TypeScript limitation, not a checker bug. Statically, a transition is any
   function exported by `*.state.ts` (§4), and L005 flags a `.set()` on state
-  reached from `*.effects.ts`. Backstop: dev builds record write provenance for
-  the causal trace; with plain-function transitions the assertion has to
-  identify the writer by call site rather than by a marker — open, see TASKS
-  "Spec gaps". Both report `SHR-L005`.
+  reached from `*.effects.ts`. There is no runtime half: a dev-build assertion
+  would have had to identify the writer by parsing a stack trace, in dev only,
+  and the two things it was for are covered elsewhere — the direct write by
+  `SHR-L010`, the write from a dead caller by §5b rule 1 (ADR 0007).
 
   Neither rule says **when** a transition may be called: `SHR-L010` guarantees
-  that a write goes through one, not that the one called was the right one, or
-  that its owner is still alive (§5b rule 1). That is the same open gap, and the
-  `transition()` marker is its answer, not this.
+  that a write goes through one, not that the one called was the right one.
+  Whether its owner is still alive is the runtime's question, not the
+  checker's: a signal dies with the owner it was created under, so a
+  transition called after unmount writes nothing (§5b rule 1, ADR 0007).
 
   Evidence for the split, from the Week 0 self-repair eval
   (`Docs/EVAL-RESULTS.md`): the `SHR-L005` violation could not be injected at
