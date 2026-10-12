@@ -152,20 +152,21 @@ test('a layout is a screen holding its own table, and it survives moves inside i
   assert.equal(text(), 'outside');
 });
 
+/** A layout whose own table wants `/app/orders` only while it is mounted. */
+function ordersShell(): Template {
+  const inner = routes({ '/app/orders': () => mount(screen('list', [])) });
+
+  return html`<section>shell ${inner}</section>`;
+}
+
 test('leaving a layout unregisters its table, so its routes stop being ours', async () => {
   const page = pageAt('https://app.test/app');
-
-  const shell = (): Template => {
-    const inner = routes({ '/app/orders': () => mount(screen('list', [])) });
-
-    return html`<section>shell ${inner}</section>`;
-  };
 
   // The outer table claims `/app` exactly, so `/app/orders` is wanted by the
   // inner table alone — which is what makes its removal observable.
   const outer = routes({
     '/': () => mount(screen('home', [])),
-    '/app': () => mount(shell),
+    '/app': () => mount(ordersShell),
   });
 
   render(() => html`<main>${outer}</main>`, host);
