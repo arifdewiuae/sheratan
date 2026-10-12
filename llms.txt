@@ -25,7 +25,7 @@ hole gets the computed.
 ## 2. API
 
 ```ts
-import { signal, computed, watch, batch, resource, mutation, stream, onDispose, flush, html, each, mount, render, location, routes, navigate, scope, Backoff, ResourceStatus, MutationStatus, StreamStatus } from 'sheratan';
+import { signal, computed, watch, batch, form, resource, mutation, stream, onDispose, flush, html, each, mount, render, location, routes, navigate, scope, Backoff, ResourceStatus, MutationStatus, StreamStatus } from 'sheratan';
 ```
 
 <!-- generated from TSDoc by packages/core/scripts/llms.ts -->
@@ -36,6 +36,7 @@ import { signal, computed, watch, batch, resource, mutation, stream, onDispose, 
 | `computed<T>(fn: () => T): Accessor<DeepReadonly<T>>` | A derived value: evaluated on first read, cached until a source changes. Every expression over state is a named computed — that is the one way to derive (SPEC §9 "Holes take signals by reference"). |
 | `watch(fn: () => void): Disposer` | Runs `fn` now, and again whenever something it read changes. Returns the disposer; the owning module disposes it automatically (SPEC §5b). |
 | `batch<T>(fn: () => T): T` | Writes inside `fn` commit once, when the outermost batch ends. |
+| `form<F extends FormFields<F>>(options: FormOptions<F>): Form<F>` | A form's state, created in `*.state.ts` like a signal. Values are strings; `check` returns a message per field, `''` for none. A field's message shows once that field has changed or after `attempted()`; the server's, recorded by `rejected()`, until that field changes (SPEC §6 Forms). |
 | `resource<T, K extends readonly unknown[]>(options: ResourceOptions<T, K>): Resource<T>` | Async state on a reactive key. The request is aborted when the key changes, when `abort()` is called and when the owning module unmounts; an identical key is not refetched, a superseded response is discarded, and errors are values. Legal in `*.effects.ts` only (`SHR-L004`). |
 | `mutation<I, R>(options: MutationOptions<I, R>): Mutation<I>` | A write with its optimistic update, rollback and follow-up specified rather than left to each app. Runs for one `key` are serialized and different keys run at once; `optimistic` and `rollback` are transitions, passed by reference; a failure is a value in `error()`, and a cancelled run is not a failure. Unmounting aborts every request in flight and drops the queue. Legal in `*.effects.ts` only (`SHR-L004`). |
 | `stream<T, M, K extends readonly unknown[]>(options: StreamOptions<T, M, K>): Stream<T>` | Push data on a reactive key. The subscription is torn down when the key changes and when the owning module unmounts; messages are folded as they arrive and the value is committed once per frame, so a flood coalesces instead of queueing. Legal in `*.effects.ts` only (`SHR-L004`). |
