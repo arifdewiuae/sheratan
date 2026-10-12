@@ -1,9 +1,10 @@
-// The public API (SPEC §5, §6, §9, §9b). Twenty-two names: if this list grows,
+// The public API (SPEC §5, §6, §9, §9b). Twenty-four names: if this list grows,
 // check it against axiom A5 first — the whole surface fits on one screen.
 
 export { ErrorCode } from './codes.ts';
 export { computed } from './computed.ts';
 export { each } from './each.ts';
+export { form } from './form.ts';
 export { location, navigate } from './location.ts';
 export { SheratanError } from './errors.ts';
 export { mount } from './mount.ts';
@@ -20,6 +21,7 @@ export { watch } from './watch.ts';
 
 export type { Disposer } from './disposer.ts';
 export type { Each, EachWindow, Key } from './each.ts';
+export type { Form, FormErrors, FormFields, FormOptions } from './form.ts';
 export type { Location, NavigateOptions } from './location.ts';
 export type { RouteParams, RouteTable } from './match.ts';
 export type { ModuleView, Mounted } from './mount.ts';

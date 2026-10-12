@@ -21,6 +21,7 @@ const ORDER = [
   'computed',
   'watch',
   'batch',
+  'form',
   'resource',
   'mutation',
   'stream',

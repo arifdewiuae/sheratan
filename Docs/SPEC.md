@@ -782,7 +782,9 @@ Values are strings, because that is what a control holds; parsing belongs to
 value and returns a message per field, `''` for none, so a rule relating two
 fields is an ordinary comparison; a value derived from several fields is a
 `computed` over `values`. `edited()` replaces the values rather than merging
-them, so an unchecked checkbox — absent from `FormData` — really clears.
+them, so an unchecked checkbox — absent from `FormData` — really clears, and
+keeps only the names `fields` declares: a misspelt `name` in the markup leaves
+the field it meant empty, and that field's `check` message says so.
 
 **Server field errors are the adapter's to translate.** The contract method
 returns a union, `Promise<Created | { readonly errors: … }>`, and the HTTP

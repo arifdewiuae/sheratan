@@ -37,6 +37,7 @@ test('the package exports exactly its documented names', () => {
     'computed',
     'each',
     'flush',
+    'form',
     'html',
     'location',
     'mount',

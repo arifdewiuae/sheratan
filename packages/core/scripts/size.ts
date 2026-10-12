@@ -52,6 +52,7 @@ const SCENARIOS: Record<string, readonly string[]> = {
     'computed',
     'each',
     'flush',
+    'form',
     'html',
     'location',
     'mount',
