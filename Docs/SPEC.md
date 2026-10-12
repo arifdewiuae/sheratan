@@ -406,7 +406,9 @@ app.ts               the only place a contract meets an adapter
 
 Smell test: a `fetch`, URL or header inside `*.effects.ts` is a leaked adapter.
 A business-meaning `if` inside `*.effects.ts` is leaked state logic. An effect
-should read as a sequence of steps, not as logic.
+should read as a sequence of steps, not as logic. It may branch on an accessor
+that state computed — `if (state.ready())` — and may not compute the condition
+itself: the meaning stays in state, effects only consults it (§6 Forms).
 
 ### Wiring: factories, not a container
 
@@ -748,6 +750,71 @@ rollback, no `onSuccess` and no status change happens afterwards, and `run()`
 on a disposed mutation does nothing. A late write would be dropped anyway
 (§5b rule 1); the mutation also skips the callbacks, which are not all writes.
 
+### Forms
+
+A form is state (ADR 0006). `form()` is called in `*.state.ts`, like `signal()`,
+and returns accessors and transitions, so the state surface rules apply to it
+unchanged (`SHR-L010`, `SHR-L005`):
+
+```ts
+// alerts.state.ts
+const rule = form({
+  fields: { metric: '', above: '', below: '' },
+  check: ({ above, below }) => ({
+    above: isNumber(above) ? '' : 'Enter a number',
+    below: Number(below) < Number(above) ? '' : 'Must be under the alarm level',
+  }),
+});
+```
+
+| Member | Kind | Meaning |
+|---|---|---|
+| `values` | accessor | The current field values |
+| `errors` | accessor | Per field, what to show: a `check` message once that field has changed or after `attempted()`, and a server message until that field changes |
+| `valid` | accessor | `check` reports nothing, shown or not |
+| `edited(fields)` | transition | Takes the `<form>`'s payload (§9); a field the form did not report becomes `''` |
+| `attempted()` | transition | Shows every field's `check` message |
+| `rejected(errors)` | transition | Records the server's messages per field |
+| `reset()` | transition | Back to the initial values, nothing shown |
+
+Values are strings, because that is what a control holds; parsing belongs to
+`check` and to the transition that needs a number. `check` receives every
+value and returns a message per field, `''` for none, so a rule relating two
+fields is an ordinary comparison; a value derived from several fields is a
+`computed` over `values`. `edited()` replaces the values rather than merging
+them, so an unchecked checkbox — absent from `FormData` — really clears.
+
+**Server field errors are the adapter's to translate.** The contract method
+returns a union, `Promise<Created | { readonly errors: … }>`, and the HTTP
+adapter maps a 422 onto its second half: core knows nothing about status codes,
+and an expected outcome is not an exception. Submitting is a `mutation()` whose
+`onSuccess` is one transition that decides what the answer means — `rejected()`
+on the form, or `reset()` and recording what was created:
+
+```ts
+// alerts.state.ts
+const sending = signal(false);
+export const ready = computed(() => rule.valid() && !sending());
+
+// alerts.effects.ts
+const save = mutation({
+  send: ({ input, signal }) => api.addRule(input, signal),
+  optimistic: state.sending,     // sets sending
+  rollback: state.notSent,       // clears it; save.error() says why
+  onSuccess: state.answered,     // clears it; rejected(), or reset() and keep the rule
+});
+
+submit: () => {
+  state.rule.attempted();
+  if (state.ready()) void save.run(state.rule.values());
+},
+```
+
+**A double submit is refused by state.** `optimistic` runs synchronously inside
+`run()`, so a second click in the same frame — before the disabled button is
+painted — already reads `ready()` as false. No option on `mutation()` is
+needed, and none exists (ADR 0006).
+
 ### `stream()` — subscriptions in the core
 
 `resource()` models request/response. Push data needs a second primitive:
@@ -1016,8 +1083,14 @@ module, invoked with a typed payload; the raw `Event` is not passed on.
 
 | Event | Payload |
 |---|---|
-| `submit` | form fields as an object (`Object.fromEntries(new FormData(form))`); default prevented |
-| anything else | the element's `value`, or `checked` when its `type` is `checkbox`; `undefined` when it has neither |
+| any event on a `<form>` | its fields as an object of strings (`Object.fromEntries(new FormData(form))`); for `submit`, the default is also prevented |
+| any event on anything else | the element's `value`, or `checked` when its `type` is `checkbox`; `undefined` when it has neither |
+
+A `<form>` reports its fields for **every** event, not only `submit`, so
+`@input=${intent.edited}` on the form keeps a whole draft current with one
+handler (§6 Forms). A form whose fields are not all text — a name that appears
+twice, or a file input — fails with `SHR-R010` instead of silently keeping the
+last value (A2); multi-value fields and uploads come after 0.1.0.
 
 **The payload is read from the element the handler is on, not chosen by the
 event's name.** A component library announces changes under its own name —
