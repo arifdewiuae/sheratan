@@ -1,9 +1,9 @@
 {
-  "everything": 7660,
-  "state only": 5347,
-  "widget": 5391,
-  "widget with lists": 5414,
-  "widget with async": 6169,
-  "widget with live data": 6013,
-  "multi-screen app": 5990
+  "everything": 7723,
+  "state only": 5418,
+  "widget": 5456,
+  "widget with lists": 5480,
+  "widget with async": 6234,
+  "widget with live data": 6079,
+  "multi-screen app": 6065
 }

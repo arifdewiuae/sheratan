@@ -228,6 +228,94 @@ test('events: handler gets a payload, never the raw Event', () => {
   assert.equal(submit.defaultPrevented, true);
 });
 
+test('events: a <form> reports its fields for every event, not only submit', () => {
+  const seen: unknown[] = [];
+
+  const edited = (payload: unknown): void => {
+    seen.push(payload);
+  };
+
+  render(
+    () =>
+      html`<form @input=${edited} @focusout=${edited}>
+        <input name="above" value="80" />
+        <input type="checkbox" name="paged" />
+      </form>`,
+    host,
+  );
+
+  const above = $('input[name=above]') as HTMLInputElement;
+  const typed = new dom.Event('input', { bubbles: true, cancelable: true });
+
+  above.value = '90';
+  above.dispatchEvent(typed as unknown as Event);
+  above.dispatchEvent(new dom.FocusEvent('focusout', { bubbles: true }) as unknown as Event);
+
+  // The whole draft, whichever control moved; an unchecked box is absent,
+  // exactly as FormData has it (SPEC §9 Intents).
+  assert.deepEqual(seen, [{ above: '90' }, { above: '90' }]);
+  assert.equal(typed.defaultPrevented, false, 'only submit is prevented');
+});
+
+/** What a handler threw: the browser reports it on the window, not to the caller. */
+function thrownWhile(act: () => void): unknown {
+  let thrown: unknown;
+
+  const listener = (event: Event): void => {
+    thrown = (event as ErrorEvent).error;
+  };
+
+  dom.addEventListener('error', listener as never);
+
+  try {
+    act();
+  } finally {
+    dom.removeEventListener('error', listener as never);
+  }
+
+  return thrown;
+}
+
+/** A form handler for tests that are about the payload, not the handler. */
+const ignored = (): void => undefined;
+
+const isFormFieldNotText = (error: unknown): boolean =>
+  error instanceof SheratanError && error.code === ErrorCode.FormFieldNotText;
+
+test('events: a form field named twice fails with SHR-R010 rather than keeping one', () => {
+  render(
+    () =>
+      html`<form @input=${ignored}>
+        <input name="tag" value="cpu" />
+        <input name="tag" value="disk" />
+      </form>`,
+    host,
+  );
+
+  const thrown = thrownWhile(() => {
+    $('input').dispatchEvent(new dom.Event('input', { bubbles: true }) as unknown as Event);
+  });
+
+  assert.ok(isFormFieldNotText(thrown), String(thrown));
+  assert.match((thrown as Error).message, /"tag"/);
+});
+
+test('events: a file input fails with SHR-R010, since a form reports text', () => {
+  render(
+    () =>
+      html`<form @submit=${ignored}>
+        <input type="file" name="attachment" />
+      </form>`,
+    host,
+  );
+
+  const thrown = thrownWhile(() => {
+    $('form').dispatchEvent(new dom.Event('submit', { cancelable: true }) as unknown as Event);
+  });
+
+  assert.ok(isFormFieldNotText(thrown), String(thrown));
+});
+
 test('events: a button names itself with its value, without a data attribute', () => {
   const picked: unknown[] = [];
 

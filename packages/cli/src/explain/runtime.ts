@@ -269,4 +269,44 @@ render(() => html\`<main>\${mount(gauge)}\${mount(gauge)}</main>\`, document.bod
 `,
     },
   },
+
+  [ErrorCode.FormFieldNotText]: {
+    ...THROWN,
+    title: 'A `<form>` reported a field that is not one piece of text',
+    why:
+      'A handler on a form receives its fields as one string per name. A repeated name or a file input ' +
+      'cannot be one string, and keeping the last value would lose data without a word.',
+    wrong: {
+      [APP]: `import { html, render } from 'sheratan';
+
+const saved = (): void => undefined;
+
+render(
+  () => html\`<form @submit=\${saved}>
+    <input name="tag" value="cpu" />
+    <input name="tag" value="disk" />
+  </form>\`,
+  document.body,
+);
+
+document.querySelector('form')?.requestSubmit();
+`,
+    },
+    right: {
+      [APP]: `import { html, render } from 'sheratan';
+
+const saved = (): void => undefined;
+
+render(
+  () => html\`<form @submit=\${saved}>
+    <input name="first" value="cpu" />
+    <input name="second" value="disk" />
+  </form>\`,
+  document.body,
+);
+
+document.querySelector('form')?.requestSubmit();
+`,
+    },
+  },
 };

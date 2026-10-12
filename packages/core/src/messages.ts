@@ -15,6 +15,7 @@ export interface MessageArgs {
   [ErrorCode.EachDuplicateKey]: [key: string];
   [ErrorCode.ArrayInHole]: [length: number];
   [ErrorCode.MountedTwice]: [];
+  [ErrorCode.FormFieldNotText]: [name: string];
 }
 
 type Messages = { [C in ErrorCode]: (...args: MessageArgs[C]) => string };
@@ -55,4 +56,8 @@ export const MESSAGES: Messages = {
   [ErrorCode.MountedTwice]: () =>
     'The same mount() was placed in two holes, and a module instance belongs to one. ' +
     'Call mount() once per hole: two calls give the child two lifetimes of its own.',
+
+  [ErrorCode.FormFieldNotText]: (name) =>
+    `The form field "${name}" is not one piece of text: its name appears twice, or it is a file input. ` +
+    'A form reports one string per name; give each control its own name, and send files outside the form.',
 };

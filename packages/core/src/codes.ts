@@ -22,6 +22,8 @@ export const ErrorCode = {
   ArrayInHole: 'SHR-R008',
   /** One `mount()` was put in two holes, and a module instance lives in one. */
   MountedTwice: 'SHR-R009',
+  /** A `<form>` reported a field that is not text: a repeated name, or a file. */
+  FormFieldNotText: 'SHR-R010',
 } as const;
 
 /** One of the runtime error codes. */
