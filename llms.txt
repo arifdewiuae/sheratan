@@ -3,7 +3,6 @@
 > A frontend framework with one legal way to structure an app. Signals and
 > tagged templates, no virtual DOM, no bundler. A checker enforces the module
 > rules and reports every violation as JSON with a code and a fix.
-> This is llms.txt v0: it covers what the runtime ships today.
 
 ## 1. The trap — read this first
 
@@ -70,6 +69,7 @@ array: `items.set([...items(), next])`, `items.set(items().map(d => d.id === id 
 | string, number | text, escaped — never markup |
 | `null`, `undefined`, `false` | nothing (attribute: removed) |
 | `true` in an attribute | empty attribute (`hidden=""`) |
+| `.name=${x}` | the element's property, not its attribute: `.value=${v}` keeps a control in step with state |
 | `html` template | nested markup |
 | a computed returning a template or `null` | conditional markup |
 | `each(…)` | keyed list |
@@ -95,13 +95,15 @@ never an inline arrow (SHR-V001). The handler receives a payload, not the Event:
 
 | Event | Payload |
 |---|---|
-| `submit` | form fields as an object; default is prevented |
+| any event on a `<form>` | its fields as an object of strings; `submit` also prevents the default. A repeated name or a file input throws (SHR-R010) |
 | anything else | the element's `value`, or `checked` for a checkbox; `undefined` if it has neither |
 
 The payload is read from the **element**, not chosen by the event's name, so a
 component library's own event works like a native one: `@sl-change=${intent.filter}`
 on an `<sl-select>` delivers its `value`. A `<button value="ascending">` names
-itself the same way, which is why a `data-` attribute is never the answer.
+itself the same way, which is why a `data-` attribute is never the answer. On a
+`<form>`, one `@input=${intent.edited}` hands every field to `form()`'s
+`edited()` on each keystroke, with no handler per input.
 
 Inside an `each` row a handler also gets a **second argument: the row's
 current item** (innermost row). Every handler runs inside `batch()`.
@@ -213,8 +215,10 @@ void calibrate.run(device);   // resolves when this run settles; never rejects
   serialized so they cannot land in the wrong order; two different records are
   in flight at once. Leave `key` out and every run waits for the one before —
   right for a form. A key is a `string | number`, usually an id.
-- A double-click is not a second write: guard with
-  `if (save.status() === 'running') return;` in the effect.
+- A double-click is not a second write: `optimistic` runs inside `run()`, so
+  a state `computed` over what it set is already false for the second click.
+  The effect branches on that accessor — `if (state.ready())` — never on
+  `status()`.
 - A failure calls `rollback`; so does a cancelled request — the write did not
   happen — but only the failure reaches `error()`.
 - An exception from `onSuccess` lands in `error()` and rolls nothing back: the
@@ -264,10 +268,7 @@ __sheratan.stop();
 `__sheratan.trace()` returns the same chains as JSON —
 `{ depth, dropped, entries: [{ at, cause, kind, source, from, to }] }` — for
 when the answer has to be parsed rather than eyeballed. Steps sharing a `cause`
-are one chain. A write the runtime makes itself (`each` rewriting a row) nests
-under the write that caused it and is attributed to `sheratan`. Past 1000
-writes a second the trace samples and reports how many entries it `dropped`.
-None of this exists in a production build.
+are one chain. None of this exists in a production build.
 
 ## 6. Module rules
 
@@ -394,9 +395,7 @@ render(createDevices(createHttpDevices('/api')), document.querySelector('#app'))
 
 `index.ts` returns a function, so state and effects are created inside
 `render()` and everything they start is disposed with it. The view declares the
-intents it needs; the effects object satisfies them. `DevicesState` is declared
-rather than inferred, so effects and view hold accessors and cannot write a
-signal even by accident.
+intents it needs; the effects object satisfies them.
 
 ## 8. Tests
 
@@ -451,13 +450,10 @@ npx sheratan build [directory] [--out dist]  # the same thing, written to a dire
 passes `sheratan check` with no findings and exercises every rule code — a
 contract-backed service, a `resource()`, a `mutation()` with rollback, a
 `stream()`, a windowed `each`, a `mount()`, a scoped stylesheet and both test
-files. Copy its shape; do not invent one. The argument is a directory, and it
-refuses one that already has files in it.
+files. Copy its shape; do not invent one.
 
 `--no-reload` keeps `dev`'s reload from landing mid-assertion in an e2e run.
 `build` writes ESM any static file server can serve — no bundler, no config.
-It strips with Node's own stripper, so it can only erase: an `enum`, a
-`namespace` or a parameter property is refused by name.
 
 ## 10. Checker output
 
