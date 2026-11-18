@@ -21,8 +21,8 @@
     "security:signatures": "pnpm audit signatures"
   },
   "devDependencies": {
-    "@stylistic/eslint-plugin": "5.10.0",
-    "eslint-plugin-jsdoc": "65.2.1",
+    "@stylistic/eslint-plugin": "6.0.0",
+    "eslint-plugin-jsdoc": "65.4.7",
     "oxfmt": "0.72.0",
     "oxlint": "1.87.0",
     "oxlint-tsgolint": "7.0.2003",
